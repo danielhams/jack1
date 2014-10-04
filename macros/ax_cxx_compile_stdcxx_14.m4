@@ -99,11 +99,9 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_14], [dnl
     ac_success=yes
   fi
 
-  # Note: I have swapped around the test order here so that the standard
-  # is check for before the "gnu" variant
-  m4_if([$1], [ext], [], [dnl
+  m4_if([$1], [noext], [], [dnl
   if test x$ac_success = xno; then
-    for switch in -std=c++14 -std=c++1y; do
+    for switch in -std=gnu++14 -std=gnu++1y; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx14_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++14 features with $switch,
                      $cachevar,
@@ -121,9 +119,9 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_14], [dnl
     done
   fi])
 
-  m4_if([$1], [noext], [], [dnl
+  m4_if([$1], [ext], [], [dnl
   if test x$ac_success = xno; then
-    for switch in -std=gnu++14 -std=gnu++1y; do
+    for switch in -std=c++14 -std=c++1y; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx14_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++14 features with $switch,
                      $cachevar,
