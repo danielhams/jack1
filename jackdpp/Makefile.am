@@ -23,7 +23,7 @@ bin_PROGRAMS = jackdpp $(CAP_PROGS)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
-jackdpp_SOURCES = jackdpp.c
+jackdpp_SOURCES = jackdpp.cpp
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@
 
 noinst_HEADERS = jackpp_md5.h md5.h md5_loc.h \
