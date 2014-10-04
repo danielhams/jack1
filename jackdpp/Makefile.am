@@ -22,6 +22,7 @@ endif
 bin_PROGRAMS = jackdpp $(CAP_PROGS)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
+AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
 jackdpp_SOURCES = jackdpp.cpp
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@

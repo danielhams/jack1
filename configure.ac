@@ -308,7 +308,8 @@ AC_ARG_ENABLE(ancient_libc,
 	JACK_LIBC_HELPER_FLAGS=""
 	)
 	 
-JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"   
+JACK_CORE_CPPFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
+JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
 
 case $build_os in
      # we need weak linkage which appeared in 10.2, but lets ask for 10.4 anyway
@@ -493,6 +494,7 @@ AC_ARG_ENABLE(optimize,
     ]
 )
 
+JACK_CPPFLAGS="$JACK_CORE_CPPFLAGS $JACK_OPT_CFLAGS"
 JACK_CFLAGS="$JACK_CORE_CFLAGS $JACK_OPT_CFLAGS"
 
 dnl
@@ -500,13 +502,16 @@ dnl most makefiles use JACK_CFLAGS, but simd code needs JACK_CORE_CFLAGS
 dnl
 
 AC_SUBST(JACK_CFLAGS)
+AC_SUBST(JACK_CPPFLAGS)
 AC_SUBST(JACK_CORE_CFLAGS)
+AC_SUBST(JACK_CORE_CPPFLAGS)
 
 dnl
 dnl use JACK_CFLAGS for jackd compilation
 dnl 
 
 CFLAGS="$CFLAGS $JACK_CFLAGS"
+CPPFLAGS="$CPPFLAGS $JACK_CFLAGS"
 
 # allow buffer resizing unless --disable-resize specified
 buffer_resizing=yes

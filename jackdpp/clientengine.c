@@ -45,6 +45,13 @@
 
 #include "libjack/local.h"
 
+char * client_state_names[] = {
+		"Not triggered",
+		"Triggered",
+		"Running",
+		"Finished"
+};
+
 static void
 jack_client_disconnect_ports (jack_engine_t *engine,
 			      jack_client_internal_t *client)

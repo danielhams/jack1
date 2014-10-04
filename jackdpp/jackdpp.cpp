@@ -18,6 +18,10 @@
 
 */
 
+// Needed to get PRId32 formatters
+#define __STDC_FORMAT_MACROS
+
+
 #include <config.h>
 
 #include <stdio.h>
@@ -44,6 +48,7 @@
 #include "driver_parse.h"
 #include "messagebuffer.h"
 #include "clientengine.h"
+#include "sanitycheck.h"
 
 #ifdef USE_CAPABILITIES
 
@@ -73,7 +78,7 @@ static jack_nframes_t frame_time_offset = 0;
 static int nozombies = 0;
 static int timeout_count_threshold = 0;
 
-extern int sanitycheck (int, int);
+char * JackAddOnDir = ADDON_DIR;
 
 static jack_driver_desc_t *
 jack_find_driver_descriptor (const char * name);
@@ -318,7 +323,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * sl
 	}
 
 	for (node=slave_names; node; node=jack_slist_next(node)) {
-		char *sl_name = node->data;
+        char *sl_name = (char*)node->data;
 		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor(sl_name);
 		if (sl_desc) {
 			jack_engine_load_slave_driver(engine, sl_desc, NULL);
@@ -403,9 +408,9 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	char* driver_dir;
 
 	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = ADDON_DIR;
+		driver_dir = JackAddOnDir;
 	}
-	filename = malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
+	filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", driver_dir, sofile);
 
 	if (verbose) {
@@ -470,7 +475,7 @@ jack_drivers_load ()
 	char* driver_dir;
 
 	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = ADDON_DIR;
+		driver_dir = JackAddOnDir;
 	}
 
 	/* search through the driver_dir and add get descriptors
@@ -939,12 +944,12 @@ main (int argc, char *argv[])
                 if (strcmp (argv[i], "-X") == 0) {
                         if (argc >= i + 2) {
                                 if (strcmp (argv[i+1], "seq") == 0) {
-                                        slave_drivers = jack_slist_append (slave_drivers,"alsa_midi");
+                                        slave_drivers = jack_slist_append (slave_drivers,(void*)"alsa_midi");
                                 }
                         }
                         break;
                 } else if (strcmp (argv[i], "-Xseq") == 0) {
-                        slave_drivers = jack_slist_append (slave_drivers,"alsa_midi");
+                        slave_drivers = jack_slist_append (slave_drivers,(void*)"alsa_midi");
                         break;
                 }
         }

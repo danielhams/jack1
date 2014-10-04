@@ -20,6 +20,10 @@
  *
  */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static inline int 
 jack_client_is_internal (jack_client_internal_t *client)
 {
@@ -27,16 +31,11 @@ jack_client_is_internal (jack_client_internal_t *client)
 		(client->control->type == ClientDriver);
 }
 
+extern char * client_state_names[];
+
 static inline char *
 jack_client_state_name (jack_client_internal_t *client)
 {
-	static char *client_state_names[] = {
-		"Not triggered",
-		"Triggered",
-		"Running",
-		"Finished"
-	};
-
 	return client_state_names[client->control->state];
 }
 
@@ -65,3 +64,8 @@ void    jack_client_registration_notify (jack_engine_t *engine,
 void jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
 
 void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
+
+#ifdef __cplusplus
+/* Close of extern "C" { */
+}
+#endif

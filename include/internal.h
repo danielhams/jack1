@@ -26,6 +26,10 @@
 #ifndef __jack_internal_h__
 #define __jack_internal_h__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
@@ -248,7 +252,7 @@ typedef enum {
 } jack_client_state_t;
 
 /* JACK client shared memory data structure. */
-typedef volatile struct {
+typedef volatile struct _jack_client_control {
 
     jack_uuid_t         uuid;            /* w: engine r: engine and client */
     volatile jack_client_state_t state;   /* w: engine and client r: engine */
@@ -560,6 +564,11 @@ extern int jack_client_handle_latency_callback (jack_client_t *client, jack_even
 #define VALGRIND_MEMSET(ptr,val,size) memset ((ptr),(val),(size))
 #else
 #define VALGRIND_MEMSET(ptr,val,size) 
+#endif
+
+#ifdef __cplusplus
+/* Close of extern "C" { */
+}
 #endif
 
 #endif /* __jack_internal_h__ */

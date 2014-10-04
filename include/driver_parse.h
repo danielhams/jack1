@@ -77,7 +77,8 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 	struct option * long_options;
 	char * options, * options_ptr;
 	unsigned long i;
-	int opt, param_index;
+    int opt;
+	uint32_t param_index;
 	JSList * params = NULL;
 	jack_driver_param_t * driver_param;
 
@@ -108,8 +109,8 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 
 
 	/* set up the stuff for getopt */
-	options = calloc (desc->nparams*3 + 1, sizeof (char));
-	long_options = calloc (desc->nparams + 1, sizeof (struct option));
+	options = (char*)calloc (desc->nparams*3 + 1, sizeof (char));
+	long_options = (struct option*)calloc (desc->nparams + 1, sizeof (struct option));
 
 	options_ptr = options;
 	for (i = 0; i < desc->nparams; i++) {
@@ -145,7 +146,7 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 			}
 		}
 
-		driver_param = calloc (1, sizeof (jack_driver_param_t));
+		driver_param = (jack_driver_param_t*)calloc (1, sizeof (jack_driver_param_t));
 
 		driver_param->character = desc->params[param_index].character;
 
