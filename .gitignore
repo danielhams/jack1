@@ -50,6 +50,9 @@ jack/version.h
 jackd/jack_md5.h
 jackd/jackd
 jackd/jackd.1
+jackdpp/jackpp_md5.h
+jackdpp/jackdpp
+jackdpp/jackdpp.1
 tags
 tools/alsa_in
 tools/alsa_out
