@@ -1,6 +1,7 @@
 # Quick hack to the script mentioned below to check for C++14
 # It checks to see is make_unique is defined in the standard library
 # which was mistakenly missing in C++11
+# Patched by Daniel Hams <daniel.hams@gmail.com>
 #
 # ORIGINAL SCRIPT BELOW
 #
@@ -43,6 +44,15 @@
 #serial 0
 
 m4_define([_AX_CXX_COMPILE_STDCXX_14_testbody], [[
+  #include <memory>
+  struct to_be_unique
+  {
+    int universal_banana;
+  };
+  void create_banana()
+  {
+    std::unique_ptr<to_be_unique> banana = std::make_unique<to_be_unique>();
+  }
   template <typename T>
     struct check
     {
@@ -89,9 +99,11 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_14], [dnl
     ac_success=yes
   fi
 
-  m4_if([$1], [noext], [], [dnl
+  # Note: I have swapped around the test order here so that the standard
+  # is check for before the "gnu" variant
+  m4_if([$1], [ext], [], [dnl
   if test x$ac_success = xno; then
-    for switch in -std=gnu++14 -std=gnu++0y; do
+    for switch in -std=c++14 -std=c++1y; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx14_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++14 features with $switch,
                      $cachevar,
@@ -109,9 +121,9 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_14], [dnl
     done
   fi])
 
-  m4_if([$1], [ext], [], [dnl
+  m4_if([$1], [noext], [], [dnl
   if test x$ac_success = xno; then
-    for switch in -std=c++14 -std=c++0y; do
+    for switch in -std=gnu++14 -std=gnu++1y; do
       cachevar=AS_TR_SH([ax_cv_cxx_compile_cxx14_$switch])
       AC_CACHE_CHECK(whether $CXX supports C++14 features with $switch,
                      $cachevar,
@@ -128,6 +140,7 @@ AC_DEFUN([AX_CXX_COMPILE_STDCXX_14], [dnl
       fi
     done
   fi])
+
   AC_LANG_POP([C++])
   if test x$ax_cxx_compile_cxx14_required = xtrue; then
     if test x$ac_success = xno; then

@@ -4,8 +4,15 @@
 
 #include <iostream>
 #include <cinttypes>
+#include <vector>
 
 constexpr uint32_t someInt = 23;
+
+std::vector<uint32_t> someInts = {
+    0,
+    1,
+    9
+};
 
 void someFunction()
 {
