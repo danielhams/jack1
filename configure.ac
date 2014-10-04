@@ -967,6 +967,7 @@ jack.pc
 jack.spec
 jackd/Makefile
 jackd/jackd.1
+jackdpp/Makefile
 include/version.h
 include/Makefile
 libjack/Makefile
