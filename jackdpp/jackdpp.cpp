@@ -50,6 +50,8 @@
 #include "clientengine.h"
 #include "sanitycheck.h"
 
+#include "TestFile.hpp"
+
 #ifdef USE_CAPABILITIES
 
 #include <sys/stat.h>
@@ -752,6 +754,7 @@ main (int argc, char *argv[])
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
     printf("Jackd CPP Test Server *** NOT TO BE USED ***\n");
+    someFunction();
 
 	maybe_use_capabilities ();
 

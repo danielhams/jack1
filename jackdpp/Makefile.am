@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINERCLEANFILES = Makefile.in jackdpp.1 jackpp_md5.h
 
 if USE_CAPABILITIES
@@ -24,7 +26,10 @@ bin_PROGRAMS = jackdpp $(CAP_PROGS)
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
-jackdpp_SOURCES = jackdpp.cpp
+jackdpp_SOURCES = jackdpp.cpp \
+	TestFile.cpp \
+	$(NULL)
+
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@
 
 noinst_HEADERS = jackpp_md5.h md5.h md5_loc.h \
