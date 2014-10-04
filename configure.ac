@@ -122,6 +122,8 @@ dnl
 
 ORIGINAL_CFLAGS="$CFLAGS"
 
+dnl Macros dir containing boost detection
+AC_CONFIG_MACRO_DIR([macros])
 dnl AM_CONFIG_HEADER(config.h)
 AC_CONFIG_HEADERS([config.h])
 AC_ENABLE_STATIC(no)

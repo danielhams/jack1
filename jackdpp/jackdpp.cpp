@@ -751,6 +751,8 @@ main (int argc, char *argv[])
 #endif
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
+    printf("Jackd CPP Test Server *** NOT TO BE USED ***\n");
+
 	maybe_use_capabilities ();
 
 	opterr = 0;
