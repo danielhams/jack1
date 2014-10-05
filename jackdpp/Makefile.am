@@ -24,13 +24,13 @@ endif
 bin_PROGRAMS = jackdpp $(CAP_PROGS)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
-AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $(BOOST_SYSTEM_CPPFLAGS) $(BOOST_THREAD_CPPFLAGS)
+AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $(BOOST_PROGRAM_OPTIONS_CPPFLAGS)
 
 jackdpp_SOURCES = jackdpp.cpp \
 	TestFile.cpp \
 	$(NULL)
 
-jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_SYSTEM_LIBS) $(BOOST_THREAD_LIBS)
+jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
 noinst_HEADERS = jackpp_md5.h md5.h md5_loc.h \
 		 clientengine.h transengine.h

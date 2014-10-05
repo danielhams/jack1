@@ -42,6 +42,15 @@
 #include <vector>
 #include <iostream>
 
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
+#include <boost/program_options.hpp>
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
+#pragma GCC diagnostic pop
+#endif
+
 #include <jack/midiport.h>
 #include <jack/intclient.h>
 #include <jack/uuid.h>
@@ -73,6 +82,8 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
+
+namespace po = boost::program_options;
 
 static JSList *drivers = NULL;
 static sigset_t signals;
@@ -106,108 +117,6 @@ do_nothing_handler (int sig)
 	snprintf (buf, sizeof(buf),
 		  "received signal %d during shutdown (ignored)\n", sig);
 	write (1, buf, strlen (buf));
-}
-
-static void
-debug_print_request( jack_request_t & request )
-{
-    cout << "'" <<
-        request.type << "' '" <<
-        request.x.intclient.name << "' '" <<
-        request.x.intclient.path << "' '" <<
-        request.x.intclient.init << "'" << endl;
-}
-
-static void
-jack_load_internal_clients_pp_debug (const vector<string> load_list)
-{
-    for( const string & str : load_list ) {
-        jack_request_t req;
-        string client_name, path, args, rest;
-
-        /* possible argument forms:
-
-           client-name:client-type/args
-           client-type/args
-           client-name:client-type
-           client-type
-
-           client-name is the desired JACK client name.
-           client-type is basically the name of the DLL/DSO without any suffix.
-           args is a string whose contents will be passed to the client as
-           it is instantiated
-        */
-        cout << "Examining '" << str << '\'' << endl;
-
-        string::size_type colon_pos = str.find(':');
-        string::size_type slash_pos = str.find('/');
-        cout << "Found cp(" << colon_pos << ") sp(" << slash_pos << ")" << endl;
-
-        if ((slash_pos == string::npos && colon_pos == string::npos) ||
-            ((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos))) {
-            /* client-type */
-            client_name = str;
-            path = client_name;
-        }
-        else if (slash_pos != string::npos && colon_pos != string::npos) {
-            /* client-name:client-type/args */
-            client_name = str.substr(0,colon_pos);
-
-            string::size_type len = slash_pos - (colon_pos + 1);
-            if (len > 0) {
-                path = str.substr(colon_pos+1,len);
-            } else {
-                path = client_name;
-            }
-
-            string::size_type rest_len = len - (slash_pos + 1);
-            if (rest_len > 0 )
-            {
-                rest = str.substr(slash_pos+1,rest_len);
-                args = rest;
-            }
-        } else if (slash_pos != string::npos && colon_pos == string::npos) {
-            /* client-type/args */
-//            string::size_type path_len = ;
-            path = str.substr(0, slash_pos);
-            string::size_type rest_len = str.size() - (slash_pos+1);
-            if (rest_len > 0) {
-                rest = str.substr(slash_pos+1,rest_len);
-                args = rest;
-            }
-        } else {
-            /* client-name:client-type */
-
-            client_name = str.substr(0,colon_pos);
-            string::size_type rest_len = str.size() - (colon_pos+1);
-            if( rest_len > 0 ) {
-                path = str.substr((colon_pos+1),rest_len);
-            }
-        }
-
-        // Check client name / path format
-        if (client_name.size() == 0 || path.size() == 0 ) {
-            const char * cstr = str.c_str();
-            fprintf (stderr, "incorrect format for internal client specification (%s)\n", cstr);
-            continue;
-        }
-
-        memset (&req, 0, sizeof (req));
-        req.type = IntClientLoad;
-        const char * client_name_cstr = client_name.c_str();
-        strncpy (req.x.intclient.name, client_name_cstr, sizeof (req.x.intclient.name));
-        const char * path_cstr = path.c_str();
-        strncpy (req.x.intclient.path, path_cstr, sizeof (req.x.intclient.path));
-
-        if (args.size() > 0) {
-            const char * args_cstr = args.c_str();
-            strncpy (req.x.intclient.init, args_cstr, sizeof (req.x.intclient.init));
-        } else {
-            req.x.intclient.init[0] = '\0';
-        }
-
-        debug_print_request( req );
-    }
 }
 
 static void
@@ -432,152 +341,6 @@ jack_load_internal_clients (JSList* load_list)
                 pthread_mutex_lock (&engine->request_lock);
                 jack_intclient_load_request (engine, &req);
                 pthread_mutex_unlock (&engine->request_lock);
-   
-                if (free_name) {
-                        free (client_name);
-                }
-                if (free_path) {
-                        free (path);
-                }
-                if (args) {
-                        free (args);
-                }
-        }
-}
-
-static void
-jack_load_internal_clients_debug (JSList* load_list)
-{ 
-    JSList * node;
-
-        for (node = load_list; node; node = jack_slist_next (node)) {
-
-                char* str = (char*) node->data;
-                jack_request_t req;
-                char* colon = strchr (str, ':');
-                char* slash = strchr (str, '/');
-                char* client_name = NULL;
-                char* path = NULL;
-                char* args = NULL;
-                char* rest = NULL;
-                int free_path = 0;
-                int free_name = 0;
-                size_t len;
-
-                printf("Examining '%s'\n", str );
-                printf("Found cp(%p) sp(%p)\n", colon, slash );
-
-                /* possible argument forms:
-
-                   client-name:client-type/args
-                   client-type/args
-                   client-name:client-type
-                   client-type
-
-                   client-name is the desired JACK client name.
-                   client-type is basically the name of the DLL/DSO without any suffix.
-                   args is a string whose contents will be passed to the client as
-                   it is instantiated
-                */
-
-                if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
-
-                        /* client-type */
-
-                        client_name = str;
-                        path = client_name;
-
-                } else if (slash && colon) {
-
-                        /* client-name:client-type/args */
-
-                        len = colon - str;
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                client_name = (char*) malloc (len + 1);
-                                free_name = 1;
-                                memcpy (client_name, str, len);
-                                client_name[len] = '\0';
-                        }
-
-                        len = slash - (colon+1);
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                path = (char*) malloc (len + 1);
-                                free_path = 1;
-                                memcpy (path, colon + 1, len);
-                                path[len] = '\0';
-                        } else {
-                                path = client_name;
-                        }
-                        
-                        rest = slash + 1;
-                        len = strlen (rest);
-                                
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                args = (char*) malloc (len + 1);
-                                memcpy (args, rest, len);
-                                args[len] = '\0';
-                        }
-                        
-                } else if (slash && colon == NULL) {
-
-                        /* client-type/args */
-
-                        len = slash - str;
-
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                path = (char *) malloc (len + 1);
-                                free_path = 1;
-                                memcpy (path, str, len);
-                                path[len] = '\0';
-                        }
-
-                        rest = slash + 1;
-                        len = strlen (rest);
-                                
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                args = (char*) malloc (len + 1);
-                                memcpy (args, rest, len);
-                                args[len] = '\0';
-                        }
-                } else {
-                        
-                        /* client-name:client-type */
-
-                        len = colon - str;
-
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                client_name = (char *) malloc (len + 1);
-                                free_name = 1;
-                                memcpy (client_name, str, len);
-                                client_name[len] = '\0';
-                                path = colon + 1;
-                        }
-                }
-
-                if (client_name == NULL || path == NULL) {
-                        fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
-                        continue;
-                }
-
-                memset (&req, 0, sizeof (req));
-                req.type = IntClientLoad;
-                req.x.intclient.options = 0;
-                strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
-                strncpy (req.x.intclient.path, path, sizeof (req.x.intclient.path));
-
-                if (args) {
-                        strncpy (req.x.intclient.init, args, sizeof (req.x.intclient.init));
-                } else {
-                        req.x.intclient.init[0] = '\0';
-                }
-
-                debug_print_request( req );
    
                 if (free_name) {
                         free (client_name);
@@ -1034,22 +797,6 @@ maybe_use_capabilities ()
 #endif /* USE_CAPABILITIES */
 }
 
-vector<string> test_internal_client_strings = {
-    "someclienttype",
-    "someclienttype/args",
-    "someclientname:someclienttype",
-    "someclientname:someclienttype/args",
-    ""
-};
-
-const char * test_internal_client_cstrings[] {
-    "someclienttype",
-    "someclienttype/args",
-    "someclientname:someclienttype",
-    "someclientname:someclienttype/args",
-    ""
-};
-
 int	       
 main (int argc, char *argv[])
 
@@ -1058,20 +805,6 @@ main (int argc, char *argv[])
 	int replace_registry = 0;
 	int do_sanity_checks = 1;
 	int show_version = 0;
-
-    JSList * orig_list = NULL;
-    for( const char * sr : test_internal_client_cstrings )
-    {
-        orig_list = jack_slist_append( orig_list, (void*)sr );
-    }
-
-    // Do a couple of calls to check they both match
-    printf("Here come the slist ones:\n");
-    jack_load_internal_clients_debug( orig_list );
-    printf("Here come the cpp vector ones:\n");
-    jack_load_internal_clients_pp_debug( test_internal_client_strings );
-
-    free(orig_list);
 
 #ifdef HAVE_ZITA_BRIDGE_DEPS
 	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
@@ -1111,6 +844,76 @@ main (int argc, char *argv[])
 		{ "timeout-thres", 2, 0, 'C' },
 		{ 0, 0, 0, 0 }
 	};
+    po::options_description all_options("Allowed Options");
+
+    po::options_description visible_options("Options");
+    visible_options.add_options()
+        ( "driver,d", po::value<string>()->required(),
+#ifdef __APPLE__
+          "Backend (coreaudio, dummy, net, or portaudio)"
+#else
+          "Backend (alsa, dummy, freebob, firewire, net, oss, sun, or portaudio)"
+#endif
+        )
+        ( "no-realtime,r", "Don't run realtime" )
+        ( "realtime,R", "Run realtime" )
+        ( "name,n", po::value<string>(), "Server name" )
+        ( "internal-client,I", po::value<vector<string>>(), "Specify an internal client" )
+        ( "no-mlock,m", "No memory lock" )
+        ( "unlock,u", "Unlock memory" )
+        ( "timeout,t", po::value<uint32_t>(), "Client timeout in msecs" )
+        ( "port-max,p", po::value<uint32_t>(), "Port maximum" )
+        ( "no-sanity-checks,N", "Skip sanity checks on launch" )
+        ( "verbose,v", "Verbose messages" )
+        ( "clock-source,c", po::value<string>(), "Clock source [ h(pet) | s(system) ]" )
+        ( "replace-registry", "Replace registry" )
+        ( "realtime-priority,P", po::value<uint32_t>(), "The priority when realtime" )
+        ( "silent,s", "Silent" )
+        ( "version,V", "Show version" )
+        ( "nozombies,Z", "No zombies" )
+    ;
+
+    po::options_description hidden_options("Hidden");
+    hidden_options.add_options()
+#ifdef HAVE_ZITA_BRIDGE_DEPS
+        ("alsa-add,A", "Add alsa zita bridge")
+#endif
+        ( "help,h", "Show this help message" )
+        ( "tmpdir-location,l", po::value<string>(), "Temporary directory" )
+        ( "midi-bufsize,M", po::value<uint32_t>(), "Midi buffer size" )
+        ( "sync,S", "Sync" )
+        ( "temporary,T", "Temporary" )
+        ( "slave-driver,X", po::value<string>(), "Slave driver to use" )
+        ( "timeout-thres,C", po::value<uint32_t>(), "Timeout threshold" )
+    ;
+
+    all_options.add(visible_options);
+
+    po::variables_map vm;
+    po::store( po::parse_command_line( argc, argv, all_options), vm );
+
+    bool show_help { false };
+    string options_error_msg;
+    if( vm.size() == 0 || vm.count("help") > 0 ) {
+        show_help = true;
+    }
+    try {
+        po::notify(vm);
+    }
+    catch( po::error & ro ) {
+        options_error_msg = ro.what();
+        show_help = true;
+    }
+
+    if( show_help ) {
+//        usage(stdout);
+        cout << visible_options << endl;
+        if( options_error_msg.length() > 0 ) {
+            cout << "Error: " << options_error_msg << endl;
+        }
+        exit(1);
+    }
+
 	int opt = 0;
 	int option_index = 0;
 	int seen_driver = 0;
@@ -1217,7 +1020,7 @@ main (int argc, char *argv[])
 
                 case 'I':
 			load_list = jack_slist_append(load_list, optarg);
-                        break;
+            break;
 
 		case 'm':
 			do_mlock = 0;

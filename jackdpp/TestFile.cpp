@@ -1,10 +1,11 @@
 #include "TestFile.hpp"
 
-#include <boost/thread.hpp>
-
 #include <iostream>
 #include <cinttypes>
 #include <vector>
+
+using std::cout;
+using std::endl;
 
 constexpr uint32_t someInt = 23;
 
