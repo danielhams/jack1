@@ -844,11 +844,21 @@ main (int argc, char *argv[])
 		{ "timeout-thres", 2, 0, 'C' },
 		{ 0, 0, 0, 0 }
 	};
-    po::options_description all_options("Allowed Options");
 
-    po::options_description visible_options("Options");
-    visible_options.add_options()
-        ( "driver,d", po::value<string>()->required(),
+    bool seen_driver_pp { false };
+    vector<string> driver_names_pp;
+    string driver_args_pp;
+    string server_name_pp;
+    vector<string> driver_params_pp;
+    vector<string> slave_drivers_pp;
+    vector<string> load_list_pp;
+    size_t midi_buffer_size_pp;
+
+    po::options_description all_options_pp("Allowed Options");
+
+    po::options_description visible_options_pp("Options");
+    visible_options_pp.add_options()
+        ( "driver,d", po::value<vector<string>>(&driver_names_pp)->required(),
 #ifdef __APPLE__
           "Backend (coreaudio, dummy, net, or portaudio)"
 #else
@@ -857,8 +867,8 @@ main (int argc, char *argv[])
         )
         ( "no-realtime,r", "Don't run realtime" )
         ( "realtime,R", "Run realtime" )
-        ( "name,n", po::value<string>(), "Server name" )
-        ( "internal-client,I", po::value<vector<string>>(), "Specify an internal client" )
+        ( "name,n", po::value<string>(&server_name_pp), "Server name" )
+        ( "internal-client,I", po::value<vector<string>>(&load_list_pp), "Specify an internal client" )
         ( "no-mlock,m", "No memory lock" )
         ( "unlock,u", "Unlock memory" )
         ( "timeout,t", po::value<uint32_t>(), "Client timeout in msecs" )
@@ -873,8 +883,8 @@ main (int argc, char *argv[])
         ( "nozombies,Z", "No zombies" )
     ;
 
-    po::options_description hidden_options("Hidden");
-    hidden_options.add_options()
+    po::options_description hidden_options_pp("Hidden");
+    hidden_options_pp.add_options()
 #ifdef HAVE_ZITA_BRIDGE_DEPS
         ("alsa-add,A", "Add alsa zita bridge")
 #endif
@@ -887,10 +897,21 @@ main (int argc, char *argv[])
         ( "timeout-thres,C", po::value<uint32_t>(), "Timeout threshold" )
     ;
 
-    all_options.add(visible_options);
+    po::options_description driver_options_pp("Driver");
+    driver_options_pp.add_options()
+//        ( ",r", "Sample rate")
+//        ( ",p", "Period length")
+//        ( ",n", "Number of periods")
+        ( ",i", "Number of input channels")
+        ( ",o", "Number of output channels")
+    ;
+
+    all_options_pp.add(visible_options_pp);
+    all_options_pp.add(hidden_options_pp);
+    all_options_pp.add(driver_options_pp);
 
     po::variables_map vm;
-    po::store( po::parse_command_line( argc, argv, all_options), vm );
+    po::store( po::parse_command_line( argc, argv, all_options_pp), vm );
 
     bool show_help { false };
     string options_error_msg;
@@ -903,15 +924,6 @@ main (int argc, char *argv[])
     catch( po::error & ro ) {
         options_error_msg = ro.what();
         show_help = true;
-    }
-
-    if( show_help ) {
-//        usage(stdout);
-        cout << visible_options << endl;
-        if( options_error_msg.length() > 0 ) {
-            cout << "Error: " << options_error_msg << endl;
-        }
-        exit(1);
     }
 
 	int opt = 0;
@@ -938,6 +950,36 @@ main (int argc, char *argv[])
     someFunction();
 
 	maybe_use_capabilities ();
+
+    // CPlusPlus option processing
+
+    for( auto & option_variable_entry : vm ) {
+        cout << "Found an option variable: " << option_variable_entry.first << endl;
+        auto & value = option_variable_entry.second.value();
+        if( auto v = boost::any_cast<uint32_t>(&value)) {
+            cout << "It's a uint32_t - " << *v << endl;
+        }
+        else if( auto v = boost::any_cast<string>(&value)) {
+            cout << "It's a string - " << *v << endl;
+        }
+        else if( auto v = boost::any_cast<vector<string>>(&value)) {
+            cout << "It's a vector<string>" << endl;
+            vector<string> & vec = *v;
+            for( string & vs : vec )
+            {
+                cout << "One string value: " << vs << endl;
+            }
+        }
+    }
+
+    if( show_help ) {
+//        usage(stdout);
+        cout << visible_options_pp << endl;
+        if( options_error_msg.length() > 0 ) {
+            cout << "Error: " << options_error_msg << endl;
+        }
+        exit(1);
+    }
 
 	opterr = 0;
 	while (!seen_driver &&
