@@ -91,7 +91,9 @@ ostream & operator<<( ostream & os, jack_options & jo )
 jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     all_options_(),
     visible_options_("Standard Options"),
-    hidden_options_("Additional Options")
+    hidden_options_("Additional Options"),
+    driver_argc_(0),
+    driver_argv_()
 {
     cout << "Options parser called!" << endl;
 
@@ -167,39 +169,48 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
     cout << "Have " << fake_argc << " non-driver arguments" << endl;
     vector<char*> fake_argv( fake_argc );
+    
     for( uint32_t i = 0 ; i < fake_argc ; ++i ) {
         fake_argv[i] = argv[i];
         cout << "Setup fake argv " << i << " to be " << fake_argv[i] << endl;
     }
 
-    uint32_t driver_argc = argc - fake_argc;
-    cout << "Have " << driver_argc << " driver arguments" << endl;
-    vector<char*> driver_argv( driver_argc );
+    driver_argc_ = argc - fake_argc;
+    cout << "Have " << driver_argc_ << " driver arguments" << endl;
+    // If we have a driver (and thus some arguments) make the driver name be
+    // the first argument
+    // We'll leave it blank here then use what it parses out as
+    // and fill it in
+    driver_argc_ = driver_argc_ + 1;
 
-    for( uint32_t i = 0 ; i < driver_argc ; ++i ) {
-        driver_argv[i] = argv[fake_argc + i];
-        cout << "Setup driver argv " << i << " to be " << driver_argv[i] << endl;
+    driver_argv_.resize( driver_argc_ );
+    driver_argv_[0] = "";
+
+    for( uint32_t i = 0 ; i < driver_argc_ - 1 ; ++i ) {
+        uint32_t da_index = i + 1;
+        driver_argv_[da_index] = argv[fake_argc + i];
+        cout << "Crossing driver argv " << da_index << " to be " << driver_argv_[da_index] << endl;
     }
 
     // Assume true, and set to false when errors encountered.
     options_.success = true;
 
     // Hack to pick up the -X supplied as driver arguments (alsa)
-    for( uint32_t i = 0 ; i < driver_argc ; ++i ) {
-        if( strcmp( driver_argv[i], "-Xseq") == 0 ) {
+    for( uint32_t i = 1 ; i < driver_argc_ ; ++i ) {
+        if( strcmp( driver_argv_[i], "-Xseq") == 0 ) {
             cout << "Found driver slave definition - using alsa midi" << endl;
             options_.slave_drivers.push_back("alsa_midi");
         }
-        else if( strcmp( driver_argv[i], "-X") == 0 ) {
+        else if( strcmp( driver_argv_[i], "-X") == 0 ) {
             cout << "Found driver slave definition - checking if alsa midi" << endl;
-            if( i + 1 < driver_argc ) {
-                if( strcmp( driver_argv[i+1], "seq" ) == 0 ) {
+            if( i + 1 < driver_argc_ ) {
+                if( strcmp( driver_argv_[i+1], "seq" ) == 0 ) {
                     options_.slave_drivers.push_back("alsa_midi");
                 }
             }
             else {
                 options_.success = false;
-                options_.error_message = "Unknown slave specified as part of driver: " + string(driver_argv[i]);
+                options_.error_message = "Unknown slave specified as part of driver: " + string(driver_argv_[i]);
             }
         }
     }
@@ -207,11 +218,13 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     po::variables_map vm;
 
     try {
-//        po::store( po::parse_command_line( fake_argc, &fake_argv[0], all_options_), vm );
+        po::store( po::parse_command_line( fake_argc, &fake_argv[0], all_options_), vm );
+        /*
         po::parsed_options parsed_options = po::parse_command_line( fake_argc, &fake_argv[0], all_options_);
         cout << "Completed option parse" << endl;
         po::store( parsed_options, vm );
         cout << "Completed variable map store" << endl;
+        */
         po::notify(vm);
         cout << "Completed notify" << endl;
     }
@@ -317,21 +330,15 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
         if( vm.count("clock-source") > 0 ) {
             string cs_str = vm["clock-source"].as<string>();
-            if( cs_str.length() < 2 ) {
-                options_.success = false;
-                options_.error_message = "Unknown or missing clock source: " + cs_str;
+            if( cs_str[0] == 's' || cs_str[0] == 'c' ) {
+                options_.clock_source = JACK_TIMER_SYSTEM_CLOCK;
+            }
+            else if( cs_str[0] == 'h' ) {
+                options_.clock_source = JACK_TIMER_HPET;
             }
             else {
-                if( cs_str[0] == 's' || cs_str[0] == 'c' ) {
-                    options_.clock_source = JACK_TIMER_SYSTEM_CLOCK;
-                }
-                else if( cs_str[0] == 'h' ) {
-                    options_.clock_source = JACK_TIMER_HPET;
-                }
-                else {
-                    options_.success = false;
-                    options_.error_message = "Unknown clock source specified: " + cs_str;
-                }
+                options_.success = false;
+                options_.error_message = "Unknown clock source specified: " + cs_str;
             }
         }
 
@@ -343,6 +350,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         if( vm.count("driver") > 0 ) {
             string driver_str = vm["driver"].as<string>();
             options_.driver = driver_str;
+            driver_argv_[0] = options_.driver.c_str();
         }
         else {
             options_.success = false;
@@ -428,6 +436,10 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
     if( debug ) {
         cout << options_ << endl;
+    }
+
+    for( uint32_t i = 0 ; i < driver_argc_ ; ++i ) {
+        cout << "Going out driver argv " << i << " is " << driver_argv_[i] << endl;
     }
 }
 

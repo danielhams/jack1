@@ -50,6 +50,8 @@ namespace jack
     jack_options_parser( int argc, char ** argv, bool debug = false );
 
     inline jack_options & get_parsed_options() { return options_; };
+    inline int get_driver_argc() { return driver_argc_; };
+    inline const char ** get_driver_argv() { return &driver_argv_[0]; };
     void display_usage();
 
   private:
@@ -57,6 +59,9 @@ namespace jack
     boost::program_options::options_description visible_options_;
     boost::program_options::options_description hidden_options_;
     jack_options options_;
+
+    uint32_t driver_argc_;
+    std::vector<const char*> driver_argv_;
   };
 
 }
