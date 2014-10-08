@@ -60,7 +60,9 @@ ostream & operator<<( ostream & os, jack_options & jo )
     os << "show_temporary(" << jo.show_temporary << ")" << endl;
 
 
-    //    os << "internal_clients(" << jo.internal_clients << ")" << endl;
+    for( const string & ic : jo.internal_clients ) {
+        os << "internal_client(" << ic << ")" << endl;
+    }
     os << "clock_source(" << jo.clock_source << ")" << endl;
     os << "timeout_threshold(" << jo.timeout_threshold << ")" << endl;
     os << "driver(" << jo.driver << ")" << endl;
@@ -78,7 +80,9 @@ ostream & operator<<( ostream & os, jack_options & jo )
     os << "client_timeout(" << jo.client_timeout << ")" << endl;
     os << "unlock_memory(" << jo.unlock_memory << ")" << endl;
     os << "verbose(" << jo.verbose << ")" << endl;
-    //    os << "slave_drivers(" << jo.slave_drivers << ")" << endl;
+    for( const string & sd : jo.slave_drivers ) {
+        os << "slave_drivers(" << sd << ")" << endl;
+    }
     os << "no_zombies(" << jo.no_zombies << ")" << endl;
 
     return os;
@@ -105,13 +109,13 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         ( "internal-client,I", po::value<vector<string>>(), "Specify an internal client" )
         ( "no-mlock,m", "No memory lock" )
         ( "unlock,u", "Unlock memory" )
-        ( "timeout,t", po::value<uint32_t>(), "Client timeout in msecs" )
-        ( "port-max,p", po::value<uint32_t>(), "Port maximum" )
+        ( "timeout,t", po::value<string>(), "Client timeout in msecs" )
+        ( "port-max,p", po::value<string>(), "Port maximum" )
         ( "no-sanity-checks,N", "Skip sanity checks on launch" )
         ( "verbose,v", "Verbose messages" )
         ( "clock-source,c", po::value<string>(), "Clock source [ h(pet) | s(system) ]" )
         ( "replace-registry", "Replace registry" )
-        ( "realtime-priority,P", po::value<uint32_t>(), "The priority when realtime" )
+        ( "realtime-priority,P", po::value<string>(), "The priority when realtime" )
         ( "silent,s", "Silent" )
         ( "version,V", "Show version" )
         ( "nozombies,Z", "No zombies" )
@@ -123,11 +127,11 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 #endif
         ( "help,h", "Show this help message" )
         ( "tmpdir-location,l", "Output temporary directory" )
-        ( "midi-bufsize,M", po::value<uint32_t>(), "Midi buffer size" )
+        ( "midi-bufsize,M", po::value<string>(), "Midi buffer size" )
         ( "sync,S", "Sync" )
         ( "temporary,T", "Temporary" )
-        ( "slave-driver,X", po::value<string>(), "Slave driver to use" )
-        ( "timeout-thres,C", po::value<uint32_t>(), "Timeout threshold" )
+        ( "slave-driver,X", po::value<vector<string>>(), "Slave driver to use" )
+        ( "timeout-thres,C", po::value<string>(), "Timeout threshold" )
         ;
 
     all_options_.add(visible_options_);
@@ -137,24 +141,25 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     // containing all the parameters up and including the first driver
     // and argument so we don't have to validate the driver options
     // and can leave that to them
-    int32_t fake_argc = 0;
-    for( ; fake_argc < argc ; ++fake_argc ) {
+    uint32_t orig_argc = argc;
+    uint32_t fake_argc = 0;
+    for( ; fake_argc < orig_argc ; ++fake_argc ) {
         char * val = argv[fake_argc];
         if( val[0] == '-' ) {
             if( val[1] == 'd' ) {
                 if( val[2] == '\0' ) {
                     // -d args
-                    fake_argc = (fake_argc + 2 <= argc ? fake_argc + 2 : argc );
+                    fake_argc = (fake_argc + 2 <= orig_argc ? fake_argc + 2 : orig_argc );
                     break;
                 } else {
                     // -dargs
-                    fake_argc = (fake_argc + 1 <= argc ? fake_argc + 1 : argc );
+                    fake_argc = (fake_argc + 1 <= orig_argc ? fake_argc + 1 : orig_argc );
                     break;
                 }
             } else if( val[1] == '-' && val[2] == 'd' ) {
                 // --driver args
                 // Make the driver arg available, too
-                fake_argc = (fake_argc + 2 <= argc ? fake_argc + 2 : argc );
+                fake_argc = (fake_argc + 2 <= orig_argc ? fake_argc + 2 : orig_argc );
                 break;
             }
         }
@@ -162,15 +167,16 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
     cout << "Have " << fake_argc << " non-driver arguments" << endl;
     vector<char*> fake_argv( fake_argc );
-    for( int32_t i = 0 ; i < fake_argc ; ++i ) {
+    for( uint32_t i = 0 ; i < fake_argc ; ++i ) {
         fake_argv[i] = argv[i];
         cout << "Setup fake argv " << i << " to be " << fake_argv[i] << endl;
     }
 
-    int32_t driver_argc = argc - fake_argc;
+    uint32_t driver_argc = argc - fake_argc;
     cout << "Have " << driver_argc << " driver arguments" << endl;
     vector<char*> driver_argv( driver_argc );
-    for( int32_t i = 0 ; i < driver_argc ; ++i ) {
+
+    for( uint32_t i = 0 ; i < driver_argc ; ++i ) {
         driver_argv[i] = argv[fake_argc + i];
         cout << "Setup driver argv " << i << " to be " << driver_argv[i] << endl;
     }
@@ -178,11 +184,36 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     // Assume true, and set to false when errors encountered.
     options_.success = true;
 
+    // Hack to pick up the -X supplied as driver arguments (alsa)
+    for( uint32_t i = 0 ; i < driver_argc ; ++i ) {
+        if( strcmp( driver_argv[i], "-Xseq") == 0 ) {
+            cout << "Found driver slave definition - using alsa midi" << endl;
+            options_.slave_drivers.push_back("alsa_midi");
+        }
+        else if( strcmp( driver_argv[i], "-X") == 0 ) {
+            cout << "Found driver slave definition - checking if alsa midi" << endl;
+            if( i + 1 < driver_argc ) {
+                if( strcmp( driver_argv[i+1], "seq" ) == 0 ) {
+                    options_.slave_drivers.push_back("alsa_midi");
+                }
+            }
+            else {
+                options_.success = false;
+                options_.error_message = "Unknown slave specified as part of driver: " + string(driver_argv[i]);
+            }
+        }
+    }
+
     po::variables_map vm;
 
     try {
-        po::store( po::parse_command_line( fake_argc, &fake_argv[0], all_options_), vm );
+//        po::store( po::parse_command_line( fake_argc, &fake_argv[0], all_options_), vm );
+        po::parsed_options parsed_options = po::parse_command_line( fake_argc, &fake_argv[0], all_options_);
+        cout << "Completed option parse" << endl;
+        po::store( parsed_options, vm );
+        cout << "Completed variable map store" << endl;
         po::notify(vm);
+        cout << "Completed notify" << endl;
     }
     catch( po::unknown_option & uo ) {
         options_.success = false;
@@ -305,7 +336,8 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         }
 
         if( vm.count("timeout-thres") > 0 ) {
-            int32_t tt_int = vm["timeout-thres"].as<int32_t>();
+            string tt_str = vm["timeout-thres"].as<string>();
+            options_.timeout_threshold = atoi(tt_str.c_str());
         }
 
         if( vm.count("driver") > 0 ) {
@@ -318,8 +350,8 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         }
 
         if( vm.count("frame-time-offset") > 0 ) {
-            int32_t fto_int = vm["frame-time-offset"].as<int32_t>();
-            options_.frame_time_offset = JACK_MAX_FRAMES - fto_int;
+            string fto_str = vm["frame-time-offset"].as<string>();
+            options_.frame_time_offset = JACK_MAX_FRAMES - atoi(fto_str.c_str());
         }
 
         if( vm.count("temporary") > 0 ) {
@@ -327,55 +359,76 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         }
 
         if( vm.count("memory-lock") > 0 ) {
+            options_.memory_locked = false;
         }
 
         if( vm.count("midi-bufsize") > 0 ) {
+            string mbs_str = vm["midi-bufsize"].as<string>();
+            options_.midi_buffer_size = (unsigned int)atol(mbs_str.c_str());
         }
 
         if( vm.count("name") > 0 ) {
+            string server_name_str = vm["server_name"].as<string>();
+            options_.server_name = server_name_str;
         }
 
         if( vm.count("no-sanity-checks") > 0 ) {
+            options_.sanity_checks = false;
         }
 
         if( vm.count("port-max") > 0 ) {
-            
+            string pm_str = vm["port-max"].as<string>();
+            options_.port_max = (unsigned int)atol(pm_str.c_str());
         }
 
         if( vm.count("realtime-priority") > 0 ) {
+            string rp_str = vm["realtime-priority"].as<string>();
+            options_.realtime_priority = (unsigned int)atol(rp_str.c_str());
         }
 
         if( vm.count("no-realtime") > 0 ) {
+            options_.realtime = false;
         }
 
         if( vm.count("realtime") > 0 ) {
+            options_.realtime = true;
         }
 
         if( vm.count("silent") > 0 ) {
+            options_.silent = true;
         }
 
         if( vm.count("temporary") > 0 ) {
+            options_.show_temporary = true;
         }
 
         if( vm.count("timeout") > 0 ) {
+            string ct_str =vm["timeout"].as<string>();
+            options_.client_timeout = atoi(ct_str.c_str());
         }
 
         if( vm.count("unlock") > 0 ) {
+            options_.unlock_memory = true;
         }
 
         if( vm.count("version") > 0 ) {
+            options_.show_version = true;
         }
 
         if( vm.count("slave-driver") > 0 ) {
+            vector<string> sd_vec = vm["slave-driver"].as<vector<string>>();
+            options_.slave_drivers.insert( options_.slave_drivers.end(), sd_vec.begin(), sd_vec.end() );
         }
 
         if( vm.count("nozombies") > 0 ) {
+            options_.no_zombies = true;
         }
         // --help should have already been handled
     }
 
-    cout << "Debugging of jack_options: " << options_ << endl;
-
+    if( debug ) {
+        cout << options_ << endl;
+    }
 }
 
 void jack_options_parser::display_usage()

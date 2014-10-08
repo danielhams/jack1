@@ -30,6 +30,8 @@ jackdpp_SOURCES = jackdpp.cpp \
 	jack_options_parser.cpp \
 	$(NULL)
 
+jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
+
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
 noinst_HEADERS = jackpp_md5.h md5.h md5_loc.h \

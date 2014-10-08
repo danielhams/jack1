@@ -888,6 +888,11 @@ main (int argc, char *argv[])
 
     jack_options & parsed_options = options_parser.get_parsed_options();
 
+    if( parsed_options.show_temporary ) {
+        printf ("%s\n", jack_tmpdir);
+        exit (0);
+    }
+
     if( parsed_options.show_help ) {
         display_version( stdout );
         options_parser.display_usage();
