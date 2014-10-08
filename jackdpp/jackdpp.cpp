@@ -108,7 +108,7 @@ static jack_engine_t *engine = NULL;
 //static int nozombies = 0;
 //static int timeout_count_threshold = 0;
 
-char * JackAddOnDir = ADDON_DIR;
+constexpr const char * jack_addon_dir = ADDON_DIR;
 
 static jack_driver_desc_t *
 jack_find_driver_descriptor (const char * name);
@@ -467,7 +467,7 @@ jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSLi
 		goto error;
 	}
 
-        jack_load_internal_clients (load_list);
+    jack_load_internal_clients (load_list);
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -536,10 +536,10 @@ jack_drivers_get_descriptor( jack_options & parsed_options, JSList * drivers, co
 	char * filename;
 	const char * dlerr;
 	int err;
-	char* driver_dir;
+	const char* driver_dir;
 
 	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = JackAddOnDir;
+		driver_dir = jack_addon_dir;
 	}
 	filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", driver_dir, sofile);
@@ -603,10 +603,10 @@ jack_drivers_load( jack_options & parsed_options )
 	int err;
 	JSList * driver_list = NULL;
 	jack_driver_desc_t * desc;
-	char* driver_dir;
+	const char* driver_dir;
 
 	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = JackAddOnDir;
+		driver_dir = jack_addon_dir;
 	}
 
 	/* search through the driver_dir and add get descriptors
