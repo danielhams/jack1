@@ -41,6 +41,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <sstream>
 
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
 #pragma GCC diagnostic push
@@ -64,7 +65,7 @@
 #include "clientengine.h"
 #include "sanitycheck.h"
 
-#include "TestFile.hpp"
+#include "jack_options_parser.hpp"
 
 #ifdef USE_CAPABILITIES
 
@@ -82,6 +83,10 @@ using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
+using std::stringstream;
+
+using jack::jack_options;
+using jack::jack_options_parser;
 
 namespace po = boost::program_options;
 
@@ -120,7 +125,7 @@ do_nothing_handler (int sig)
 }
 
 static void
-jack_load_internal_clients_pp (const vector<string> load_list)
+jack_load_internal_clients_pp (const vector<string> & load_list)
 {
     for( const string & str : load_list ) {
         jack_request_t req;
@@ -138,6 +143,7 @@ jack_load_internal_clients_pp (const vector<string> load_list)
            args is a string whose contents will be passed to the client as
            it is instantiated
         */
+        string::size_type str_length = str.size();
 
         string::size_type colon_pos = str.find(':');
         string::size_type slash_pos = str.find('/');
@@ -168,7 +174,7 @@ jack_load_internal_clients_pp (const vector<string> load_list)
         } else if (slash_pos != string::npos && colon_pos == string::npos) {
             /* client-type/args */
             path = str.substr(0, slash_pos);
-            string::size_type rest_len = str.size() - (slash_pos+1);
+            string::size_type rest_len = str_length - (slash_pos+1);
             if (rest_len > 0) {
                 rest = str.substr(slash_pos+1,rest_len);
                 args = rest;
@@ -797,6 +803,15 @@ maybe_use_capabilities ()
 #endif /* USE_CAPABILITIES */
 }
 
+static
+void display_version( FILE * ohandle )
+{
+    fprintf ( ohandle, "jackd version " VERSION 
+             " tmpdir " DEFAULT_TMP_DIR 
+             " protocol " PROTOCOL_VERSION
+             "\n");
+}
+
 int	       
 main (int argc, char *argv[])
 
@@ -845,87 +860,6 @@ main (int argc, char *argv[])
 		{ 0, 0, 0, 0 }
 	};
 
-    bool seen_driver_pp { false };
-    vector<string> driver_names_pp;
-    string driver_args_pp;
-    string server_name_pp;
-    vector<string> driver_params_pp;
-    vector<string> slave_drivers_pp;
-    vector<string> load_list_pp;
-    size_t midi_buffer_size_pp;
-
-    po::options_description all_options_pp("Allowed Options");
-
-    po::options_description visible_options_pp("Options");
-    visible_options_pp.add_options()
-        ( "driver,d", po::value<vector<string>>(&driver_names_pp)->required(),
-#ifdef __APPLE__
-          "Backend (coreaudio, dummy, net, or portaudio)"
-#else
-          "Backend (alsa, dummy, freebob, firewire, net, oss, sun, or portaudio)"
-#endif
-        )
-        ( "no-realtime,r", "Don't run realtime" )
-        ( "realtime,R", "Run realtime" )
-        ( "name,n", po::value<string>(&server_name_pp), "Server name" )
-        ( "internal-client,I", po::value<vector<string>>(&load_list_pp), "Specify an internal client" )
-        ( "no-mlock,m", "No memory lock" )
-        ( "unlock,u", "Unlock memory" )
-        ( "timeout,t", po::value<uint32_t>(), "Client timeout in msecs" )
-        ( "port-max,p", po::value<uint32_t>(), "Port maximum" )
-        ( "no-sanity-checks,N", "Skip sanity checks on launch" )
-        ( "verbose,v", "Verbose messages" )
-        ( "clock-source,c", po::value<string>(), "Clock source [ h(pet) | s(system) ]" )
-        ( "replace-registry", "Replace registry" )
-        ( "realtime-priority,P", po::value<uint32_t>(), "The priority when realtime" )
-        ( "silent,s", "Silent" )
-        ( "version,V", "Show version" )
-        ( "nozombies,Z", "No zombies" )
-    ;
-
-    po::options_description hidden_options_pp("Hidden");
-    hidden_options_pp.add_options()
-#ifdef HAVE_ZITA_BRIDGE_DEPS
-        ("alsa-add,A", "Add alsa zita bridge")
-#endif
-        ( "help,h", "Show this help message" )
-        ( "tmpdir-location,l", po::value<string>(), "Temporary directory" )
-        ( "midi-bufsize,M", po::value<uint32_t>(), "Midi buffer size" )
-        ( "sync,S", "Sync" )
-        ( "temporary,T", "Temporary" )
-        ( "slave-driver,X", po::value<string>(), "Slave driver to use" )
-        ( "timeout-thres,C", po::value<uint32_t>(), "Timeout threshold" )
-    ;
-
-    po::options_description driver_options_pp("Driver");
-    driver_options_pp.add_options()
-//        ( ",r", "Sample rate")
-//        ( ",p", "Period length")
-//        ( ",n", "Number of periods")
-        ( ",i", "Number of input channels")
-        ( ",o", "Number of output channels")
-    ;
-
-    all_options_pp.add(visible_options_pp);
-    all_options_pp.add(hidden_options_pp);
-    all_options_pp.add(driver_options_pp);
-
-    po::variables_map vm;
-    po::store( po::parse_command_line( argc, argv, all_options_pp), vm );
-
-    bool show_help { false };
-    string options_error_msg;
-    if( vm.size() == 0 || vm.count("help") > 0 ) {
-        show_help = true;
-    }
-    try {
-        po::notify(vm);
-    }
-    catch( po::error & ro ) {
-        options_error_msg = ro.what();
-        show_help = true;
-    }
-
 	int opt = 0;
 	int option_index = 0;
 	int seen_driver = 0;
@@ -947,36 +881,18 @@ main (int argc, char *argv[])
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
     printf("Jackd CPP Test Server *** NOT TO BE USED ***\n");
-    someFunction();
 
 	maybe_use_capabilities ();
 
-    // CPlusPlus option processing
+    jack_options_parser options_parser( argc, argv, true );
 
-    for( auto & option_variable_entry : vm ) {
-        cout << "Found an option variable: " << option_variable_entry.first << endl;
-        auto & value = option_variable_entry.second.value();
-        if( auto v = boost::any_cast<uint32_t>(&value)) {
-            cout << "It's a uint32_t - " << *v << endl;
-        }
-        else if( auto v = boost::any_cast<string>(&value)) {
-            cout << "It's a string - " << *v << endl;
-        }
-        else if( auto v = boost::any_cast<vector<string>>(&value)) {
-            cout << "It's a vector<string>" << endl;
-            vector<string> & vec = *v;
-            for( string & vs : vec )
-            {
-                cout << "One string value: " << vs << endl;
-            }
-        }
-    }
+    jack_options & parsed_options = options_parser.get_parsed_options();
 
-    if( show_help ) {
-//        usage(stdout);
-        cout << visible_options_pp << endl;
-        if( options_error_msg.length() > 0 ) {
-            cout << "Error: " << options_error_msg << endl;
+    if( parsed_options.show_help ) {
+        display_version( stdout );
+        options_parser.display_usage();
+        if( parsed_options.error_message.length() > 0 ) {
+            cout << "Error: " << parsed_options.error_message << endl;
         }
         exit(1);
     }
@@ -999,23 +915,27 @@ main (int argc, char *argv[])
                                           (int) strlen (optarg) - 2, optarg,
                                           alsa_add_client_name_playback,
                                           (int) strlen (optarg) - 2, optarg);
+                                printf("(1)Adding '%s' to the internal client list\n", alsa_add_args);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                         } else if ((dirstr = strstr (optarg, "%c")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
                                 snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec:%s/-dhw:%.*s", 
                                           (int) strlen (optarg) - 2, optarg,
                                           alsa_add_client_name_capture,
                                           (int) strlen (optarg) - 2, optarg);
+                                printf("(2)Adding '%s' to the internal client list\n", alsa_add_args);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                         } else {
                                 snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play:%s/-dhw:%s", 
                                           optarg,
                                           alsa_add_client_name_playback,
                                           optarg);
+                                printf("(3)Adding '%s' to the internal client list\n", alsa_add_args);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                                 snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec:%s/-dhw:%s", 
                                           optarg,
                                           alsa_add_client_name_capture,
                                           optarg);
+                                printf("(4)Adding '%s' to the internal client list\n", alsa_add_args);
                                 load_list = jack_slist_append(load_list, strdup (alsa_add_args));
                         }
                         break;
@@ -1143,10 +1063,7 @@ main (int argc, char *argv[])
 	}
 
 	if (show_version) {
-		printf ( "jackd version " VERSION 
-				" tmpdir " DEFAULT_TMP_DIR 
-				" protocol " PROTOCOL_VERSION
-				"\n");
+        display_version (stdout );
 		return 0;
 	}
 
