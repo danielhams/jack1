@@ -350,7 +350,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         if( vm.count("driver") > 0 ) {
             string driver_str = vm["driver"].as<string>();
             options_.driver = driver_str;
-            driver_argv_[0] = options_.driver.c_str();
+            driver_argv_[0] = (char*)options_.driver.c_str();
         }
         else {
             options_.success = false;

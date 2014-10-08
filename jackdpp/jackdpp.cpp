@@ -80,6 +80,8 @@ static struct stat pipe_stat;
 #endif /* USE_CAPABILITIES */
 
 using std::cout;
+using std::cerr;
+using std::ostream;
 using std::endl;
 using std::string;
 using std::vector;
@@ -641,45 +643,14 @@ jack_drivers_load ()
 	return driver_list;
 }
 
-static void copyright (FILE* file)
+static void copyright( ostream & os)
 {
-	fprintf (file, "jackd " VERSION "\n"
-"Copyright 2001-2009 Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn and others.\n"
-"jackd comes with ABSOLUTELY NO WARRANTY\n"
-"This is free software, and you are welcome to redistribute it\n"
-"under certain conditions; see the file COPYING for details\n\n");
+    os << "jackd " << VERSION << endl;
+    os << "Copyright 2001-2009 Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn and others." << endl;
+    os << "jackd comes with ABSOLUTELY NO WARRANTY" << endl;
+    os << "This is free software, and you are welcome to redistribute it" << endl;
+    os << "under certain conditions; see the file COPYING for details" << endl << endl;
 }
-
-static void usage (FILE *file) 
-{
-	copyright (file);
-	fprintf (file, "\n"
-"usage: jackd [ --no-realtime OR -r ]\n"
-"             [ --realtime OR -R [ --realtime-priority OR -P priority ] ]\n"
-"      (the two previous arguments are mutually exclusive. The default is --realtime)\n"
-"             [ --name OR -n server-name ]\n"
-"             [ --load OR -l internal-client ]\n"
-"             [ --no-mlock OR -m ]\n"
-"             [ --unlock OR -u ]\n"
-"             [ --timeout OR -t client-timeout-in-msecs ]\n"
-"             [ --port-max OR -p maximum-number-of-ports]\n"
-"             [ --debug-timer OR -D ]\n"
-"             [ --no-sanity-checks OR -N ]\n"
-"             [ --verbose OR -v ]\n"
-"             [ --clocksource OR -c [ h(pet) | s(ystem) ]\n"
-"             [ --replace-registry ]\n"
-"             [ --silent OR -s ]\n"
-"             [ --version OR -V ]\n"
-"             [ --nozombies OR -Z ]\n"
-"         -d backend [ ... backend args ... ]\n"
-#ifdef __APPLE__
-"             Available backends may include: coreaudio, dummy, net, portaudio.\n\n"
-#else 
-"             Available backends may include: alsa, dummy, freebob, firewire, net, oss, sun, or portaudio.\n\n"
-#endif
-"       jackd -d backend --help\n"
-"             to display options for each backend\n\n");
-}	
 
 static jack_driver_desc_t *
 jack_find_driver_descriptor (const char * name)
@@ -804,83 +775,21 @@ maybe_use_capabilities ()
 }
 
 static
-void display_version( FILE * ohandle )
+void display_version( ostream & os )
 {
-    fprintf ( ohandle, "jackd version " VERSION 
-             " tmpdir " DEFAULT_TMP_DIR 
-             " protocol " PROTOCOL_VERSION
-             "\n");
+    os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
+        " protocol " << PROTOCOL_VERSION << endl;
 }
 
 int	       
 main (int argc, char *argv[])
 
 {
-	jack_driver_desc_t * desc;
-	int replace_registry = 0;
-	int do_sanity_checks = 1;
-	int show_version = 0;
+    jack_driver_desc_t * desc;
 
-#ifdef HAVE_ZITA_BRIDGE_DEPS
-	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
-#else
-	const char *options = "A:d:P:uvshVrRZTFlI:t:mM:n:Np:c:X:C:";
-#endif
-	struct option long_options[] = 
-	{ 
-		/* keep ordered by single-letter option code */
-
-#ifdef HAVE_ZITA_BRIDGE_DEPS
-                { "alsa-add", 1, 0, 'A' },
-#endif
-		{ "clock-source", 1, 0, 'c' },
-		{ "driver", 1, 0, 'd' },
-		{ "help", 0, 0, 'h' },
-		{ "tmpdir-location", 0, 0, 'l' },
-		{ "internal-client", 0, 0, 'I' },
-		{ "no-mlock", 0, 0, 'm' },
-		{ "midi-bufsize", 1, 0, 'M' },
-		{ "name", 1, 0, 'n' },
-                { "no-sanity-checks", 0, 0, 'N' },
-		{ "port-max", 1, 0, 'p' },
-		{ "realtime-priority", 1, 0, 'P' },
-		{ "no-realtime", 0, 0, 'r' },
-		{ "realtime", 0, 0, 'R' },
-		{ "replace-registry", 0, &replace_registry, 0 },
-		{ "silent", 0, 0, 's' },
-		{ "sync", 0, 0, 'S' },
-		{ "timeout", 1, 0, 't' },
-		{ "temporary", 0, 0, 'T' },
-		{ "unlock", 0, 0, 'u' },
-		{ "version", 0, 0, 'V' },
-		{ "verbose", 0, 0, 'v' },
-		{ "slave-driver", 1, 0, 'X' },
-		{ "nozombies", 0, 0, 'Z' },
-		{ "timeout-thres", 2, 0, 'C' },
-		{ 0, 0, 0, 0 }
-	};
-
-	int opt = 0;
-	int option_index = 0;
-	int seen_driver = 0;
-	char *driver_name = NULL;
-	char **driver_args = NULL;
-	JSList * driver_params;
-	JSList * slave_drivers = NULL;
-        JSList * load_list = NULL;
-	size_t midi_buffer_size = 0;
-	int driver_nargs = 1;
-	int i;
-	int rc;
-#ifdef HAVE_ZITA_BRIDGE_DEPS
-        const char* alsa_add_client_name_playback = "zalsa_out";
-        const char* alsa_add_client_name_capture = "zalsa_in";
-        char alsa_add_args[64];
-        char* dirstr;
-#endif
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
-    printf("Jackd CPP Test Server *** NOT TO BE USED ***\n");
+    cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
 
 	maybe_use_capabilities ();
 
@@ -889,305 +798,117 @@ main (int argc, char *argv[])
     jack_options & parsed_options = options_parser.get_parsed_options();
 
     if( parsed_options.show_temporary ) {
-        printf ("%s\n", jack_tmpdir);
+        cout << jack_tmpdir << endl;
         exit (0);
     }
 
     if( parsed_options.show_help ) {
-        display_version( stdout );
+        display_version( cout );
         options_parser.display_usage();
         if( parsed_options.error_message.length() > 0 ) {
-            cout << "Error: " << parsed_options.error_message << endl;
+            cerr << "Error: " << parsed_options.error_message << endl;
         }
         exit(1);
     }
 
-	opterr = 0;
-	while (!seen_driver &&
-	       (opt = getopt_long (argc, argv, options,
-				   long_options, &option_index)) != EOF) {
-		switch (opt) {
-
-#ifdef HAVE_ZITA_BRIDGE_DEPS
-                case 'A':
-                        /* add a new internal client named after the ALSA device name
-                           given as optarg, using the last character 'p' or 'c' to
-                           indicate playback or capture. If there isn't one,
-                           assume capture (common case: USB mics etc.)
-                        */
-                        if ((dirstr = strstr (optarg, "%p")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_play:%s/-dhw:%.*s", 
-                                          (int) strlen (optarg) - 2, optarg,
-                                          alsa_add_client_name_playback,
-                                          (int) strlen (optarg) - 2, optarg);
-                                printf("(1)Adding '%s' to the internal client list\n", alsa_add_args);
-                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
-                        } else if ((dirstr = strstr (optarg, "%c")) != NULL && dirstr == (optarg + strlen(optarg) - 2)) {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%.*s_rec:%s/-dhw:%.*s", 
-                                          (int) strlen (optarg) - 2, optarg,
-                                          alsa_add_client_name_capture,
-                                          (int) strlen (optarg) - 2, optarg);
-                                printf("(2)Adding '%s' to the internal client list\n", alsa_add_args);
-                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
-                        } else {
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_play:%s/-dhw:%s", 
-                                          optarg,
-                                          alsa_add_client_name_playback,
-                                          optarg);
-                                printf("(3)Adding '%s' to the internal client list\n", alsa_add_args);
-                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
-                                snprintf (alsa_add_args, sizeof (alsa_add_args), "%s_rec:%s/-dhw:%s", 
-                                          optarg,
-                                          alsa_add_client_name_capture,
-                                          optarg);
-                                printf("(4)Adding '%s' to the internal client list\n", alsa_add_args);
-                                load_list = jack_slist_append(load_list, strdup (alsa_add_args));
-                        }
-                        break;
-#endif
-
-		case 'c':
-			if (tolower (optarg[0]) == 'h') {
-				clock_source = JACK_TIMER_HPET;
-			} else if (tolower (optarg[0]) == 'c') {
-				/* For backwards compatibility with scripts,
-				 * allow the user to request the cycle clock
-				 * on the command line, but use the system
-				 * clock instead
-				 */
-				clock_source = JACK_TIMER_SYSTEM_CLOCK;
-			} else if (tolower (optarg[0]) == 's') {
-				clock_source = JACK_TIMER_SYSTEM_CLOCK;
-			} else {
-				usage (stderr);
-				return -1;
-			}
-			break;
-
-		case 'C':
-			if (optarg)
-				timeout_count_threshold = atoi (optarg);
-			else
-				timeout_count_threshold = 250;
-			break;
-
-		case 'd':
-			seen_driver = optind + 1;
-			driver_name = optarg;
-			break;
-
-		case 'D':
-			frame_time_offset = JACK_MAX_FRAMES - atoi(optarg); 
-			break;
-
-		case 'l':
-			/* special flag to allow libjack to determine jackd's idea of where tmpdir is */
-			printf ("%s\n", jack_tmpdir);
-			exit (0);
-
-                case 'I':
-			load_list = jack_slist_append(load_list, optarg);
-            break;
-
-		case 'm':
-			do_mlock = 0;
-			break;
-
-		case 'M':
-			midi_buffer_size = (unsigned int) atol (optarg);
-			break;
-
-		case 'n':
-			server_name = optarg;
-			break;
-
-		case 'N':
-			do_sanity_checks = 0;
-			break;
-
-		case 'p':
-			port_max = (unsigned int) atol (optarg);
-			break;
-
-		case 'P':
-			realtime_priority = atoi (optarg);
-			break;
-
-		case 'r':
-			realtime = 0;
-			break;
-
-		case 'R':
-			/* this is now the default */
-			realtime = 1;
-			break;
-
-		case 's':
-			jack_set_error_function (silent_jack_error_callback);
-			break;
-
-                case 'S':
-                        /* this option is for jack2 only (synchronous mode) */
-                        break;
-
-		case 'T':
-			temporary = 1;
-			break;
-
-		case 't':
-			client_timeout = atoi (optarg);
-			break;
-
-		case 'u':
-			do_unlock = 1;
-			break;
-
-		case 'v':
-			verbose = 1;
-			break;
-
-		case 'V':
-			show_version = 1;
-			break;
-
-		case 'X':
-			slave_drivers = jack_slist_append(slave_drivers, optarg);
-			break;
-		case 'Z':
-			nozombies = 1;
-			break;
-
-		default:
-			jack_error ("Unknown option character %c",
-				    optopt);
-			/*fallthru*/
-		case 'h':
-			usage (stdout);
-			return -1;
-		}
-	}
-
-	if (show_version) {
-        display_version (stdout );
+	if( parsed_options.show_version ) {
+        display_version( cout );
 		return 0;
 	}
 
-	copyright (stdout);
+	copyright( cout );
 
-	if (do_sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
-		return -1;
+	if( parsed_options.sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
+        cerr << "Failed sanity checks" << endl;
+        exit(1);
 	}
 
-	if (!seen_driver) {
-		usage (stderr);
-		exit (1);
-	}
-
-        /* DIRTY HACK needed to pick up -X supplied as part of ALSA driver args. This is legacy
-           hack to make control apps like qjackctl based on the < 0.124 command line interface
-           continue to work correctly.
-
-           If -X seq was given as part of the driver args, load the ALSA MIDI slave driver.
-        */
-        
-        for (i = seen_driver; i < argc; ++i) {
-                if (strcmp (argv[i], "-X") == 0) {
-                        if (argc >= i + 2) {
-                                if (strcmp (argv[i+1], "seq") == 0) {
-                                        slave_drivers = jack_slist_append (slave_drivers,(void*)"alsa_midi");
-                                }
-                        }
-                        break;
-                } else if (strcmp (argv[i], "-Xseq") == 0) {
-                        slave_drivers = jack_slist_append (slave_drivers,(void*)"alsa_midi");
-                        break;
-                }
+    if( !parsed_options.success ) {
+        options_parser.display_usage();
+        if( parsed_options.error_message.length() > 0 ) {
+            cerr << "Error: " << parsed_options.error_message << endl;
         }
+        exit(1);
+    }
 
 	drivers = jack_drivers_load ();
 
 	if (!drivers) {
-		fprintf (stderr, "jackd: no drivers found; exiting\n");
+        cerr << "jackd: no drivers found; exiting" << endl;
 		exit (1);
 	}
 	
-	if (midi_buffer_size != 0) {
+	if( parsed_options.midi_buffer_size != 0 ) {
 		jack_port_type_info_t* port_type = &jack_builtin_port_types[JACK_MIDI_PORT_TYPE];
-		port_type->buffer_size = midi_buffer_size * jack_midi_internal_event_size ();
+		port_type->buffer_size = parsed_options.midi_buffer_size * jack_midi_internal_event_size ();
 		port_type->buffer_scale_factor = -1;
 		if (verbose) {
-			fprintf (stderr, "Set MIDI buffer size to %u bytes\n", port_type->buffer_size);
+            cerr << "Set MIDI buffer size to " << port_type->buffer_size << " bytes" << endl;
 		}
 	}
 
-	desc = jack_find_driver_descriptor (driver_name);
+	desc = jack_find_driver_descriptor( parsed_options.driver.c_str() );
 	if (!desc) {
-		fprintf (stderr, "jackd: unknown driver '%s'\n", driver_name);
+        cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 		exit (1);
 	}
 
-	if (optind < argc) {
-		driver_nargs = 1 + argc - optind;
-	} else {
-		driver_nargs = 1;
-	}
+    int driver_nargs = options_parser.get_driver_argc();
+    char ** driver_args = options_parser.get_driver_argv();
 
-	if (driver_nargs == 0) {
-		fprintf (stderr, "No driver specified ... hmm. JACK won't do"
-			 " anything when run like this.\n");
-		return -1;
-	}
-
-	driver_args = (char **) malloc (sizeof (char *) * driver_nargs);
-	driver_args[0] = driver_name;
-	
-	for (i = 1; i < driver_nargs; i++) {
-		driver_args[i] = argv[optind++];
-	}
+    JSList * driver_params = NULL;
 
 	if (jack_parse_driver_params (desc, driver_nargs,
 				      driver_args, &driver_params)) {
 		exit (0);
 	}
 
-	if (server_name == NULL)
-		server_name = jack_default_server_name ();
+	if( parsed_options.server_name.length() == 0 ) {
+		parsed_options.server_name = jack_default_server_name ();
+    }
 
-	rc = jack_register_server (server_name, replace_registry);
+	int rc = jack_register_server( parsed_options.server_name.c_str(), parsed_options.replace_registry );
 	switch (rc) {
 	case EEXIST:
-		fprintf (stderr, "`%s' server already active\n", server_name);
+        cerr << "'" << parsed_options.server_name << "' server already active" << endl;
 		exit (1);
 	case ENOSPC:
-		fprintf (stderr, "too many servers already active\n");
+        cerr << "too many servers already active" << endl;
 		exit (2);
 	case ENOMEM:
-		fprintf (stderr, "no access to shm registry\n");
+        cerr << "no access to shm registry" << endl;
 		exit (3);
 	default:
 		if (verbose)
-			fprintf (stderr, "server `%s' registered\n",
-				 server_name);
+            cerr << "server '" << parsed_options.server_name << "' registered" << endl;
 	}
 
 	/* clean up shared memory and files from any previous
 	 * instance of this server name */
-	jack_cleanup_shm ();
-	jack_cleanup_files (server_name);
+	jack_cleanup_shm();
+	jack_cleanup_files( parsed_options.server_name.c_str() );
 
 	/* run the server engine until it terminates */
-	jack_main (desc, driver_params, slave_drivers, load_list);
+    JSList * slave_drivers_jsl = NULL;
+    for( string & sd : parsed_options.slave_drivers ) {
+        slave_drivers_jsl = jack_slist_append( slave_drivers_jsl, (void*)sd.c_str() );
+    }
+    JSList * load_list_jsl = NULL;
+    for( string & ic : parsed_options.internal_clients ) {
+        load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
+    }
+	jack_main (desc, driver_params, slave_drivers_jsl, load_list_jsl);
 
 	/* clean up shared memory and files from this server instance */
 	if (verbose)
-		fprintf (stderr, "cleaning up shared memory\n");
+        cerr << "cleaning up shared memory" << endl;
 	jack_cleanup_shm ();
 	if (verbose)
-		fprintf (stderr, "cleaning up files\n");
-	jack_cleanup_files (server_name);
+        cerr << "cleaning up files" << endl;
+	jack_cleanup_files( parsed_options.server_name.c_str() );
 	if (verbose)
-		fprintf (stderr, "unregistering server `%s'\n", server_name);
-	jack_unregister_server (server_name);
+        cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
+	jack_unregister_server( parsed_options.server_name.c_str() );
 
 	exit (0);
 }

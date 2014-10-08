@@ -51,7 +51,7 @@ namespace jack
 
     inline jack_options & get_parsed_options() { return options_; };
     inline int get_driver_argc() { return driver_argc_; };
-    inline const char ** get_driver_argv() { return &driver_argv_[0]; };
+    inline char ** get_driver_argv() { return &driver_argv_[0]; };
     void display_usage();
 
   private:
@@ -61,7 +61,7 @@ namespace jack
     jack_options options_;
 
     uint32_t driver_argc_;
-    std::vector<const char*> driver_argv_;
+    std::vector<char*> driver_argv_;
   };
 
 }
