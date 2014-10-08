@@ -77,7 +77,7 @@ jack_parse_driver_params (jack_driver_desc_t * desc, int argc, char **argv, JSLi
 	struct option * long_options;
 	char * options, * options_ptr;
 	unsigned long i;
-    int opt;
+	int opt;
 	uint32_t param_index;
 	JSList * params = NULL;
 	jack_driver_param_t * driver_param;
