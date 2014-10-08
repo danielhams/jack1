@@ -32,6 +32,7 @@ namespace jack
     int realtime_priority;
     bool silent;
     bool synchronous;
+    bool temporary;
     bool show_temporary;
     int client_timeout;
     bool unlock_memory;

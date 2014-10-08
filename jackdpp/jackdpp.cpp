@@ -95,18 +95,18 @@ namespace po = boost::program_options;
 static JSList *drivers = NULL;
 static sigset_t signals;
 static jack_engine_t *engine = NULL;
-static char *server_name = NULL;
-static int realtime = 1;
-static int realtime_priority = 10;
-static int do_mlock = 1;
-static int temporary = 0;
-static int verbose = 0;
-static int client_timeout = 0; /* msecs; if zero, use period size. */
-static unsigned int port_max = 256;
-static int do_unlock = 0;
-static jack_nframes_t frame_time_offset = 0;
-static int nozombies = 0;
-static int timeout_count_threshold = 0;
+//static char *server_name = NULL;
+//static int realtime = 1;
+//static int realtime_priority = 10;
+//static int do_mlock = 1;
+//static int temporary = 0;
+//static int verbose = 0;
+//static int client_timeout = 0; /* msecs; if zero, use period size. */
+//static unsigned int port_max = 256;
+//static int do_unlock = 0;
+//static jack_nframes_t frame_time_offset = 0;
+//static int nozombies = 0;
+//static int timeout_count_threshold = 0;
 
 char * JackAddOnDir = ADDON_DIR;
 
@@ -363,7 +363,7 @@ jack_load_internal_clients (JSList* load_list)
 }
 
 static int
-jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list)
+jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list )
 {
 	int sig;
 	int i;
@@ -421,16 +421,26 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * sl
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 
-	if (!realtime && client_timeout == 0)
-		client_timeout = 500; /* 0.5 sec; usable when non realtime. */
+	if( !parsed_options.realtime && parsed_options.client_timeout == 0) {
+		parsed_options.client_timeout = 500; /* 0.5 sec; usable when non realtime. */
+    }
 
 	/* get the engine/driver started */
-
-	if ((engine = jack_engine_new (realtime, realtime_priority, 
-				       do_mlock, do_unlock, server_name,
-				       temporary, verbose, client_timeout,
-				       port_max, getpid(), frame_time_offset, 
-				       nozombies, timeout_count_threshold, drivers)) == 0) {
+	if ((engine = jack_engine_new(
+             parsed_options.realtime,
+             parsed_options.realtime_priority,
+             parsed_options.memory_locked,
+             parsed_options.unlock_memory,
+             parsed_options.server_name.c_str(),
+             parsed_options.temporary,
+             parsed_options.verbose,
+             parsed_options.client_timeout,
+             parsed_options.port_max,
+             getpid(),
+             parsed_options.frame_time_offset, 
+             parsed_options.no_zombies,
+             parsed_options.timeout_threshold,
+             drivers)) == 0) {
 		jack_error ("cannot create engine");
 		return -1;
 	}
@@ -474,7 +484,7 @@ jack_main (jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * sl
 		} 
 	}
 	
-	if (verbose) {
+	if( parsed_options.verbose ) {
 		jack_info ("%d waiting for signals", getpid());
 	}
 
@@ -517,7 +527,7 @@ error:
 }
 
 static jack_driver_desc_t *
-jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
+jack_drivers_get_descriptor( jack_options & parsed_options, JSList * drivers, const char * sofile)
 {
 	jack_driver_desc_t * descriptor, * other_descriptor;
 	JackDriverDescFunction so_get_descriptor;
@@ -534,7 +544,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 	filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", driver_dir, sofile);
 
-	if (verbose) {
+	if( parsed_options.verbose ) {
 		jack_info ("getting driver descriptor from %s", filename);
 	}
 
@@ -585,7 +595,7 @@ jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 }
 
 static JSList *
-jack_drivers_load ()
+jack_drivers_load( jack_options & parsed_options )
 {
 	struct dirent * dir_entry;
 	DIR * dir_stream;
@@ -623,7 +633,7 @@ jack_drivers_load ()
 			continue;
 		}
 
-		desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
+		desc = jack_drivers_get_descriptor( parsed_options, drivers, dir_entry->d_name );
 		if (desc) {
 			driver_list = jack_slist_append (driver_list, desc);
 		}
@@ -818,7 +828,7 @@ main (int argc, char *argv[])
 
 	copyright( cout );
 
-	if( parsed_options.sanity_checks && (0 < sanitycheck (realtime, FALSE))) {
+	if( parsed_options.sanity_checks && (0 < sanitycheck( parsed_options.realtime, FALSE))) {
         cerr << "Failed sanity checks" << endl;
         exit(1);
 	}
@@ -831,7 +841,7 @@ main (int argc, char *argv[])
         exit(1);
     }
 
-	drivers = jack_drivers_load ();
+	drivers = jack_drivers_load( parsed_options );
 
 	if (!drivers) {
         cerr << "jackd: no drivers found; exiting" << endl;
@@ -842,7 +852,7 @@ main (int argc, char *argv[])
 		jack_port_type_info_t* port_type = &jack_builtin_port_types[JACK_MIDI_PORT_TYPE];
 		port_type->buffer_size = parsed_options.midi_buffer_size * jack_midi_internal_event_size ();
 		port_type->buffer_scale_factor = -1;
-		if (verbose) {
+		if( parsed_options.verbose ) {
             cerr << "Set MIDI buffer size to " << port_type->buffer_size << " bytes" << endl;
 		}
 	}
@@ -879,7 +889,7 @@ main (int argc, char *argv[])
         cerr << "no access to shm registry" << endl;
 		exit (3);
 	default:
-		if (verbose)
+		if( parsed_options.verbose )
             cerr << "server '" << parsed_options.server_name << "' registered" << endl;
 	}
 
@@ -897,16 +907,16 @@ main (int argc, char *argv[])
     for( string & ic : parsed_options.internal_clients ) {
         load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
     }
-	jack_main (desc, driver_params, slave_drivers_jsl, load_list_jsl);
+	jack_main( parsed_options, desc, driver_params, slave_drivers_jsl, load_list_jsl);
 
 	/* clean up shared memory and files from this server instance */
-	if (verbose)
+	if( parsed_options.verbose )
         cerr << "cleaning up shared memory" << endl;
 	jack_cleanup_shm ();
-	if (verbose)
+	if( parsed_options.verbose )
         cerr << "cleaning up files" << endl;
 	jack_cleanup_files( parsed_options.server_name.c_str() );
-	if (verbose)
+	if( parsed_options.verbose )
         cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
 	jack_unregister_server( parsed_options.server_name.c_str() );
 

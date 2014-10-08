@@ -37,6 +37,7 @@ jack_options::jack_options() :
     realtime_priority(10),
     silent(false),
     synchronous(),
+    temporary(false),
     show_temporary(false),
     client_timeout(0),
     unlock_memory(false),
@@ -77,6 +78,7 @@ ostream & operator<<( ostream & os, jack_options & jo )
     os << "realtime_priority(" << jo.realtime_priority << ")" << endl;
     os << "silent(" << jo.silent << ")" << endl;
     os << "synchronous(" << jo.synchronous << ")" << endl;
+    os << "temporary(" << jo.temporary << ")" << endl;
     os << "client_timeout(" << jo.client_timeout << ")" << endl;
     os << "unlock_memory(" << jo.unlock_memory << ")" << endl;
     os << "verbose(" << jo.verbose << ")" << endl;
@@ -128,7 +130,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         ( "alsa-add,A", po::value<vector<string>>(), "Add alsa zita bridge")
 #endif
         ( "help,h", "Show this help message" )
-        ( "tmpdir-location,l", "Output temporary directory" )
+        ( "tmpdir-location,l", "Output temporary directory location" )
         ( "midi-bufsize,M", po::value<string>(), "Midi buffer size" )
         ( "sync,S", "Sync" )
         ( "temporary,T", "Temporary" )
@@ -363,6 +365,10 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         }
 
         if( vm.count("temporary") > 0 ) {
+            options_.temporary = true;
+        }
+
+        if( vm.count("tmpdir-location") > 0 ) {
             options_.show_temporary = true;
         }
 
@@ -404,10 +410,6 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
         if( vm.count("silent") > 0 ) {
             options_.silent = true;
-        }
-
-        if( vm.count("temporary") > 0 ) {
-            options_.show_temporary = true;
         }
 
         if( vm.count("timeout") > 0 ) {
