@@ -793,7 +793,6 @@ void display_version( ostream & os )
 
 int	       
 main (int argc, char *argv[])
-
 {
     jack_driver_desc_t * desc;
 
@@ -812,6 +811,11 @@ main (int argc, char *argv[])
         exit (0);
     }
 
+	if( parsed_options.show_version ) {
+        display_version( cout );
+        exit (0);
+	}
+
     if( parsed_options.show_help ) {
         display_version( cout );
         options_parser.display_usage();
@@ -820,11 +824,6 @@ main (int argc, char *argv[])
         }
         exit(1);
     }
-
-	if( parsed_options.show_version ) {
-        display_version( cout );
-		return 0;
-	}
 
 	copyright( cout );
 
