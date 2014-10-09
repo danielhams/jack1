@@ -254,11 +254,15 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 		for( auto & option_variable_entry : vm ) {
 			cout << "Found an option variable: " << option_variable_entry.first << endl;
 			auto & value = option_variable_entry.second.value();
+
 			if( auto v = boost::any_cast<uint32_t>(&value)) {
 				cout << "It's a uint32_t - " << *v << endl;
 			}
 			else if( auto v = boost::any_cast<string>(&value)) {
-				cout << "It's a string - " << *v << endl;
+				string & sv = *v;
+				if( sv.length() > 0 ) {
+					cout << "It's a string - " << *v << endl;
+				}
 			}
 			else if( auto v = boost::any_cast<vector<string>>(&value)) {
 				cout << "It's a vector<string>" << endl;

@@ -802,7 +802,11 @@ main (int argc, char *argv[])
 
 	maybe_use_capabilities ();
 
+#ifdef DEBUG_ENABLED
 	jack_options_parser options_parser( argc, argv, true );
+#else
+	jack_options_parser options_parser( argc, argv );
+#endif
 
 	jack_options & parsed_options = options_parser.get_parsed_options();
 

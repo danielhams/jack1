@@ -1207,7 +1207,7 @@ do_request (jack_engine_t *engine, jack_request_t *req, int *reply_fd)
 	 */
 	pthread_mutex_lock (&engine->request_lock);
 
-	DEBUG ("got a request of type %d (%s)", req->type, jack_event_type_name (req->type));
+	DEBUG ("got a request of type %d (%s)", req->type, jack_event_type_name ((JackEventType)req->type));
 
 	switch (req->type) {
 	case RegisterPort:
