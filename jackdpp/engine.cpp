@@ -80,8 +80,8 @@ typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, cons
 typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
 
 typedef struct _jack_driver_info {
-    jack_driver_t *(*initialize)(jack_client_t*, const JSList *);
-	void           (*finish)(jack_driver_t*);
+	jack_driver_info_init_callback_t initialize;
+	jack_driver_info_finish_callback_t finish;
     char           (*client_name);
     dlhandle       handle;
 } jack_driver_info_t;
