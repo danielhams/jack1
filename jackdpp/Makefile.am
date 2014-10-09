@@ -55,7 +55,7 @@ libjackserverpp_la_CFLAGS = $(AM_CFLAGS)
 libjackserverpp_la_SOURCES = engine.cpp \
 	clientengine.c \
 	transengine.c \
-	controlapi.c \
+	controlapi.cpp \
 	../libjackpp/systemtest.c \
 	../libjackpp/sanitycheck.c \
 	../libjackpp/client.c \

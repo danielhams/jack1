@@ -60,6 +60,7 @@
 #include <jack/uuid.h>
 
 #include "engine.h"
+#include "engine.hpp"
 #include "internal.h"
 #include "driver.h"
 #include "shm.h"
@@ -92,8 +93,6 @@ using std::stringstream;
 
 using jack::jack_options;
 using jack::jack_options_parser;
-
-namespace po = boost::program_options;
 
 //static JSList *drivers = NULL;
 static sigset_t signals;
@@ -288,7 +287,7 @@ jack_main( const jack_options & parsed_options,
 	}
 
 	/* get the engine/driver started */
-	if ((engine = jack_engine_new(
+	if ((engine = jack_engine_new_pp(
              parsed_options.realtime,
              parsed_options.realtime_priority,
              parsed_options.memory_locked,
@@ -388,9 +387,9 @@ error:
 }
 
 static jack_driver_desc_t *
-jack_drivers_get_descriptor_pp( const jack_options & parsed_options,
-								const vector<jack_driver_desc_t*> & loaded_drivers,
-								const char * sofile)
+jack_drivers_get_descriptor_pp( const vector<jack_driver_desc_t*> & loaded_drivers,
+								const char * sofile,
+								bool verbose )
 {
 	jack_driver_desc_t * descriptor;
 	JackDriverDescFunction so_get_descriptor;
@@ -406,7 +405,7 @@ jack_drivers_get_descriptor_pp( const jack_options & parsed_options,
 	filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
 	sprintf (filename, "%s/%s", driver_dir, sofile);
 
-	if( parsed_options.verbose ) {
+	if( verbose ) {
 		jack_info ("getting driver descriptor from %s", filename);
 	}
 
@@ -455,7 +454,7 @@ jack_drivers_get_descriptor_pp( const jack_options & parsed_options,
 }
 
 static vector<jack_driver_desc_t*>
-jack_drivers_load_pp( const jack_options & parsed_options )
+jack_drivers_load_pp( bool verbose )
 {
 	vector<jack_driver_desc_t*> loaded_drivers;
 
@@ -494,7 +493,7 @@ jack_drivers_load_pp( const jack_options & parsed_options )
 			continue;
 		}
 
-		desc = jack_drivers_get_descriptor_pp( parsed_options, loaded_drivers, dir_entry->d_name );
+		desc = jack_drivers_get_descriptor_pp( loaded_drivers, dir_entry->d_name, verbose );
 		if (desc) {
 			loaded_drivers.push_back( desc );
 		}
@@ -697,7 +696,7 @@ main (int argc, char *argv[])
 		exit(1);
 	}
 
-	vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( parsed_options );
+	vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( parsed_options.verbose );
 
 	if (loaded_drivers.size() == 0) {
 		cerr << "jackd: no drivers found; exiting" << endl;

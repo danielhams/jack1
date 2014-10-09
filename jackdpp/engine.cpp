@@ -1,4 +1,4 @@
-/* -*- mode: c; c-file-style: "bsd"; -*- */
+/* -*- mode: cpp; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     Copyright (C) 2004 Jack O'Quin
@@ -45,6 +45,7 @@
 
 #include "internal.h"
 #include "engine.h"
+#include "engine.hpp"
 #include "messagebuffer.h"
 #include "driver.h"
 #include "shm.h"
@@ -1739,14 +1740,15 @@ jack_server_thread (void *arg)
 }
 
 jack_engine_t *
-jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
-		 const char *server_name, int temporary, int verbose,
-		 int client_timeout, unsigned int port_max, pid_t wait_pid,
-		 jack_nframes_t frame_time_offset, int nozombies, int timeout_count_threshold, JSList *drivers)
+jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
+					const char *server_name, int temporary, int verbose,
+					int client_timeout, unsigned int port_max, pid_t wait_pid,
+					jack_nframes_t frame_time_offset, int nozombies,
+					int timeout_count_threshold, JSList *drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
-        char server_dir[PATH_MAX+1] = "";
+	char server_dir[PATH_MAX+1] = "";
 
 #ifdef USE_CAPABILITIES
 	uid_t uid = getuid ();
@@ -1769,7 +1771,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 		if (do_mlock && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 			jack_error ("cannot lock down memory for jackd (%s)",
-				    strerror (errno));
+						strerror (errno));
 #ifdef ENSURE_MLOCK
 			return NULL;
 #endif /* ENSURE_MLOCK */
@@ -1817,7 +1819,7 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->nozombies = nozombies;
 	engine->timeout_count_threshold = timeout_count_threshold;
 	engine->removing_clients = 0;
-        engine->new_clients_allowed = 1;
+	engine->new_clients_allowed = 1;
 
 	engine->session_reply_fd = -1;
 	engine->session_pending_replies = 0;
@@ -1868,16 +1870,16 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	srandom (time ((time_t *) 0));
 
 	if (jack_shmalloc (sizeof (jack_control_t)
-			   + ((sizeof (jack_port_shared_t) * engine->port_max)),
-			   &engine->control_shm)) {
+					   + ((sizeof (jack_port_shared_t) * engine->port_max)),
+					   &engine->control_shm)) {
 		jack_error ("cannot create engine control shared memory "
-			    "segment (%s)", strerror (errno));
+					"segment (%s)", strerror (errno));
 		return NULL;
 	}
 
 	if (jack_attach_shm (&engine->control_shm)) {
 		jack_error ("cannot attach to engine control shared memory"
-			    " (%s)", strerror (errno));
+					" (%s)", strerror (errno));
 		jack_destroy_shm (&engine->control_shm);
 		return NULL;
 	}
@@ -1891,11 +1893,11 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	for (i = 0; jack_builtin_port_types[i].type_name[0]; ++i) {
 
 		memcpy (&engine->control->port_types[i],
-			&jack_builtin_port_types[i],
-			sizeof (jack_port_type_info_t));
+				&jack_builtin_port_types[i],
+				sizeof (jack_port_type_info_t));
 
 		VERBOSE (engine, "registered builtin port type %s",
-			 engine->control->port_types[i].type_name);
+				 engine->control->port_types[i].type_name);
 
 		/* the port type id is index into port_types array */
 		engine->control->port_types[i].ptype_id = i;
@@ -1949,11 +1951,11 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	*/
 
 	engine->control->client_priority = (realtime
-					    ? engine->rtpriority - 5
-					    : 0);
+										? engine->rtpriority - 5
+										: 0);
 	engine->control->max_client_priority = (realtime
-						? engine->rtpriority - 1
-						: 0);
+											? engine->rtpriority - 1
+											: 0);
 	engine->control->do_mlock = do_mlock;
 	engine->control->do_munlock = do_unlock;
 	engine->control->cpu_load = 0;
@@ -1982,37 +1984,37 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
-        
+		
 #ifdef JACK_USE_MACH_THREADS
-        /* specific resources for server/client real-time thread
+	/* specific resources for server/client real-time thread
 	 * communication */
 	engine->servertask = mach_task_self();
 	if (task_get_bootstrap_port(engine->servertask, &engine->bp)){
 		jack_error("Jackd: Can't find bootstrap mach port");
 		return NULL;
-        }
-        engine->portnum = 0;
+	}
+	engine->portnum = 0;
 #endif /* JACK_USE_MACH_THREADS */
-        
-        
+		
+		
 #ifdef USE_CAPABILITIES
 	if (uid == 0 || euid == 0) {
 		VERBOSE (engine, "running with uid=%d and euid=%d, "
-			 "will not try to use capabilites",
-			 uid, euid);
+				 "will not try to use capabilites",
+				 uid, euid);
 	} else {
 		/* only try to use capabilities if not running as root */
 		engine->control->has_capabilities = check_capabilities (engine);
 		if (engine->control->has_capabilities == 0) {
 			VERBOSE (engine, "required capabilities not "
-				 "available");
+					 "available");
 		}
 		if (engine->verbose) {
 			size_t size;
 			cap_t cap = cap_init();
 			capgetp(0, cap);
 			VERBOSE (engine, "capabilities: %s",
-				 cap_to_text(cap, &size));
+					 cap_to_text(cap, &size));
 		}
 	}
 #endif /* USE_CAPABILITIES */
@@ -2020,13 +2022,13 @@ jack_engine_new (int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->engine_ok = 1;
 
 	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
-		  "%s/jack-ack-fifo-%d",
-		  jack_server_dir (engine->server_name, server_dir), getpid ());
+			  "%s/jack-ack-fifo-%d",
+			  jack_server_dir (engine->server_name, server_dir), getpid ());
 
 	(void) jack_get_fifo_fd (engine, 0);
 
 	jack_client_create_thread (NULL, &engine->server_thread, 0, FALSE,
-				   &jack_server_thread, engine);
+							   &jack_server_thread, engine);
 
 	return engine;
 }
@@ -2196,7 +2198,7 @@ jack_start_freewheeling (jack_engine_t* engine, jack_uuid_t client_id)
 	jack_deliver_event_to_all (engine, &event);
 	
 	if (jack_client_create_thread (NULL, &engine->freewheel_thread, 0, FALSE,
-				       jack_engine_freewheel, engine)) {
+								   jack_engine_freewheel, engine)) {
 		jack_error ("could not start create freewheel thread");
 		return -1;
 	}
