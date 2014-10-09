@@ -114,7 +114,7 @@ static jack_engine_t *engine = NULL;
 constexpr const char * jack_addon_dir = ADDON_DIR;
 
 static jack_driver_desc_t *
-jack_find_driver_descriptor_pp( vector<jack_driver_desc_t*> & loaded_drivers, const char * name);
+jack_find_driver_descriptor_pp( const vector<jack_driver_desc_t*> & loaded_drivers, const string & name );
 
 static void 
 do_nothing_handler (int sig)
@@ -130,7 +130,7 @@ do_nothing_handler (int sig)
 }
 
 static void
-jack_load_internal_clients_pp (const vector<string> & load_list)
+jack_load_internal_clients_pp( const vector<string> & load_list )
 {
     for( const string & str : load_list ) {
         jack_request_t req;
@@ -221,152 +221,151 @@ jack_load_internal_clients_pp (const vector<string> & load_list)
 }
 
 static void
-jack_load_internal_clients (JSList* load_list)
+jack_load_internal_clients( JSList* load_list )
 { 
     JSList * node;
 
-        for (node = load_list; node; node = jack_slist_next (node)) {
+	for (node = load_list; node; node = jack_slist_next (node)) {
+		char* str = (char*) node->data;
+		jack_request_t req;
+		char* colon = strchr (str, ':');
+		char* slash = strchr (str, '/');
+		char* client_name = NULL;
+		char* path = NULL;
+		char* args = NULL;
+		char* rest = NULL;
+		int free_path = 0;
+		int free_name = 0;
+		size_t len;
 
-                char* str = (char*) node->data;
-                jack_request_t req;
-                char* colon = strchr (str, ':');
-                char* slash = strchr (str, '/');
-                char* client_name = NULL;
-                char* path = NULL;
-                char* args = NULL;
-                char* rest = NULL;
-                int free_path = 0;
-                int free_name = 0;
-                size_t len;
+		/* possible argument forms:
 
-                /* possible argument forms:
+		   client-name:client-type/args
+		   client-type/args
+		   client-name:client-type
+		   client-type
 
-                   client-name:client-type/args
-                   client-type/args
-                   client-name:client-type
-                   client-type
+		   client-name is the desired JACK client name.
+		   client-type is basically the name of the DLL/DSO without any suffix.
+		   args is a string whose contents will be passed to the client as
+		   it is instantiated
+		*/
 
-                   client-name is the desired JACK client name.
-                   client-type is basically the name of the DLL/DSO without any suffix.
-                   args is a string whose contents will be passed to the client as
-                   it is instantiated
-                */
+		if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
 
-                if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
+			/* client-type */
 
-                        /* client-type */
+			client_name = str;
+			path = client_name;
 
-                        client_name = str;
-                        path = client_name;
+		} else if (slash && colon) {
 
-                } else if (slash && colon) {
+			/* client-name:client-type/args */
 
-                        /* client-name:client-type/args */
+			len = colon - str;
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				client_name = (char*) malloc (len + 1);
+				free_name = 1;
+				memcpy (client_name, str, len);
+				client_name[len] = '\0';
+			}
 
-                        len = colon - str;
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                client_name = (char*) malloc (len + 1);
-                                free_name = 1;
-                                memcpy (client_name, str, len);
-                                client_name[len] = '\0';
-                        }
-
-                        len = slash - (colon+1);
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                path = (char*) malloc (len + 1);
-                                free_path = 1;
-                                memcpy (path, colon + 1, len);
-                                path[len] = '\0';
-                        } else {
-                                path = client_name;
-                        }
+			len = slash - (colon+1);
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				path = (char*) malloc (len + 1);
+				free_path = 1;
+				memcpy (path, colon + 1, len);
+				path[len] = '\0';
+			} else {
+				path = client_name;
+			}
                         
-                        rest = slash + 1;
-                        len = strlen (rest);
+			rest = slash + 1;
+			len = strlen (rest);
                                 
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                args = (char*) malloc (len + 1);
-                                memcpy (args, rest, len);
-                                args[len] = '\0';
-                        }
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				args = (char*) malloc (len + 1);
+				memcpy (args, rest, len);
+				args[len] = '\0';
+			}
                         
-                } else if (slash && colon == NULL) {
+		} else if (slash && colon == NULL) {
 
-                        /* client-type/args */
+			/* client-type/args */
 
-                        len = slash - str;
+			len = slash - str;
 
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                path = (char *) malloc (len + 1);
-                                free_path = 1;
-                                memcpy (path, str, len);
-                                path[len] = '\0';
-                        }
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				path = (char *) malloc (len + 1);
+				free_path = 1;
+				memcpy (path, str, len);
+				path[len] = '\0';
+			}
 
-                        rest = slash + 1;
-                        len = strlen (rest);
+			rest = slash + 1;
+			len = strlen (rest);
                                 
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                args = (char*) malloc (len + 1);
-                                memcpy (args, rest, len);
-                                args[len] = '\0';
-                        }
-                } else {
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				args = (char*) malloc (len + 1);
+				memcpy (args, rest, len);
+				args[len] = '\0';
+			}
+		} else {
                         
-                        /* client-name:client-type */
+			/* client-name:client-type */
 
-                        len = colon - str;
+			len = colon - str;
 
-                        if (len) {
-                                /* add 1 to leave space for a NULL */
-                                client_name = (char *) malloc (len + 1);
-                                free_name = 1;
-                                memcpy (client_name, str, len);
-                                client_name[len] = '\0';
-                                path = colon + 1;
-                        }
-                }
+			if (len) {
+				/* add 1 to leave space for a NULL */
+				client_name = (char *) malloc (len + 1);
+				free_name = 1;
+				memcpy (client_name, str, len);
+				client_name[len] = '\0';
+				path = colon + 1;
+			}
+		}
 
-                if (client_name == NULL || path == NULL) {
-                        fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
-                        exit (1);
-                }
+		if (client_name == NULL || path == NULL) {
+			fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
+			exit (1);
+		}
 
-                memset (&req, 0, sizeof (req));
-                req.type = IntClientLoad;
-                req.x.intclient.options = 0;
-                strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
-                strncpy (req.x.intclient.path, path, sizeof (req.x.intclient.path));
+		memset (&req, 0, sizeof (req));
+		req.type = IntClientLoad;
+		req.x.intclient.options = 0;
+		strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
+		strncpy (req.x.intclient.path, path, sizeof (req.x.intclient.path));
 
-                if (args) {
-                        strncpy (req.x.intclient.init, args, sizeof (req.x.intclient.init));
-                } else {
-                        req.x.intclient.init[0] = '\0';
-                }
+		if (args) {
+			strncpy (req.x.intclient.init, args, sizeof (req.x.intclient.init));
+		} else {
+			req.x.intclient.init[0] = '\0';
+		}
 
-                pthread_mutex_lock (&engine->request_lock);
-                jack_intclient_load_request (engine, &req);
-                pthread_mutex_unlock (&engine->request_lock);
+		pthread_mutex_lock (&engine->request_lock);
+		jack_intclient_load_request (engine, &req);
+		pthread_mutex_unlock (&engine->request_lock);
    
-                if (free_name) {
-                        free (client_name);
-                }
-                if (free_path) {
-                        free (path);
-                }
-                if (args) {
-                        free (args);
-                }
-        }
+		if (free_name) {
+			free (client_name);
+		}
+		if (free_path) {
+			free (path);
+		}
+		if (args) {
+			free (args);
+		}
+	}
 }
 
 static int
-jack_main( jack_options & parsed_options, vector<jack_driver_desc_t*> & loaded_drivers,
+jack_main( const jack_options & parsed_options, const vector<jack_driver_desc_t*> & loaded_drivers,
 		   jack_driver_desc_t * driver_desc,
 		   JSList * driver_params, JSList * slave_names, JSList * load_list )
 {
@@ -426,10 +425,6 @@ jack_main( jack_options & parsed_options, vector<jack_driver_desc_t*> & loaded_d
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 
-	if( !parsed_options.realtime && parsed_options.client_timeout == 0) {
-		parsed_options.client_timeout = 500; /* 0.5 sec; usable when non realtime. */
-    }
-
 	JSList * drivers_jsl = NULL;
 	for( jack_driver_desc_t * od : loaded_drivers ) {
 		drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
@@ -465,7 +460,8 @@ jack_main( jack_options & parsed_options, vector<jack_driver_desc_t*> & loaded_d
 
 	for (node=slave_names; node; node=jack_slist_next(node)) {
         char *sl_name = (char*)node->data;
-		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, sl_name);
+		string sl_name_str( sl_name );
+		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, sl_name_str );
 		if (sl_desc) {
 			jack_engine_load_slave_driver(engine, sl_desc, NULL);
 		}
@@ -537,8 +533,8 @@ error:
 }
 
 static jack_driver_desc_t *
-jack_drivers_get_descriptor_pp( jack_options & parsed_options,
-								vector<jack_driver_desc_t*> & loaded_drivers,
+jack_drivers_get_descriptor_pp( const jack_options & parsed_options,
+								const vector<jack_driver_desc_t*> & loaded_drivers,
 								const char * sofile)
 {
 	jack_driver_desc_t * descriptor;
@@ -604,7 +600,7 @@ jack_drivers_get_descriptor_pp( jack_options & parsed_options,
 }
 
 static vector<jack_driver_desc_t*>
-jack_drivers_load_pp( jack_options & parsed_options )
+jack_drivers_load_pp( const jack_options & parsed_options )
 {
 	vector<jack_driver_desc_t*> loaded_drivers;
 
@@ -672,10 +668,10 @@ static void copyright( ostream & os)
 }
 
 static jack_driver_desc_t *
-jack_find_driver_descriptor_pp( vector<jack_driver_desc_t*> & loaded_drivers, const char * name)
+jack_find_driver_descriptor_pp( const vector<jack_driver_desc_t*> & loaded_drivers, const string & name)
 {
 	for( jack_driver_desc_t * desc : loaded_drivers ) {
-		if (strcmp (desc->name, name) == 0) {
+		if (strcmp (desc->name, name.c_str()) == 0) {
 			return desc;
 		}
 	}
@@ -846,7 +842,6 @@ main (int argc, char *argv[])
 		exit(1);
 	}
 
-//	drivers = jack_drivers_load( parsed_options );
 	vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( parsed_options );
 
 	if (loaded_drivers.size() == 0) {
@@ -863,7 +858,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	desc = jack_find_driver_descriptor_pp( loaded_drivers, parsed_options.driver.c_str() );
+	desc = jack_find_driver_descriptor_pp( loaded_drivers, parsed_options.driver );
 	if (!desc) {
 		cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 		exit (1);

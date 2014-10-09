@@ -444,6 +444,11 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 		// --help should have already been handled
 	}
 
+	if( !options_.realtime && options_.client_timeout == 0 ) {
+		// Moved from jack_main
+		options_.client_timeout = 500; /* 0.5 sec; usable when non realtime. */
+	}
+
 	if( debug ) {
 		cout << options_ << endl;
 		for( uint32_t i = 0 ; i < driver_argc_ ; ++i ) {
