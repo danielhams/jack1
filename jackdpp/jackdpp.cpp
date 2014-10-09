@@ -832,7 +832,7 @@ main (int argc, char *argv[])
         exit(1);
 	}
 
-    if( !parsed_options.success || parsed_options.show_help ) {
+    if( !parsed_options.success ) {
         options_parser.display_usage();
         if( parsed_options.error_message.length() > 0 ) {
             cerr << "Error: " << parsed_options.error_message << endl;
