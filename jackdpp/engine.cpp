@@ -68,7 +68,11 @@
 
 #include "libjack/local.h"
 
+// C++ bits
 #include <cinttypes>
+#include <vector>
+
+using std::vector;
 
 typedef struct {
 
@@ -1744,7 +1748,8 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 					const char *server_name, int temporary, int verbose,
 					int client_timeout, unsigned int port_max, pid_t wait_pid,
 					jack_nframes_t frame_time_offset, int nozombies,
-					int timeout_count_threshold, JSList *drivers)
+					int timeout_count_threshold,
+					const vector<jack_driver_desc_t*> & loaded_drivers)
 {
 	jack_engine_t *engine;
 	unsigned int i;
@@ -1787,7 +1792,12 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	/* allocate the engine, zero the structure to ease debugging */
 	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
 
-	engine->drivers = drivers;
+	JSList * drivers_jsl = NULL;
+	for( jack_driver_desc_t * od : loaded_drivers ) {
+		drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
+	}
+
+	engine->drivers = drivers_jsl;
 	engine->driver = NULL;
 	engine->driver_desc = NULL;
 	engine->driver_params = NULL;

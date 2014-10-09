@@ -27,9 +27,7 @@
 #include <internal.h>
 #include <driver_interface.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <vector>
 
 jack_engine_t * jack_engine_new_pp( int real_time, int real_time_priority,
 									int do_mlock, int do_unlock,
@@ -38,10 +36,7 @@ jack_engine_t * jack_engine_new_pp( int real_time, int real_time_priority,
 									unsigned int port_max,
 									pid_t waitpid, jack_nframes_t frame_time_offset, int nozombies, 
 									int timeout_count_threshold,
-									JSList *drivers);
+									const std::vector<jack_driver_desc_t*> & loaded_drivers);
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif

@@ -55,6 +55,11 @@
 //#include "JackDriverLoader.h"
 //#include "JackServerGlobals.h"
 
+// C++
+#include <vector>
+
+using std::vector;
+
 /*
  * XXX: dont like statics here.
  */
@@ -1165,6 +1170,9 @@ jackctl_server_start(
     // TODO:
     int frame_time_offset = 0;
 
+	vector<jack_driver_desc_t*> loaded_drivers;
+	JSList* dli;
+
     rc = jack_register_server (server_ptr->name.str, server_ptr->replace_registry.b);
     switch (rc)
     {
@@ -1191,11 +1199,19 @@ jackctl_server_start(
     
     oldsignals = jackctl_block_signals();
 
+	// Hack to support jack_engine_new_pp until I fix up where this is constructing the drivers list
+	dli = drivers;
+	do
+	{
+		loaded_drivers.push_back( (jack_driver_desc_t*)dli->data );
+	}
+	while( dli != NULL );
+
     if ((server_ptr->engine = jack_engine_new_pp( server_ptr->realtime.b, server_ptr->realtime_priority.i, 
 				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
 				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
 				    server_ptr->port_max.i, getpid(), frame_time_offset, 
-				    server_ptr->nozombies.b, server_ptr->timothres.ui, drivers)) == 0) {
+				    server_ptr->nozombies.b, server_ptr->timothres.ui, loaded_drivers)) == 0) {
 	    jack_error ("cannot create engine");
 	    goto fail_unregister;
     }

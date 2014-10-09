@@ -96,7 +96,7 @@ using jack::jack_options_parser;
 
 //static JSList *drivers = NULL;
 static sigset_t signals;
-static jack_engine_t *engine = NULL;
+//static jack_engine_t *engine = NULL;
 //static char *server_name = NULL;
 //static int realtime = 1;
 //static int realtime_priority = 10;
@@ -129,7 +129,7 @@ do_nothing_handler (int sig)
 }
 
 static void
-jack_load_internal_clients_pp( const vector<string> & internal_clients )
+jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
 {
 	for( const string & internal_client : internal_clients ) {
 		jack_request_t req;
@@ -226,6 +226,7 @@ jack_main( const jack_options & parsed_options,
 		   jack_driver_desc_t * driver_desc,
 		   JSList * driver_params )
 {
+	jack_engine_t *engine = NULL;
 	int sig;
 	int i;
 	sigset_t allsignals;
@@ -281,13 +282,8 @@ jack_main( const jack_options & parsed_options,
 
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 
-	JSList * drivers_jsl = NULL;
-	for( jack_driver_desc_t * od : loaded_drivers ) {
-		drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
-	}
-
 	/* get the engine/driver started */
-	if ((engine = jack_engine_new_pp(
+	if( (engine = jack_engine_new_pp(
              parsed_options.realtime,
              parsed_options.realtime_priority,
              parsed_options.memory_locked,
@@ -301,7 +297,7 @@ jack_main( const jack_options & parsed_options,
              parsed_options.frame_time_offset, 
              parsed_options.no_zombies,
              parsed_options.timeout_threshold,
-             drivers_jsl)) == 0) {
+			 loaded_drivers )) == 0 ) {
 		jack_error ("cannot create engine");
 		return -1;
 	}
@@ -327,7 +323,7 @@ jack_main( const jack_options & parsed_options,
 		goto error;
 	}
 
-	jack_load_internal_clients_pp( internal_client_names );
+	jack_load_internal_clients_pp( engine, internal_client_names );
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -438,7 +434,7 @@ jack_drivers_get_descriptor_pp( const vector<jack_driver_desc_t*> & loaded_drive
 
 	/* check it doesn't exist already */
 	for( jack_driver_desc_t * other_descriptor : loaded_drivers ) {
-		if (strcmp (descriptor->name, other_descriptor->name) == 0) {
+		if( descriptor->name == other_descriptor->name ) {
 			jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
 				    other_descriptor->file, filename, other_descriptor->name);
 			/* FIXME: delete the descriptor */
