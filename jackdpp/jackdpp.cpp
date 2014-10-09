@@ -95,7 +95,7 @@ using jack::jack_options_parser;
 
 namespace po = boost::program_options;
 
-static JSList *drivers = NULL;
+//static JSList *drivers = NULL;
 static sigset_t signals;
 static jack_engine_t *engine = NULL;
 //static char *server_name = NULL;
@@ -114,7 +114,7 @@ static jack_engine_t *engine = NULL;
 constexpr const char * jack_addon_dir = ADDON_DIR;
 
 static jack_driver_desc_t *
-jack_find_driver_descriptor (const char * name);
+jack_find_driver_descriptor_pp( vector<jack_driver_desc_t*> & loaded_drivers, const char * name);
 
 static void 
 do_nothing_handler (int sig)
@@ -366,7 +366,9 @@ jack_load_internal_clients (JSList* load_list)
 }
 
 static int
-jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSList * driver_params, JSList * slave_names, JSList * load_list )
+jack_main( jack_options & parsed_options, vector<jack_driver_desc_t*> & loaded_drivers,
+		   jack_driver_desc_t * driver_desc,
+		   JSList * driver_params, JSList * slave_names, JSList * load_list )
 {
 	int sig;
 	int i;
@@ -428,6 +430,11 @@ jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSLi
 		parsed_options.client_timeout = 500; /* 0.5 sec; usable when non realtime. */
     }
 
+	JSList * drivers_jsl = NULL;
+	for( jack_driver_desc_t * od : loaded_drivers ) {
+		drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
+	}
+
 	/* get the engine/driver started */
 	if ((engine = jack_engine_new(
              parsed_options.realtime,
@@ -443,7 +450,7 @@ jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSLi
              parsed_options.frame_time_offset, 
              parsed_options.no_zombies,
              parsed_options.timeout_threshold,
-             drivers)) == 0) {
+             drivers_jsl)) == 0) {
 		jack_error ("cannot create engine");
 		return -1;
 	}
@@ -458,7 +465,7 @@ jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSLi
 
 	for (node=slave_names; node; node=jack_slist_next(node)) {
         char *sl_name = (char*)node->data;
-		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor(sl_name);
+		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, sl_name);
 		if (sl_desc) {
 			jack_engine_load_slave_driver(engine, sl_desc, NULL);
 		}
@@ -530,11 +537,12 @@ error:
 }
 
 static jack_driver_desc_t *
-jack_drivers_get_descriptor( jack_options & parsed_options, JSList * drivers, const char * sofile)
+jack_drivers_get_descriptor_pp( jack_options & parsed_options,
+								vector<jack_driver_desc_t*> & loaded_drivers,
+								const char * sofile)
 {
-	jack_driver_desc_t * descriptor, * other_descriptor;
+	jack_driver_desc_t * descriptor;
 	JackDriverDescFunction so_get_descriptor;
-	JSList * node;
 	void * dlhandle;
 	char * filename;
 	const char * dlerr;
@@ -579,9 +587,7 @@ jack_drivers_get_descriptor( jack_options & parsed_options, JSList * drivers, co
 	}
 
 	/* check it doesn't exist already */
-	for (node = drivers; node; node = jack_slist_next (node)) {
-		other_descriptor = (jack_driver_desc_t *) node->data;
-
+	for( jack_driver_desc_t * other_descriptor : loaded_drivers ) {
 		if (strcmp (descriptor->name, other_descriptor->name) == 0) {
 			jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
 				    other_descriptor->file, filename, other_descriptor->name);
@@ -597,14 +603,15 @@ jack_drivers_get_descriptor( jack_options & parsed_options, JSList * drivers, co
 	return descriptor;
 }
 
-static JSList *
-jack_drivers_load( jack_options & parsed_options )
+static vector<jack_driver_desc_t*>
+jack_drivers_load_pp( jack_options & parsed_options )
 {
+	vector<jack_driver_desc_t*> loaded_drivers;
+
 	struct dirent * dir_entry;
 	DIR * dir_stream;
 	const char * ptr;
 	int err;
-	JSList * driver_list = NULL;
 	jack_driver_desc_t * desc;
 	const char* driver_dir;
 
@@ -618,7 +625,7 @@ jack_drivers_load( jack_options & parsed_options )
 	if (!dir_stream) {
 		jack_error ("could not open driver directory %s: %s\n",
 			    driver_dir, strerror (errno));
-		return NULL;
+		return loaded_drivers;
 	}
   
 	while ( (dir_entry = readdir (dir_stream)) ) {
@@ -636,9 +643,9 @@ jack_drivers_load( jack_options & parsed_options )
 			continue;
 		}
 
-		desc = jack_drivers_get_descriptor( parsed_options, drivers, dir_entry->d_name );
+		desc = jack_drivers_get_descriptor_pp( parsed_options, loaded_drivers, dir_entry->d_name );
 		if (desc) {
-			driver_list = jack_slist_append (driver_list, desc);
+			loaded_drivers.push_back( desc );
 		}
 	}
 
@@ -648,12 +655,11 @@ jack_drivers_load( jack_options & parsed_options )
 			    driver_dir, strerror (errno));
 	}
 
-	if (!driver_list) {
+	if (loaded_drivers.size() == 0) {
 		jack_error ("could not find any drivers in %s!\n", driver_dir);
-		return NULL;
 	}
 
-	return driver_list;
+	return loaded_drivers;
 }
 
 static void copyright( ostream & os)
@@ -666,22 +672,15 @@ static void copyright( ostream & os)
 }
 
 static jack_driver_desc_t *
-jack_find_driver_descriptor (const char * name)
+jack_find_driver_descriptor_pp( vector<jack_driver_desc_t*> & loaded_drivers, const char * name)
 {
-	jack_driver_desc_t * desc = 0;
-	JSList * node;
-
-	for (node = drivers; node; node = jack_slist_next (node)) {
-		desc = (jack_driver_desc_t *) node->data;
-
-		if (strcmp (desc->name, name) != 0) {
-			desc = NULL;
-		} else {
-			break;
+	for( jack_driver_desc_t * desc : loaded_drivers ) {
+		if (strcmp (desc->name, name) == 0) {
+			return desc;
 		}
 	}
 
-	return desc;
+	return NULL;
 }
 
 static void
@@ -847,9 +846,10 @@ main (int argc, char *argv[])
 		exit(1);
 	}
 
-	drivers = jack_drivers_load( parsed_options );
+//	drivers = jack_drivers_load( parsed_options );
+	vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( parsed_options );
 
-	if (!drivers) {
+	if (loaded_drivers.size() == 0) {
 		cerr << "jackd: no drivers found; exiting" << endl;
 		exit (1);
 	}
@@ -863,7 +863,7 @@ main (int argc, char *argv[])
 		}
 	}
 
-	desc = jack_find_driver_descriptor( parsed_options.driver.c_str() );
+	desc = jack_find_driver_descriptor_pp( loaded_drivers, parsed_options.driver.c_str() );
 	if (!desc) {
 		cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 		exit (1);
@@ -913,7 +913,7 @@ main (int argc, char *argv[])
 	for( string & ic : parsed_options.internal_clients ) {
 		load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
 	}
-	jack_main( parsed_options, desc, driver_params, slave_drivers_jsl, load_list_jsl);
+	jack_main( parsed_options, loaded_drivers, desc, driver_params, slave_drivers_jsl, load_list_jsl);
 
 	/* clean up shared memory and files from this server instance */
 	if( parsed_options.verbose )
