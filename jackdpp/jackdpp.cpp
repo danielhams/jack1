@@ -130,113 +130,11 @@ do_nothing_handler (int sig)
 }
 
 static void
-jack_load_internal_clients_pp( const vector<string> & load_list )
+jack_load_internal_clients_pp( const vector<string> & internal_clients )
 {
-    for( const string & str : load_list ) {
-        jack_request_t req;
-        string client_name, path, args, rest;
-
-        /* possible argument forms:
-
-           client-name:client-type/args
-           client-type/args
-           client-name:client-type
-           client-type
-
-           client-name is the desired JACK client name.
-           client-type is basically the name of the DLL/DSO without any suffix.
-           args is a string whose contents will be passed to the client as
-           it is instantiated
-        */
-        string::size_type str_length = str.size();
-
-        string::size_type colon_pos = str.find(':');
-        string::size_type slash_pos = str.find('/');
-
-        if ((slash_pos == string::npos && colon_pos == string::npos) ||
-            ((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos))) {
-            /* client-type */
-            client_name = str;
-            path = client_name;
-        }
-        else if (slash_pos != string::npos && colon_pos != string::npos) {
-            /* client-name:client-type/args */
-            client_name = str.substr(0,colon_pos);
-
-            string::size_type len = slash_pos - (colon_pos + 1);
-            if (len > 0) {
-                path = str.substr(colon_pos+1,len);
-            } else {
-                path = client_name;
-            }
-
-            string::size_type rest_len = len - (slash_pos + 1);
-            if (rest_len > 0 )
-            {
-                rest = str.substr(slash_pos+1,rest_len);
-                args = rest;
-            }
-        } else if (slash_pos != string::npos && colon_pos == string::npos) {
-            /* client-type/args */
-            path = str.substr(0, slash_pos);
-            string::size_type rest_len = str_length - (slash_pos+1);
-            if (rest_len > 0) {
-                rest = str.substr(slash_pos+1,rest_len);
-                args = rest;
-            }
-        } else {
-            /* client-name:client-type */
-            client_name = str.substr(0,colon_pos);
-            string::size_type rest_len = str.size() - (colon_pos+1);
-            if( rest_len > 0 ) {
-                path = str.substr((colon_pos+1),rest_len);
-            }
-        }
-
-        // Check client name / path format
-        if (client_name.size() == 0 || path.size() == 0 ) {
-            const char * cstr = str.c_str();
-            fprintf (stderr, "incorrect format for internal client specification (%s)\n", cstr);
-            exit (1);
-        }
-
-        memset (&req, 0, sizeof (req));
-        req.type = IntClientLoad;
-        const char * client_name_cstr = client_name.c_str();
-        strncpy (req.x.intclient.name, client_name_cstr, sizeof (req.x.intclient.name));
-        const char * path_cstr = path.c_str();
-        strncpy (req.x.intclient.path, path_cstr, sizeof (req.x.intclient.path));
-
-        if (args.size() > 0) {
-            const char * args_cstr = args.c_str();
-            strncpy (req.x.intclient.init, args_cstr, sizeof (req.x.intclient.init));
-        } else {
-            req.x.intclient.init[0] = '\0';
-        }
-
-        pthread_mutex_lock (&engine->request_lock);
-        jack_intclient_load_request (engine, &req);
-        pthread_mutex_unlock (&engine->request_lock);
-    }
-}
-
-static void
-jack_load_internal_clients( JSList* load_list )
-{ 
-    JSList * node;
-
-	for (node = load_list; node; node = jack_slist_next (node)) {
-		char* str = (char*) node->data;
+	for( const string & internal_client : internal_clients ) {
 		jack_request_t req;
-		char* colon = strchr (str, ':');
-		char* slash = strchr (str, '/');
-		char* client_name = NULL;
-		char* path = NULL;
-		char* args = NULL;
-		char* rest = NULL;
-		int free_path = 0;
-		int free_name = 0;
-		size_t len;
+		string client_name, path, args, rest;
 
 		/* possible argument forms:
 
@@ -250,100 +148,67 @@ jack_load_internal_clients( JSList* load_list )
 		   args is a string whose contents will be passed to the client as
 		   it is instantiated
 		*/
+		string::size_type str_length = internal_client.size();
 
-		if ((slash == NULL && colon == NULL) || (slash && colon && colon > slash)) {
+		string::size_type colon_pos = internal_client.find(':');
+		string::size_type slash_pos = internal_client.find('/');
 
+		if ((slash_pos == string::npos && colon_pos == string::npos) ||
+			((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos))) {
 			/* client-type */
-
-			client_name = str;
+			client_name = internal_client;
 			path = client_name;
-
-		} else if (slash && colon) {
-
+		}
+		else if (slash_pos != string::npos && colon_pos != string::npos) {
 			/* client-name:client-type/args */
+			client_name = internal_client.substr(0,colon_pos);
 
-			len = colon - str;
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				client_name = (char*) malloc (len + 1);
-				free_name = 1;
-				memcpy (client_name, str, len);
-				client_name[len] = '\0';
-			}
-
-			len = slash - (colon+1);
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				path = (char*) malloc (len + 1);
-				free_path = 1;
-				memcpy (path, colon + 1, len);
-				path[len] = '\0';
+			string::size_type len = slash_pos - (colon_pos + 1);
+			if (len > 0) {
+				path = internal_client.substr(colon_pos+1,len);
 			} else {
 				path = client_name;
 			}
-                        
-			rest = slash + 1;
-			len = strlen (rest);
-                                
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				args = (char*) malloc (len + 1);
-				memcpy (args, rest, len);
-				args[len] = '\0';
-			}
-                        
-		} else if (slash && colon == NULL) {
 
+			string::size_type rest_len = len - (slash_pos + 1);
+			if (rest_len > 0 )
+			{
+				rest = internal_client.substr(slash_pos+1,rest_len);
+				args = rest;
+			}
+		} else if (slash_pos != string::npos && colon_pos == string::npos) {
 			/* client-type/args */
-
-			len = slash - str;
-
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				path = (char *) malloc (len + 1);
-				free_path = 1;
-				memcpy (path, str, len);
-				path[len] = '\0';
-			}
-
-			rest = slash + 1;
-			len = strlen (rest);
-                                
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				args = (char*) malloc (len + 1);
-				memcpy (args, rest, len);
-				args[len] = '\0';
+			path = internal_client.substr(0, slash_pos);
+			string::size_type rest_len = str_length - (slash_pos+1);
+			if (rest_len > 0) {
+				rest = internal_client.substr(slash_pos+1,rest_len);
+				args = rest;
 			}
 		} else {
-                        
 			/* client-name:client-type */
-
-			len = colon - str;
-
-			if (len) {
-				/* add 1 to leave space for a NULL */
-				client_name = (char *) malloc (len + 1);
-				free_name = 1;
-				memcpy (client_name, str, len);
-				client_name[len] = '\0';
-				path = colon + 1;
+			client_name = internal_client.substr(0,colon_pos);
+			string::size_type rest_len = str_length - (colon_pos+1);
+			if( rest_len > 0 ) {
+				path = internal_client.substr((colon_pos+1),rest_len);
 			}
 		}
 
-		if (client_name == NULL || path == NULL) {
-			fprintf (stderr, "incorrect format for internal client specification (%s)\n", str);
+		// Check client name / path format
+		if (client_name.size() == 0 || path.size() == 0 ) {
+			cerr << "incorrect format for internal client specification (" << internal_client << ")" << endl;
 			exit (1);
 		}
 
 		memset (&req, 0, sizeof (req));
 		req.type = IntClientLoad;
-		req.x.intclient.options = 0;
-		strncpy (req.x.intclient.name, client_name, sizeof (req.x.intclient.name));
-		strncpy (req.x.intclient.path, path, sizeof (req.x.intclient.path));
+		const char * client_name_cstr = client_name.c_str();
+		strncpy (req.x.intclient.name, client_name_cstr, sizeof (req.x.intclient.name));
+		const char * path_cstr = path.c_str();
+		strncpy (req.x.intclient.path, path_cstr, sizeof (req.x.intclient.path));
 
-		if (args) {
-			strncpy (req.x.intclient.init, args, sizeof (req.x.intclient.init));
+		if (args.size() > 0) {
+			const char * args_cstr = args.c_str();
+			strncpy (req.x.intclient.init, args_cstr, sizeof (req.x.intclient.init));
 		} else {
 			req.x.intclient.init[0] = '\0';
 		}
@@ -351,30 +216,22 @@ jack_load_internal_clients( JSList* load_list )
 		pthread_mutex_lock (&engine->request_lock);
 		jack_intclient_load_request (engine, &req);
 		pthread_mutex_unlock (&engine->request_lock);
-   
-		if (free_name) {
-			free (client_name);
-		}
-		if (free_path) {
-			free (path);
-		}
-		if (args) {
-			free (args);
-		}
 	}
 }
 
 static int
-jack_main( const jack_options & parsed_options, const vector<jack_driver_desc_t*> & loaded_drivers,
+jack_main( const jack_options & parsed_options,
+		   const vector<jack_driver_desc_t*> & loaded_drivers,
+		   const vector<string> & slave_driver_names,
+		   const vector<string> & internal_client_names,
 		   jack_driver_desc_t * driver_desc,
-		   JSList * driver_params, JSList * slave_names, JSList * load_list )
+		   JSList * driver_params )
 {
 	int sig;
 	int i;
 	sigset_t allsignals;
 	struct sigaction action;
 	int waiting;
-	JSList * node;
 
 	/* ensure that we are in our own process group so that
 	   kill (SIG, -pgrp) does the right thing.
@@ -390,12 +247,12 @@ jack_main( const jack_options & parsed_options, const vector<jack_driver_desc_t*
 
 	   * if a thread has blocked that signal, it is not
 	       a candidate to receive the signal.
-           * of all threads not blocking the signal, pick
+       * of all threads not blocking the signal, pick
 	       one at random, and deliver the signal.
 
-           this means that a simple-minded multi-threaded program can
-           expect to get POSIX signals delivered randomly to any one
-           of its threads,
+       this means that a simple-minded multi-threaded program can
+	   expect to get POSIX signals delivered randomly to any one
+	   of its threads,
 
 	   here, we block all signals that we think we might receive
 	   and want to catch. all "child" threads will inherit this
@@ -458,10 +315,8 @@ jack_main( const jack_options & parsed_options, const vector<jack_driver_desc_t*
 		goto error;
 	}
 
-	for (node=slave_names; node; node=jack_slist_next(node)) {
-        char *sl_name = (char*)node->data;
-		string sl_name_str( sl_name );
-		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, sl_name_str );
+	for( const string & slave_driver_name : slave_driver_names ) {
+		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, slave_driver_name );
 		if (sl_desc) {
 			jack_engine_load_slave_driver(engine, sl_desc, NULL);
 		}
@@ -473,7 +328,7 @@ jack_main( const jack_options & parsed_options, const vector<jack_driver_desc_t*
 		goto error;
 	}
 
-	jack_load_internal_clients (load_list);
+	jack_load_internal_clients_pp( internal_client_names );
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -900,15 +755,11 @@ main (int argc, char *argv[])
 	jack_cleanup_files( parsed_options.server_name.c_str() );
 
 	/* run the server engine until it terminates */
-	JSList * slave_drivers_jsl = NULL;
-	for( string & sd : parsed_options.slave_drivers ) {
-		slave_drivers_jsl = jack_slist_append( slave_drivers_jsl, (void*)sd.c_str() );
-	}
-	JSList * load_list_jsl = NULL;
-	for( string & ic : parsed_options.internal_clients ) {
-		load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
-	}
-	jack_main( parsed_options, loaded_drivers, desc, driver_params, slave_drivers_jsl, load_list_jsl);
+	jack_main( parsed_options,
+			   loaded_drivers,
+			   parsed_options.slave_drivers,
+			   parsed_options.internal_clients,
+			   desc, driver_params );
 
 	/* clean up shared memory and files from this server instance */
 	if( parsed_options.verbose )
