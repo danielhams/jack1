@@ -983,6 +983,7 @@ jackdpp/jackdpp.1
 include/version.h
 include/Makefile
 libjack/Makefile
+libjackpp/Makefile
 python/Makefile
 )
 

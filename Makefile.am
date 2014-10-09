@@ -13,8 +13,8 @@ dist-check-doxygen:
 	@false
 endif
 
-SUBDIRS =      libjack jackd jackdpp drivers example-clients tools config $(DOC_DIR) man python
-DIST_SUBDIRS = config libjack jackd jackdpp include drivers example-clients tools doc man python
+SUBDIRS =      libjack libjackpp jackd jackdpp drivers example-clients tools config $(DOC_DIR) man python
+DIST_SUBDIRS = config libjack libjackpp jackd jackdpp include drivers example-clients tools doc man python
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
@@ -46,4 +46,3 @@ libjackinclude_HEADERS =   \
 	jack/metadata.h     \
 	jack/uuid.h     \
 	jack/jslist.h
-
