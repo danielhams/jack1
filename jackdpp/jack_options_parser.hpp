@@ -33,56 +33,55 @@
 
 namespace jack
 {
-  struct jack_options {
-    jack_options();
-    std::vector<std::string> internal_clients;
-    int clock_source;
-    int timeout_threshold;
-    std::string driver;
-    int frame_time_offset;
-    bool memory_locked;
-    int midi_buffer_size;
-    std::string server_name;
-    bool sanity_checks;
-    int port_max;
-    bool replace_registry;
-    bool realtime;
-    int realtime_priority;
-    bool silent;
-    bool synchronous;
-    bool temporary;
-    bool show_temporary;
-    int client_timeout;
-    bool unlock_memory;
-    bool verbose;
-    bool show_help;
-    bool show_version;
-    std::vector<std::string> slave_drivers;
-    bool no_zombies;
+struct jack_options {
+	jack_options();
+	std::vector<std::string> internal_clients;
+	int clock_source;
+	int timeout_threshold;
+	std::string driver;
+	int frame_time_offset;
+	bool memory_locked;
+	int midi_buffer_size;
+	std::string server_name;
+	bool sanity_checks;
+	int port_max;
+	bool replace_registry;
+	bool realtime;
+	int realtime_priority;
+	bool silent;
+	bool synchronous;
+	bool temporary;
+	bool show_temporary;
+	int client_timeout;
+	bool unlock_memory;
+	bool verbose;
+	bool show_help;
+	bool show_version;
+	std::vector<std::string> slave_drivers;
+	bool no_zombies;
 
-    bool success;
-    std::string error_message;
-  };
+	bool success;
+	std::string error_message;
+};
 
-  class jack_options_parser {
-  public:
-    jack_options_parser( int argc, char ** argv, bool debug = false );
+class jack_options_parser {
+public:
+	jack_options_parser( int argc, char ** argv, bool debug = false );
 
-    inline jack_options & get_parsed_options() { return options_; };
-    inline int get_driver_argc() { return driver_argc_; };
-    inline char ** get_driver_argv() { return &driver_argv_[0]; };
-    void display_usage();
+	inline jack_options & get_parsed_options() { return options_; };
+	inline int get_driver_argc() { return driver_argc_; };
+	inline char ** get_driver_argv() { return &driver_argv_[0]; };
+	void display_usage();
 
-  private:
-    boost::program_options::options_description all_options_;
-    boost::program_options::options_description visible_options_;
-    boost::program_options::options_description hidden_options_;
-    jack_options options_;
+private:
+	boost::program_options::options_description all_options_;
+	boost::program_options::options_description visible_options_;
+	boost::program_options::options_description hidden_options_;
+	jack_options options_;
 
-    uint32_t driver_argc_;
-    std::vector<char*> driver_argv_;
-  };
-
+	uint32_t driver_argc_;
+	std::vector<char*> driver_argv_;
+};
 }
 
 #endif

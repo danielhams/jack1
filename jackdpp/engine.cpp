@@ -76,9 +76,12 @@ typedef struct {
     jack_client_internal_t *dstclient;
 } jack_connection_internal_t;
 
+typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, const JSList *);
+typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
+
 typedef struct _jack_driver_info {
     jack_driver_t *(*initialize)(jack_client_t*, const JSList *);
-    void           (*finish);
+	void           (*finish)(jack_driver_t*);
     char           (*client_name);
     dlhandle       handle;
 } jack_driver_info_t;
@@ -961,7 +964,7 @@ jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 		goto fail;
 	}
 
-	info->initialize = dlsym (info->handle, "driver_initialize");
+	info->initialize = (jack_driver_info_init_callback_t)dlsym (info->handle, "driver_initialize");
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no initialize function in shared object %s\n",
@@ -969,7 +972,7 @@ jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
 		goto fail;
 	}
 
-	info->finish = dlsym (info->handle, "driver_finish");
+	info->finish = (jack_driver_info_finish_callback_t)dlsym (info->handle, "driver_finish");
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("no finish function in in shared driver object %s",
@@ -2090,7 +2093,7 @@ jack_drivers_start (jack_engine_t *engine)
 	/* first start the slave drivers */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
-		jack_driver_t *sdriver = node->data;
+		jack_driver_t *sdriver = (jack_driver_t*)node->data;
 		if (sdriver->start (sdriver)) {
 			failed_drivers = jack_slist_append(failed_drivers, sdriver);
                 }
@@ -2099,7 +2102,7 @@ jack_drivers_start (jack_engine_t *engine)
 	// Clean up drivers which failed to start.
 	for (node=failed_drivers; node; node=jack_slist_next(node))
 	{
-		jack_driver_t *sdriver = node->data;
+		jack_driver_t *sdriver = (jack_driver_t*)node->data;
 		jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
 		jack_slave_driver_remove(engine, sdriver);
 	}
@@ -2118,7 +2121,7 @@ jack_drivers_stop (jack_engine_t *engine)
 	/* now the slave drivers are stopped */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
-		jack_driver_t *sdriver = node->data;
+		jack_driver_t *sdriver = (jack_driver_t*)node->data;
 		sdriver->stop( sdriver );
 	}
 
@@ -2132,7 +2135,7 @@ jack_drivers_read (jack_engine_t *engine, jack_nframes_t nframes)
 	/* first read the slave drivers */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
-		jack_driver_t *sdriver = node->data;
+		jack_driver_t *sdriver = (jack_driver_t*)node->data;
 		sdriver->read (sdriver, nframes);
 	}
 
@@ -2147,7 +2150,7 @@ jack_drivers_write (jack_engine_t *engine, jack_nframes_t nframes)
 	/* first start the slave drivers */
 	for (node=engine->slave_drivers; node; node=jack_slist_next(node))
 	{
-		jack_driver_t *sdriver = node->data;
+		jack_driver_t *sdriver = (jack_driver_t*)node->data;
 		sdriver->write (sdriver, nframes);
 	}
 
@@ -2669,7 +2672,7 @@ static void jack_do_get_uuid_by_client_name (jack_engine_t *engine, jack_request
         
 	for (node = engine->clients; node; node = jack_slist_next (node)) {
 		jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-		if (strcmp (client->control->name, req->x.name) == 0) {
+		if (strcmp ((const char *)client->control->name, req->x.name) == 0) {
                         jack_uuid_copy (&req->x.client_id, client->control->uuid);
 			req->status = 0;
 			return;
@@ -2690,7 +2693,7 @@ static void jack_do_reserve_name (jack_engine_t *engine, jack_request_t *req)
 		}
 	}
 
-	reservation = malloc (sizeof (jack_reserved_name_t));
+	reservation = (jack_reserved_name_t*)malloc (sizeof (jack_reserved_name_t));
 	if (reservation == NULL) {
 		req->status = -1;
 		return;
@@ -2955,7 +2958,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
 		case PortConnected:
 		case PortDisconnected:
 			jack_client_handle_port_connection
-				(client->private_client, event);
+			(client->private_client, (jack_event_t*)event);
 			break;
 
 		case BufferSizeChange:
@@ -3000,7 +3003,7 @@ jack_deliver_event (jack_engine_t *engine, jack_client_internal_t *client,
                         break;
 
 		case LatencyCallback:
-			jack_client_handle_latency_callback (client->private_client, event, (client->control->type == ClientDriver));
+				jack_client_handle_latency_callback (client->private_client, (jack_event_t*)event, (client->control->type == ClientDriver));
 			break;
 
 		default:

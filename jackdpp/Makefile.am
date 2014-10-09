@@ -52,13 +52,28 @@ lib_LTLIBRARIES	= libjackserverpp.la
 
 libjackserverpp_la_CFLAGS = $(AM_CFLAGS)
 
-libjackserverpp_la_SOURCES = engine.c clientengine.c transengine.c controlapi.c \
-	../libjack/systemtest.c ../libjack/sanitycheck.c \
-	../libjack/client.c ../libjack/driver.c ../libjack/intclient.c \
-        ../libjack/messagebuffer.c ../libjack/pool.c ../libjack/port.c \
-        ../libjack/midiport.c ../libjack/ringbuffer.c ../libjack/shm.c \
-        ../libjack/thread.c ../libjack/time.c  ../libjack/transclient.c \
-        ../libjack/unlock.c ../libjack/uuid.c ../libjack/metadata.c
+libjackserverpp_la_SOURCES = engine.cpp \
+	clientengine.c \
+	transengine.c \
+	controlapi.c \
+	../libjack/systemtest.c \
+	../libjack/sanitycheck.c \
+	../libjack/client.c \
+	../libjack/driver.c \
+	../libjack/intclient.c \
+	../libjack/messagebuffer.c \
+	../libjack/pool.c \
+	../libjack/port.c \
+	../libjack/midiport.c \
+	../libjack/ringbuffer.c \
+	../libjack/shm.c \
+	../libjack/thread.c \
+	../libjack/time.c \
+	../libjack/transclient.c \
+	../libjack/unlock.c \
+	../libjack/uuid.c \
+	../libjack/metadata.c \
+	$(NULL)
 libjackserverpp_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@ 
 libjackserverpp_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 

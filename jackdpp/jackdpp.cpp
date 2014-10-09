@@ -467,7 +467,7 @@ jack_main( jack_options & parsed_options, jack_driver_desc_t * driver_desc, JSLi
 		goto error;
 	}
 
-    jack_load_internal_clients (load_list);
+	jack_load_internal_clients (load_list);
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -832,7 +832,7 @@ main (int argc, char *argv[])
         exit(1);
 	}
 
-    if( !parsed_options.success ) {
+    if( !parsed_options.success || parsed_options.show_help ) {
         options_parser.display_usage();
         if( parsed_options.error_message.length() > 0 ) {
             cerr << "Error: " << parsed_options.error_message << endl;

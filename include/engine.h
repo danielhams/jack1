@@ -21,13 +21,13 @@
 #ifndef __jack_engine_h__
 #define __jack_engine_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <jack/jack.h>
 #include "internal.h"
 #include "driver_interface.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct _jack_driver;
 struct _jack_client_internal;
