@@ -787,8 +787,8 @@ maybe_use_capabilities ()
 static
 void display_version( ostream & os )
 {
-    os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
-        " protocol " << PROTOCOL_VERSION << endl;
+	os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
+		" protocol " << PROTOCOL_VERSION << endl;
 }
 
 int	       
