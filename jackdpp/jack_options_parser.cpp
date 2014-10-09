@@ -116,8 +116,6 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     driver_argc_(0),
     driver_argv_()
 {
-    cout << "Options parser called!" << endl;
-
     visible_options_.add_options()
         ( "driver,d", po::value<string>(),
 #ifdef __APPLE__
@@ -188,16 +186,14 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         }
     }
 
-    cout << "Have " << fake_argc << " non-driver arguments" << endl;
     vector<char*> fake_argv( fake_argc );
     
     for( uint32_t i = 0 ; i < fake_argc ; ++i ) {
         fake_argv[i] = argv[i];
-        cout << "Setup fake argv " << i << " to be " << fake_argv[i] << endl;
     }
 
     driver_argc_ = argc - fake_argc;
-    cout << "Have " << driver_argc_ << " driver arguments" << endl;
+
     // If we have a driver (and thus some arguments) make the driver name be
     // the first argument
     // We'll leave it blank here then use what it parses out as
@@ -205,12 +201,10 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     driver_argc_ = driver_argc_ + 1;
 
     driver_argv_.resize( driver_argc_ );
-    driver_argv_[0] = "";
 
     for( uint32_t i = 0 ; i < driver_argc_ - 1 ; ++i ) {
         uint32_t da_index = i + 1;
         driver_argv_[da_index] = argv[fake_argc + i];
-        cout << "Crossing driver argv " << da_index << " to be " << driver_argv_[da_index] << endl;
     }
 
     // Assume true, and set to false when errors encountered.
@@ -219,11 +213,9 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     // Hack to pick up the -X supplied as driver arguments (alsa)
     for( uint32_t i = 1 ; i < driver_argc_ ; ++i ) {
         if( strcmp( driver_argv_[i], "-Xseq") == 0 ) {
-            cout << "Found driver slave definition - using alsa midi" << endl;
             options_.slave_drivers.push_back("alsa_midi");
         }
         else if( strcmp( driver_argv_[i], "-X") == 0 ) {
-            cout << "Found driver slave definition - checking if alsa midi" << endl;
             if( i + 1 < driver_argc_ ) {
                 if( strcmp( driver_argv_[i+1], "seq" ) == 0 ) {
                     options_.slave_drivers.push_back("alsa_midi");
@@ -240,14 +232,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
     try {
         po::store( po::parse_command_line( fake_argc, &fake_argv[0], all_options_), vm );
-        /*
-        po::parsed_options parsed_options = po::parse_command_line( fake_argc, &fake_argv[0], all_options_);
-        cout << "Completed option parse" << endl;
-        po::store( parsed_options, vm );
-        cout << "Completed variable map store" << endl;
-        */
         po::notify(vm);
-        cout << "Completed notify" << endl;
     }
     catch( po::unknown_option & uo ) {
         options_.success = false;
@@ -290,7 +275,6 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
     // If we didn't get any arguments or one of them was "help"
     // Just display the usage.
     if( argc < 2 || vm.count("help") > 0 ) {
-        cout << "Overriding any options error as either empty or help specified." << endl;
         // In the case the help switch was present, don't consider
         // any parse errors
         options_.show_help = true;
@@ -303,7 +287,6 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
         if( vm.count("alsa-add") > 0 ) {
             vector<string> zita_alsa_devices = vm["alsa-add"].as<vector<string>>();
             for( string & zita_alsa_device : zita_alsa_devices ) {
-                cout << "Found zita alsa device entry: " << zita_alsa_device << endl;
                 string::size_type percent_pos = zita_alsa_device.find( '%' );
                 bool need_capture = false;
                 bool need_playback = false;
@@ -337,13 +320,11 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
                     stringstream ss( stringstream::out );
                     ss << device_name << "_rec:zalsa_in/-dhw:" << device_name;
                     options_.internal_clients.push_back( ss.str() );
-                    cout << "(1)PPAdded '" << options_.internal_clients.back() << "' to the internal client list" << endl;
                 }
                 if( need_playback ) {
                     stringstream ss( stringstream::out );
                     ss << device_name << "_play:zalsa_out/-dhw:" << device_name;
                     options_.internal_clients.push_back( ss.str() );
-                    cout << "(2)PPAdded '" << options_.internal_clients.back() << "' to the internal client list" << endl;
                 }
             }
         }
@@ -457,10 +438,9 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 
     if( debug ) {
         cout << options_ << endl;
-    }
-
-    for( uint32_t i = 0 ; i < driver_argc_ ; ++i ) {
-        cout << "Going out driver argv " << i << " is " << driver_argv_[i] << endl;
+        for( uint32_t i = 0 ; i < driver_argc_ ; ++i ) {
+          cout << "Going out driver argv " << i << " is " << driver_argv_[i] << endl;
+        }
     }
 }
 
