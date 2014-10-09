@@ -794,56 +794,56 @@ void display_version( ostream & os )
 int	       
 main (int argc, char *argv[])
 {
-    jack_driver_desc_t * desc;
+	jack_driver_desc_t * desc;
 
 	setvbuf (stdout, NULL, _IOLBF, 0);
 
-    cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
+	cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
 
 	maybe_use_capabilities ();
 
-    jack_options_parser options_parser( argc, argv, true );
+	jack_options_parser options_parser( argc, argv, true );
 
-    jack_options & parsed_options = options_parser.get_parsed_options();
+	jack_options & parsed_options = options_parser.get_parsed_options();
 
-    if( parsed_options.show_temporary ) {
-        cout << jack_tmpdir << endl;
-        exit (0);
-    }
-
-	if( parsed_options.show_version ) {
-        display_version( cout );
-        exit (0);
+	if( parsed_options.show_temporary ) {
+		cout << jack_tmpdir << endl;
+		exit (0);
 	}
 
-    if( parsed_options.show_help ) {
-        display_version( cout );
-        options_parser.display_usage();
-        if( parsed_options.error_message.length() > 0 ) {
-            cerr << "Error: " << parsed_options.error_message << endl;
-        }
-        exit(1);
-    }
+	if( parsed_options.show_version ) {
+		display_version( cout );
+		exit (0);
+	}
+
+	if( parsed_options.show_help ) {
+		display_version( cout );
+		options_parser.display_usage();
+		if( parsed_options.error_message.length() > 0 ) {
+			cerr << "Error: " << parsed_options.error_message << endl;
+		}
+		exit(1);
+	}
 
 	copyright( cout );
 
 	if( parsed_options.sanity_checks && (0 < sanitycheck( parsed_options.realtime, FALSE))) {
-        cerr << "Failed sanity checks" << endl;
-        exit(1);
+		cerr << "Failed sanity checks" << endl;
+		exit(1);
 	}
 
-    if( !parsed_options.success ) {
-        options_parser.display_usage();
-        if( parsed_options.error_message.length() > 0 ) {
-            cerr << "Error: " << parsed_options.error_message << endl;
-        }
-        exit(1);
-    }
+	if( !parsed_options.success ) {
+		options_parser.display_usage();
+		if( parsed_options.error_message.length() > 0 ) {
+			cerr << "Error: " << parsed_options.error_message << endl;
+		}
+		exit(1);
+	}
 
 	drivers = jack_drivers_load( parsed_options );
 
 	if (!drivers) {
-        cerr << "jackd: no drivers found; exiting" << endl;
+		cerr << "jackd: no drivers found; exiting" << endl;
 		exit (1);
 	}
 	
@@ -852,44 +852,44 @@ main (int argc, char *argv[])
 		port_type->buffer_size = parsed_options.midi_buffer_size * jack_midi_internal_event_size ();
 		port_type->buffer_scale_factor = -1;
 		if( parsed_options.verbose ) {
-            cerr << "Set MIDI buffer size to " << port_type->buffer_size << " bytes" << endl;
+			cerr << "Set MIDI buffer size to " << port_type->buffer_size << " bytes" << endl;
 		}
 	}
 
 	desc = jack_find_driver_descriptor( parsed_options.driver.c_str() );
 	if (!desc) {
-        cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
+		cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 		exit (1);
 	}
 
-    int driver_nargs = options_parser.get_driver_argc();
-    char ** driver_args = options_parser.get_driver_argv();
+	int driver_nargs = options_parser.get_driver_argc();
+	char ** driver_args = options_parser.get_driver_argv();
 
-    JSList * driver_params = NULL;
+	JSList * driver_params = NULL;
 
 	if (jack_parse_driver_params (desc, driver_nargs,
-				      driver_args, &driver_params)) {
+								  driver_args, &driver_params)) {
 		exit (0);
 	}
 
 	if( parsed_options.server_name.length() == 0 ) {
 		parsed_options.server_name = jack_default_server_name ();
-    }
+	}
 
 	int rc = jack_register_server( parsed_options.server_name.c_str(), parsed_options.replace_registry );
 	switch (rc) {
 	case EEXIST:
-        cerr << "'" << parsed_options.server_name << "' server already active" << endl;
+		cerr << "'" << parsed_options.server_name << "' server already active" << endl;
 		exit (1);
 	case ENOSPC:
-        cerr << "too many servers already active" << endl;
+		cerr << "too many servers already active" << endl;
 		exit (2);
 	case ENOMEM:
-        cerr << "no access to shm registry" << endl;
+		cerr << "no access to shm registry" << endl;
 		exit (3);
 	default:
 		if( parsed_options.verbose )
-            cerr << "server '" << parsed_options.server_name << "' registered" << endl;
+			cerr << "server '" << parsed_options.server_name << "' registered" << endl;
 	}
 
 	/* clean up shared memory and files from any previous
@@ -898,25 +898,25 @@ main (int argc, char *argv[])
 	jack_cleanup_files( parsed_options.server_name.c_str() );
 
 	/* run the server engine until it terminates */
-    JSList * slave_drivers_jsl = NULL;
-    for( string & sd : parsed_options.slave_drivers ) {
-        slave_drivers_jsl = jack_slist_append( slave_drivers_jsl, (void*)sd.c_str() );
-    }
-    JSList * load_list_jsl = NULL;
-    for( string & ic : parsed_options.internal_clients ) {
-        load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
-    }
+	JSList * slave_drivers_jsl = NULL;
+	for( string & sd : parsed_options.slave_drivers ) {
+		slave_drivers_jsl = jack_slist_append( slave_drivers_jsl, (void*)sd.c_str() );
+	}
+	JSList * load_list_jsl = NULL;
+	for( string & ic : parsed_options.internal_clients ) {
+		load_list_jsl = jack_slist_append( load_list_jsl, (void*)ic.c_str() );
+	}
 	jack_main( parsed_options, desc, driver_params, slave_drivers_jsl, load_list_jsl);
 
 	/* clean up shared memory and files from this server instance */
 	if( parsed_options.verbose )
-        cerr << "cleaning up shared memory" << endl;
+		cerr << "cleaning up shared memory" << endl;
 	jack_cleanup_shm ();
 	if( parsed_options.verbose )
-        cerr << "cleaning up files" << endl;
+		cerr << "cleaning up files" << endl;
 	jack_cleanup_files( parsed_options.server_name.c_str() );
 	if( parsed_options.verbose )
-        cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
+		cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
 	jack_unregister_server( parsed_options.server_name.c_str() );
 
 	exit (0);
