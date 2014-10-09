@@ -56,29 +56,29 @@ libjackserverpp_la_SOURCES = engine.cpp \
 	clientengine.c \
 	transengine.c \
 	controlapi.c \
-	../libjack/systemtest.c \
-	../libjack/sanitycheck.c \
-	../libjack/client.c \
-	../libjack/driver.c \
-	../libjack/intclient.c \
-	../libjack/messagebuffer.c \
-	../libjack/pool.c \
-	../libjack/port.c \
-	../libjack/midiport.c \
-	../libjack/ringbuffer.c \
-	../libjack/shm.c \
-	../libjack/thread.c \
-	../libjack/time.c \
-	../libjack/transclient.c \
-	../libjack/unlock.c \
-	../libjack/uuid.c \
-	../libjack/metadata.c \
+	../libjackpp/systemtest.c \
+	../libjackpp/sanitycheck.c \
+	../libjackpp/client.c \
+	../libjackpp/driver.c \
+	../libjackpp/intclient.c \
+	../libjackpp/messagebuffer.c \
+	../libjackpp/pool.c \
+	../libjackpp/port.c \
+	../libjackpp/midiport.c \
+	../libjackpp/ringbuffer.c \
+	../libjackpp/shm.c \
+	../libjackpp/thread.c \
+	../libjackpp/time.c \
+	../libjackpp/transclient.c \
+	../libjackpp/unlock.c \
+	../libjackpp/uuid.c \
+	../libjackpp/metadata.c \
 	$(NULL)
 libjackserverpp_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@ 
 libjackserverpp_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
-simd.lo: $(srcdir)/../libjack/simd.c
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjack/simd.c
+simd.lo: $(srcdir)/../libjackpp/simd.c
+	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjackpp/simd.c
 
 man_MANS = jackdpp.1 jackstartpp.1
 EXTRA_DIST = $(man_MANS)

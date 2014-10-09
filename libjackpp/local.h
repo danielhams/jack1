@@ -1,6 +1,10 @@
 #ifndef __jack_libjack_local_h__
 #define __jack_libjack_local_h__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Client data structure, in the client address space. */
 struct _jack_client {
 
@@ -99,5 +103,10 @@ extern void *jack_zero_filled_buffer;
 
 extern void jack_set_clock_source (jack_timer_type_t);
 extern char* jack_server_dir (const char* server_name, char* server_dir);
+
+#ifdef __cplusplus
+/* Close of extern "C" { */
+}
+#endif
 
 #endif /* __jack_libjack_local_h__ */
