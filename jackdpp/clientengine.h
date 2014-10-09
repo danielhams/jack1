@@ -19,6 +19,8 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
+#ifndef __jackd_client_engine_h__
+#define __jackd_client_engine_h__
 
 #ifdef __cplusplus
 extern "C" {
@@ -68,4 +70,6 @@ void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
 #ifdef __cplusplus
 /* Close of extern "C" { */
 }
+#endif
+
 #endif
