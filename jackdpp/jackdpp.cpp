@@ -1,6 +1,9 @@
-/* -*- mode: c; c-file-style: "bsd"; -*- */
+/* -*- mode: cpp; c-file-style: "bsd"; -*- */
 /*
+    Original file (jackd.c):
     Copyright (C) 2001-2005 Paul Davis
+	C++ Conversion And Modifications:
+	Copyright (C) 2014 Daniel Hams
     
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
