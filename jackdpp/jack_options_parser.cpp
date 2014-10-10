@@ -450,6 +450,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 	}
 
 	if( debug ) {
+		cout << options_ << endl;
 		for( uint32_t i = 0 ; i < driver_argc_ ; ++i )
 		{
 			cout << "Going out driver argv " << i << " is " << driver_argv_[i] << endl;
