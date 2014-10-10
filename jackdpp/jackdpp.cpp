@@ -285,7 +285,7 @@ jack_main( const jack_options & parsed_options,
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 
 	/* get the engine/driver started */
-	if( (engine = jack_engine_create(
+	if( (engine = jack_engine_create_pp(
              parsed_options.realtime,
              parsed_options.realtime_priority,
              parsed_options.memory_locked,
@@ -376,11 +376,11 @@ jack_main( const jack_options & parsed_options,
 		sigprocmask (SIG_UNBLOCK, &signals, 0);
 	}
 	
-	jack_engine_cleanup( engine.get() );
+	jack_engine_cleanup_pp( engine.get() );
 	return 1;
 	
 error:
-	jack_engine_cleanup( engine.get() );
+	jack_engine_cleanup_pp( engine.get() );
 	return -1;
 }
 

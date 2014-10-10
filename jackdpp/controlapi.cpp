@@ -1135,7 +1135,7 @@ const JSList * jackctl_server_get_drivers_list(jackctl_server_t *server_ptr)
 bool jackctl_server_stop(jackctl_server_t *server_ptr)
 {
 	//jack_engine_driver_exit (server_ptr->engine);
-	jack_engine_cleanup( server_ptr->engine.get() );
+	jack_engine_cleanup_pp( server_ptr->engine.get() );
 
     /* clean up shared memory and files from this server instance */
     //jack_log("cleaning up shared memory");
@@ -1209,7 +1209,7 @@ jackctl_server_start(
 	}
 	while( dli != NULL );
 
-    if ((server_ptr->engine = jack_engine_create( server_ptr->realtime.b, server_ptr->realtime_priority.i, 
+    if ((server_ptr->engine = jack_engine_create_pp( server_ptr->realtime.b, server_ptr->realtime_priority.i, 
 				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
 				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
 				    server_ptr->port_max.i, getpid(), frame_time_offset, 
@@ -1235,7 +1235,7 @@ jackctl_server_start(
 fail_close:
 
 fail_delete:
-    jack_engine_cleanup( server_ptr->engine.get() );
+    jack_engine_cleanup_pp( server_ptr->engine.get() );
     server_ptr->engine.release();
 
 fail_unregister:

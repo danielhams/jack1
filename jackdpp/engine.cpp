@@ -1790,10 +1790,8 @@ jack_server_thread (void *arg)
 	return 0;
 }
 
-//jack_engine_t *
-//jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 unique_ptr<jack_engine_t>
-jack_engine_create( int realtime, int rtpriority, int do_mlock, int do_unlock,
+jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 					const char *server_name, int temporary, int verbose,
 					int client_timeout, unsigned int port_max, pid_t wait_pid,
 					jack_nframes_t frame_time_offset, int nozombies,
@@ -2594,7 +2592,7 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 }
 
 void 
-jack_engine_cleanup( jack_engine_t *engine )
+jack_engine_cleanup_pp( jack_engine_t *engine )
 {
 	if (engine == NULL)
 		return;

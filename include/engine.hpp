@@ -32,7 +32,7 @@
 #include <string>
 
 // jack_engine_t * jack_engine_new_pp( int real_time, int real_time_priority,
-std::unique_ptr<jack_engine_t> jack_engine_create( int real_time, int real_time_priority,
+std::unique_ptr<jack_engine_t> jack_engine_create_pp( int real_time, int real_time_priority,
 												   int do_mlock, int do_unlock,
 												   const char *server_name, int temporary,
 												   int verbose, int client_timeout,
@@ -41,7 +41,7 @@ std::unique_ptr<jack_engine_t> jack_engine_create( int real_time, int real_time_
 												   int timeout_count_threshold,
 												   const std::vector<jack_driver_desc_t*> & loaded_drivers);
 
-void jack_engine_cleanup( jack_engine_t * );
+void jack_engine_cleanup_pp( jack_engine_t * );
 
 int jack_engine_load_driver_pp( jack_engine_t *engine,
 								jack_driver_desc_t * driver_desc,
