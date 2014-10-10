@@ -58,9 +58,19 @@
 //#include "JackDriverLoader.h"
 //#include "JackServerGlobals.h"
 
+#include "jack_options_parser.hpp"
+#include "jack_cpp_utils.hpp"
+
 using std::vector;
 using std::string;
 using std::unique_ptr;
+
+using jack::jack_signals_create;
+using jack::jack_signals_block;
+using jack::jack_signals_unblock;
+using jack::jack_signals_install_do_nothing_action;
+using jack::jack_signals_wait;
+using jack::jack_options;
 
 /*
  * XXX: dont like statics here.
@@ -695,92 +705,13 @@ void jackctl_wait_signals(sigset_t signals)
 
 #else
 
-static
-void
-do_nothing_handler(int sig)
-{
-    /* this is used by the child (active) process, but it never
-       gets called unless we are already shutting down after
-       another signal.
-    */
-    char buf[64];
-    snprintf (buf, sizeof(buf), "received signal %d during shutdown (ignored)\n", sig);
-}
-
 sigset_t
 jackctl_setup_signals(
     unsigned int flags)
 {
-    sigset_t signals;
-    sigset_t allsignals;
-    struct sigaction action;
-    int i;
+    sigset_t signals = jack_signals_create();
 
-    /* ensure that we are in our own process group so that
-       kill (SIG, -pgrp) does the right thing.
-    */
-
-    setsid();
-
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-    /* what's this for?
-
-       POSIX says that signals are delivered like this:
-
-       * if a thread has blocked that signal, it is not
-       a candidate to receive the signal.
-       * of all threads not blocking the signal, pick
-       one at random, and deliver the signal.
-
-       this means that a simple-minded multi-threaded program can
-       expect to get POSIX signals delivered randomly to any one
-       of its threads,
-
-       here, we block all signals that we think we might receive
-       and want to catch. all "child" threads will inherit this
-       setting. if we create a thread that calls sigwait() on the
-       same set of signals, implicitly unblocking all those
-       signals. any of those signals that are delivered to the
-       process will be delivered to that thread, and that thread
-       alone. this makes cleanup for a signal-driven exit much
-       easier, since we know which thread is doing it and more
-       importantly, we are free to call async-unsafe functions,
-       because the code is executing in normal thread context
-       after a return from sigwait().
-    */
-
-    sigemptyset(&signals);
-    sigaddset(&signals, SIGHUP);
-    sigaddset(&signals, SIGINT);
-    sigaddset(&signals, SIGQUIT);
-    sigaddset(&signals, SIGPIPE);
-    sigaddset(&signals, SIGTERM);
-    sigaddset(&signals, SIGUSR1);
-    sigaddset(&signals, SIGUSR2);
-
-    /* all child threads will inherit this mask unless they
-     * explicitly reset it
-     */
-
-    pthread_sigmask(SIG_BLOCK, &signals, 0);
-
-    /* install a do-nothing handler because otherwise pthreads
-       behaviour is undefined when we enter sigwait.
-    */
-
-    sigfillset(&allsignals);
-    action.sa_handler = do_nothing_handler;
-    action.sa_mask = allsignals;
-    action.sa_flags = SA_RESTART|SA_RESETHAND;
-
-    for (i = 1; i < NSIG; i++)
-    {
-        if (sigismember (&signals, i))
-        {
-            sigaction(i, &action, 0);
-        }
-    }
+    jack_signals_install_do_nothing_action( signals );
 
     return signals;
 }
@@ -788,38 +719,13 @@ jackctl_setup_signals(
 void
 jackctl_wait_signals(sigset_t signals)
 {
-    int sig;
-    bool waiting = true;
-
-    while (waiting) {
-#if defined(sun) && !defined(__sun__) // SUN compiler only, to check
-        sigwait(&signals);
-#else
-        sigwait(&signals, &sig);
-#endif
-        fprintf(stderr, "jack main caught signal %d\n", sig);
-
-        switch (sig) {
-            case SIGUSR1:
-                //jack_dump_configuration(engine, 1);
-                break;
-            case SIGUSR2:
-                // driver exit
-                waiting = false;
-                break;
-            case SIGTTOU:
-                break;
-            default:
-                waiting = false;
-                break;
-        }
-    }
+    int sig = jack_signals_wait( signals, nullptr );
 
     if (sig != SIGSEGV) {
         // unblock signals so we can see them during shutdown.
         // this will help prod developers not to lose sight of
         // bugs that cause segfaults etc. during shutdown.
-        sigprocmask(SIG_UNBLOCK, &signals, 0);
+	jack_signals_unblock( signals );
     }
 }
 #endif
@@ -827,29 +733,14 @@ jackctl_wait_signals(sigset_t signals)
 static sigset_t
 jackctl_block_signals()
 {
-    sigset_t signals;
-    sigset_t oldsignals;
-
-    sigemptyset(&signals);
-    sigaddset(&signals, SIGHUP);
-    sigaddset(&signals, SIGINT);
-    sigaddset(&signals, SIGQUIT);
-    sigaddset(&signals, SIGPIPE);
-    sigaddset(&signals, SIGTERM);
-    sigaddset(&signals, SIGUSR1);
-    sigaddset(&signals, SIGUSR2);
-
-    pthread_sigmask(SIG_BLOCK, &signals, &oldsignals);
-
-    return oldsignals;
+    return jack_signals_block();
 }
 
 static void
-jackctl_unblock_signals(sigset_t oldsignals)
+jackctl_unblock_signals( sigset_t signals )
 {
-    pthread_sigmask(SIG_SETMASK, &oldsignals, 0);
+    jack_signals_unblock( signals );
 }
-
 
 static
 jack_driver_param_constraint_desc_t *
@@ -1171,10 +1062,14 @@ jackctl_server_start(
     // TODO:
     int frame_time_offset = 0;
 
+    // Hack to support jack_engine_create until I fix up where this is constructing the drivers list
+    // (see below)
     vector<jack_driver_desc_t*> loaded_drivers;
     JSList* dli;
 
-    rc = jack_register_server (server_ptr->name.str, server_ptr->replace_registry.b);
+    jack_options server_options;
+
+    rc = jack_register_server( server_ptr->name.str, server_ptr->replace_registry.b );
     switch (rc)
     {
 	case EEXIST:
@@ -1208,11 +1103,23 @@ jackctl_server_start(
     }
     while( dli != NULL );
 
-    if ((server_ptr->engine = jack_engine_create_pp( server_ptr->realtime.b, server_ptr->realtime_priority.i, 
-						     server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
-						     server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
-						     server_ptr->port_max.i, getpid(), frame_time_offset, 
-						     server_ptr->nozombies.b, server_ptr->timothres.ui, loaded_drivers)) == 0) {
+    server_options.realtime = server_ptr->realtime.b;
+    server_options.realtime_priority = server_ptr->realtime_priority.i;
+    server_options.memory_locked = server_ptr->do_mlock.b;
+    server_options.unlock_gui_memory = server_ptr->do_unlock.b;
+    server_options.server_name = server_ptr->name.str;
+    server_options.temporary = server_ptr->temporary.b;
+    server_options.verbose = server_ptr->verbose.b;
+    server_options.client_timeout = server_ptr->client_timeout.i;
+    server_options.port_max = server_ptr->port_max.i;
+    server_options.frame_time_offset = frame_time_offset;
+    server_options.no_zombies = server_ptr->nozombies.b;
+    server_options.timeout_threshold = server_ptr->timothres.ui;
+
+    if ((server_ptr->engine = jack_engine_create_pp(
+	     server_options,
+	     getpid(),
+	     loaded_drivers)) == 0 ) {
 	jack_error ("cannot create engine");
 	goto fail_unregister;
     }

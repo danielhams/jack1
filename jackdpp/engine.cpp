@@ -1789,13 +1789,10 @@ jack_server_thread (void *arg)
     return 0;
 }
 
-unique_ptr<jack_engine_t>
-jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
-		       const char *server_name, int temporary, int verbose,
-		       int client_timeout, unsigned int port_max, pid_t wait_pid,
-		       jack_nframes_t frame_time_offset, int nozombies,
-		       int timeout_count_threshold,
-		       const vector<jack_driver_desc_t*> & loaded_drivers)
+unique_ptr<jack_engine_t> jack_engine_create_pp(
+    const jack::jack_options & parsed_options,
+    pid_t wait_pid,
+    const std::vector<jack_driver_desc_t*> & loaded_drivers )
 {
     std::unique_ptr<jack_engine_t> engine = make_unique<jack_engine_t>();
     unsigned int i;
@@ -1810,7 +1807,7 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
        actually do it.
     */
 
-    if (realtime) {
+    if( parsed_options.realtime ) {
 	if (jack_acquire_real_time_scheduling (pthread_self(), 10) != 0) {
 	    /* can't run realtime - time to bomb */
 	    return NULL;
@@ -1820,7 +1817,7 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
 
 #ifdef USE_MLOCK
 
-	if (do_mlock && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
+	if( parsed_options.memory_locked && (mlockall (MCL_CURRENT | MCL_FUTURE) != 0)) {
 	    jack_error ("cannot lock down memory for jackd (%s)",
 			strerror (errno));
 #ifdef ENSURE_MLOCK
@@ -1856,24 +1853,24 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
     engine->delay = jack_engine_delay;
     engine->driver_exit = jack_engine_driver_exit;
     engine->transport_cycle_start = jack_transport_cycle_start;
-    engine->client_timeout_msecs = client_timeout;
+    engine->client_timeout_msecs = parsed_options.client_timeout;
     engine->timeout_count = 0;
     engine->problems = 0;
 
-    engine->port_max = port_max;
+    engine->port_max = parsed_options.port_max;
     engine->server_thread = 0;
-    engine->rtpriority = rtpriority;
+    engine->rtpriority = parsed_options.realtime_priority;
     engine->silent_buffer = 0;
-    engine->verbose = verbose;
-    engine->server_name = server_name;
-    engine->temporary = temporary;
+    engine->verbose = parsed_options.verbose;
+    engine->server_name = parsed_options.server_name.c_str();
+    engine->temporary = parsed_options.temporary;
     engine->freewheeling = 0;
     engine->stop_freewheeling = 0;
     jack_uuid_clear( &engine->fwclient );
     engine->feedbackcount = 0;
     engine->wait_pid = wait_pid;
-    engine->nozombies = nozombies;
-    engine->timeout_count_threshold = timeout_count_threshold;
+    engine->nozombies = parsed_options.no_zombies;
+    engine->timeout_count_threshold = parsed_options.timeout_threshold;
     engine->removing_clients = 0;
     engine->new_clients_allowed = 1;
 
@@ -1997,7 +1994,7 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
     }
 
     engine->control->port_max = engine->port_max;
-    engine->control->real_time = realtime;
+    engine->control->real_time = parsed_options.realtime;
 	
     /* leave some headroom for other client threads to run
        with priority higher than the regular client threads
@@ -2006,14 +2003,14 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
        which are affected by this.
     */
 
-    engine->control->client_priority = (realtime
+    engine->control->client_priority = (parsed_options.realtime
 					? engine->rtpriority - 5
 					: 0);
-    engine->control->max_client_priority = (realtime
+    engine->control->max_client_priority = (parsed_options.realtime
 					    ? engine->rtpriority - 1
 					    : 0);
-    engine->control->do_mlock = do_mlock;
-    engine->control->do_munlock = do_unlock;
+    engine->control->do_mlock = parsed_options.memory_locked;
+    engine->control->do_munlock = parsed_options.unlock_gui_memory;
     engine->control->cpu_load = 0;
     engine->control->xrun_delayed_usecs = 0;
     engine->control->max_delayed_usecs = 0;
@@ -2024,7 +2021,7 @@ jack_engine_create_pp( int realtime, int rtpriority, int do_mlock, int do_unlock
 
     VERBOSE( engine.get(), "clock source = %s", jack_clock_source_name (clock_source) );
 
-    engine->control->frame_timer.frames = frame_time_offset;
+    engine->control->frame_timer.frames = parsed_options.frame_time_offset;
     engine->control->frame_timer.reset_pending = 0;
     engine->control->frame_timer.current_wakeup = 0;
     engine->control->frame_timer.next_wakeup = 0;

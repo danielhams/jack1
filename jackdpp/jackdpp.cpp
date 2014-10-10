@@ -70,6 +70,7 @@
 #include "sanitycheck.h"
 
 #include "jack_options_parser.hpp"
+#include "jack_cpp_utils.hpp"
 
 #ifdef USE_CAPABILITIES
 
@@ -94,9 +95,13 @@ using std::unique_ptr;
 
 using jack::jack_options;
 using jack::jack_options_parser;
+using jack::jack_signals_create;
+using jack::jack_signals_unblock;
+using jack::jack_signals_install_do_nothing_action;
+using jack::jack_signals_wait;
 
 //static JSList *drivers = NULL;
-static sigset_t signals;
+//static sigset_t signals;
 //static jack_engine_t *engine = NULL;
 //static char *server_name = NULL;
 //static int realtime = 1;
@@ -115,19 +120,6 @@ constexpr const char * jack_addon_dir = ADDON_DIR;
 
 static jack_driver_desc_t *
 jack_find_driver_descriptor_pp( const vector<jack_driver_desc_t*> & loaded_drivers, const string & name );
-
-static void 
-do_nothing_handler (int sig)
-{
-    /* this is used by the child (active) process, but it never
-       gets called unless we are already shutting down after
-       another signal.
-    */
-    char buf[64];
-    snprintf (buf, sizeof(buf),
-	      "received signal %d during shutdown (ignored)\n", sig);
-    write (1, buf, strlen (buf));
-}
 
 static void
 jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
@@ -229,75 +221,12 @@ jack_main( const jack_options & parsed_options,
 {
     unique_ptr<jack_engine_t> engine;
     int sig;
-    int i;
-    sigset_t allsignals;
-    struct sigaction action;
-    int waiting;
 
-    /* ensure that we are in our own process group so that
-       kill (SIG, -pgrp) does the right thing.
-    */
+    sigset_t signals = jack_signals_create();
 
-    setsid ();
-
-    pthread_setcanceltype (PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-    /* what's this for?
-
-       POSIX says that signals are delivered like this:
-
-       * if a thread has blocked that signal, it is not
-       a candidate to receive the signal.
-       * of all threads not blocking the signal, pick
-       one at random, and deliver the signal.
-
-       this means that a simple-minded multi-threaded program can
-       expect to get POSIX signals delivered randomly to any one
-       of its threads,
-
-       here, we block all signals that we think we might receive
-       and want to catch. all "child" threads will inherit this
-       setting. if we create a thread that calls sigwait() on the
-       same set of signals, implicitly unblocking all those
-       signals. any of those signals that are delivered to the
-       process will be delivered to that thread, and that thread
-       alone. this makes cleanup for a signal-driven exit much
-       easier, since we know which thread is doing it and more
-       importantly, we are free to call async-unsafe functions,
-       because the code is executing in normal thread context
-       after a return from sigwait().
-    */
-
-    sigemptyset (&signals);
-    sigaddset(&signals, SIGHUP);
-    sigaddset(&signals, SIGINT);
-    sigaddset(&signals, SIGQUIT);
-    sigaddset(&signals, SIGPIPE);
-    sigaddset(&signals, SIGTERM);
-    sigaddset(&signals, SIGUSR1);
-    sigaddset(&signals, SIGUSR2);
-
-    /* all child threads will inherit this mask unless they
-     * explicitly reset it 
-     */
-
-    pthread_sigmask (SIG_BLOCK, &signals, 0);
-
-    /* get the engine/driver started */
     if( (engine = jack_engine_create_pp(
-             parsed_options.realtime,
-             parsed_options.realtime_priority,
-             parsed_options.memory_locked,
-             parsed_options.unlock_memory,
-             parsed_options.server_name.c_str(),
-             parsed_options.temporary,
-             parsed_options.verbose,
-             parsed_options.client_timeout,
-             parsed_options.port_max,
+             parsed_options,
              getpid(),
-             parsed_options.frame_time_offset, 
-             parsed_options.no_zombies,
-             parsed_options.timeout_threshold,
 	     loaded_drivers )) == 0 ) {
 	jack_error ("cannot create engine");
 	return -1;
@@ -329,52 +258,22 @@ jack_main( const jack_options & parsed_options,
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
     */
+    jack_signals_install_do_nothing_action( signals );
 
-    sigfillset (&allsignals);
-    action.sa_handler = do_nothing_handler;
-    action.sa_mask = allsignals;
-    action.sa_flags = SA_RESTART|SA_RESETHAND;
-
-    for (i = 1; i < NSIG; i++) {
-	if (sigismember (&signals, i)) {
-	    sigaction (i, &action, 0);
-	} 
-    }
-	
     if( parsed_options.verbose ) {
 	jack_info ("%d waiting for signals", getpid());
     }
 
-    waiting = TRUE;
+    sig = jack_signals_wait( signals, engine.get() );
 
-    while (waiting) {
-	sigwait (&signals, &sig);
-
-	jack_info ("jack main caught signal %d", sig);
-		
-	switch (sig) {
-	    case SIGUSR1:
-		jack_dump_configuration( engine.get(), 1 );
-		break;
-	    case SIGUSR2:
-		/* driver exit */
-		waiting = FALSE;
-		break;
-	    default:
-		waiting = FALSE;
-		break;
-	}
-    } 
-	
     if (sig != SIGSEGV) {
-
 	/* unblock signals so we can see them during shutdown.
 	   this will help prod developers not to lose sight of
 	   bugs that cause segfaults etc. during shutdown.
 	*/
-	sigprocmask (SIG_UNBLOCK, &signals, 0);
+	jack_signals_unblock( signals );
     }
-	
+
     jack_engine_cleanup_pp( engine.get() );
     return 1;
 	

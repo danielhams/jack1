@@ -54,7 +54,7 @@ struct jack_options {
     bool temporary;
     bool show_temporary;
     int client_timeout;
-    bool unlock_memory;
+    bool unlock_gui_memory;
     bool verbose;
     bool show_help;
     bool show_version;

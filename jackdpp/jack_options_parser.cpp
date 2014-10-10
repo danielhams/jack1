@@ -61,7 +61,7 @@ jack_options::jack_options() :
     temporary(false),
     show_temporary(false),
     client_timeout(0),
-    unlock_memory(false),
+    unlock_gui_memory(false),
     verbose(false),
     show_help(false),
     show_version(false),
@@ -101,7 +101,7 @@ ostream & operator<<( ostream & os, jack_options & jo )
     os << "synchronous(" << jo.synchronous << ")" << endl;
     os << "temporary(" << jo.temporary << ")" << endl;
     os << "client_timeout(" << jo.client_timeout << ")" << endl;
-    os << "unlock_memory(" << jo.unlock_memory << ")" << endl;
+    os << "unlock_gui_memory(" << jo.unlock_gui_memory << ")" << endl;
     os << "verbose(" << jo.verbose << ")" << endl;
     for( const string & sd : jo.slave_drivers ) {
 	os << "slave_drivers(" << sd << ")" << endl;
@@ -426,7 +426,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 	}
 
 	if( vm.count("unlock") > 0 ) {
-	    options_.unlock_memory = true;
+	    options_.unlock_gui_memory = true;
 	}
 
 	if( vm.count("version") > 0 ) {
