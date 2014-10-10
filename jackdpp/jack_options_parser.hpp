@@ -1,19 +1,19 @@
 /*
-    Copyright (C) 2014- Daniel Hams
+  Copyright (C) 2014- Daniel Hams
     
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
 #ifndef JACK_OPTIONS_PARSER_HPP
@@ -33,7 +33,7 @@
 
 namespace jack
 {
-struct jack_options {
+    struct jack_options {
 	jack_options();
 	std::vector<std::string> internal_clients;
 	int clock_source;
@@ -62,10 +62,10 @@ struct jack_options {
 
 	bool success;
 	std::string error_message;
-};
+    };
 
-class jack_options_parser {
-public:
+    class jack_options_parser {
+    public:
 	jack_options_parser( int argc, char ** argv, bool debug = false );
 
 	inline jack_options & get_parsed_options() { return options_; };
@@ -73,7 +73,7 @@ public:
 	inline char ** get_driver_argv() { return &driver_argv_[0]; };
 	void display_usage();
 
-private:
+    private:
 	boost::program_options::options_description all_options_;
 	boost::program_options::options_description visible_options_;
 	boost::program_options::options_description hidden_options_;
@@ -81,7 +81,7 @@ private:
 
 	uint32_t driver_argc_;
 	std::vector<char*> driver_argv_;
-};
+    };
 }
 
 #endif

@@ -1,4 +1,3 @@
-/* -*- mode: c++; c-file-style: "bsd"; -*- */
 /*
     (Original file engine.h)
     Copyright (C) 2001-2003 Paul Davis
@@ -33,18 +32,18 @@
 
 // jack_engine_t * jack_engine_new_pp( int real_time, int real_time_priority,
 std::unique_ptr<jack_engine_t> jack_engine_create_pp( int real_time, int real_time_priority,
-												   int do_mlock, int do_unlock,
-												   const char *server_name, int temporary,
-												   int verbose, int client_timeout,
-												   unsigned int port_max,
-												   pid_t waitpid, jack_nframes_t frame_time_offset, int nozombies, 
-												   int timeout_count_threshold,
-												   const std::vector<jack_driver_desc_t*> & loaded_drivers);
+						      int do_mlock, int do_unlock,
+						      const char *server_name, int temporary,
+						      int verbose, int client_timeout,
+						      unsigned int port_max,
+						      pid_t waitpid, jack_nframes_t frame_time_offset, int nozombies, 
+						      int timeout_count_threshold,
+						      const std::vector<jack_driver_desc_t*> & loaded_drivers);
 
 void jack_engine_cleanup_pp( jack_engine_t * );
 
 int jack_engine_load_driver_pp( jack_engine_t *engine,
-								jack_driver_desc_t * driver_desc,
-								JSList * driver_params_jsl );
+				jack_driver_desc_t * driver_desc,
+				JSList * driver_params_jsl );
 
 #endif

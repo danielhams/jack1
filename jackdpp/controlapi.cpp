@@ -1,4 +1,3 @@
-// u/* -*- Mode: C++ ; c-basic-offset: 4 -*- */
 /*
   JACK control API implementation
 
@@ -74,7 +73,7 @@ struct jackctl_server
     JSList * internals;
     JSList * parameters;
 
-	std::unique_ptr<jack_engine_t> engine;
+    std::unique_ptr<jack_engine_t> engine;
 
     /* string, server name */
     union jackctl_parameter_value name;
@@ -215,7 +214,7 @@ jackctl_add_parameter(
 
     return parameter_ptr;
 
-fail:
+  fail:
     return NULL;
 }
 
@@ -260,30 +259,30 @@ jackctl_add_driver_parameters(
 
         switch (descriptor_ptr->type)
         {
-        case JackDriverParamInt:
-            jackctl_type = JackParamInt;
-            jackctl_value.i = descriptor_ptr->value.i;
-            break;
-        case JackDriverParamUInt:
-            jackctl_type = JackParamUInt;
-            jackctl_value.ui = descriptor_ptr->value.ui;
-            break;
-        case JackDriverParamChar:
-            jackctl_type = JackParamChar;
-            jackctl_value.c = descriptor_ptr->value.c;
-            break;
-        case JackDriverParamString:
-            jackctl_type = JackParamString;
-            strcpy(jackctl_value.str, descriptor_ptr->value.str);
-            break;
-        case JackDriverParamBool:
-            jackctl_type = JackParamBool;
-            jackctl_value.b = descriptor_ptr->value.i;
-            break;
-        default:
-            jack_error("unknown driver parameter type %i", (int)descriptor_ptr->type);
-            assert(0);
-            goto fail;
+	    case JackDriverParamInt:
+		jackctl_type = JackParamInt;
+		jackctl_value.i = descriptor_ptr->value.i;
+		break;
+	    case JackDriverParamUInt:
+		jackctl_type = JackParamUInt;
+		jackctl_value.ui = descriptor_ptr->value.ui;
+		break;
+	    case JackDriverParamChar:
+		jackctl_type = JackParamChar;
+		jackctl_value.c = descriptor_ptr->value.c;
+		break;
+	    case JackDriverParamString:
+		jackctl_type = JackParamString;
+		strcpy(jackctl_value.str, descriptor_ptr->value.str);
+		break;
+	    case JackDriverParamBool:
+		jackctl_type = JackParamBool;
+		jackctl_value.b = descriptor_ptr->value.i;
+		break;
+	    default:
+		jack_error("unknown driver parameter type %i", (int)descriptor_ptr->type);
+		assert(0);
+		goto fail;
         }
 
         parameter_ptr = jackctl_add_parameter(
@@ -308,7 +307,7 @@ jackctl_add_driver_parameters(
 
     return true;
 
-fail:
+  fail:
     jackctl_free_driver_parameters(driver_ptr);
 
     return false;
@@ -317,193 +316,193 @@ fail:
 static jack_driver_desc_t *
 jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
 {
-	jack_driver_desc_t * descriptor, * other_descriptor;
-	JackDriverDescFunction so_get_descriptor;
-	JSList * node;
-	void * dlhandle;
-	char * filename;
-	const char * dlerr;
-	int err;
-	char* driver_dir;
+    jack_driver_desc_t * descriptor, * other_descriptor;
+    JackDriverDescFunction so_get_descriptor;
+    JSList * node;
+    void * dlhandle;
+    char * filename;
+    const char * dlerr;
+    int err;
+    char* driver_dir;
 
-	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = ADDON_DIR;
-	}
-	filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
-	sprintf (filename, "%s/%s", driver_dir, sofile);
+    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
+	driver_dir = ADDON_DIR;
+    }
+    filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
+    sprintf (filename, "%s/%s", driver_dir, sofile);
 
 //	if (verbose) {
 //		jack_info ("getting driver descriptor from %s", filename);
 //	}
 
-	if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
-		jack_error ("could not open driver .so '%s': %s\n", filename, dlerror ());
-		free (filename);
-		return NULL;
-	}
-
-	so_get_descriptor = (JackDriverDescFunction)
-		dlsym (dlhandle, "driver_get_descriptor");
-
-	if ((dlerr = dlerror ()) != NULL) {
-		jack_error("%s", dlerr);
-		dlclose (dlhandle);
-		free (filename);
-		return NULL;
-	}
-
-	if ((descriptor = so_get_descriptor ()) == NULL) {
-		jack_error ("driver from '%s' returned NULL descriptor\n", filename);
-		dlclose (dlhandle);
-		free (filename);
-		return NULL;
-	}
-
-	if ((err = dlclose (dlhandle)) != 0) {
-		jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
-	}
-
-	/* check it doesn't exist already */
-	for (node = drivers; node; node = jack_slist_next (node)) {
-		other_descriptor = (jack_driver_desc_t *) node->data;
-
-		if (strcmp (descriptor->name, other_descriptor->name) == 0) {
-			jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
-				    other_descriptor->file, filename, other_descriptor->name);
-			/* FIXME: delete the descriptor */
-			free (filename);
-			return NULL;
-		}
-	}
-
-	snprintf (descriptor->file, sizeof(descriptor->file), "%s", filename);
+    if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
+	jack_error ("could not open driver .so '%s': %s\n", filename, dlerror ());
 	free (filename);
+	return NULL;
+    }
 
-	return descriptor;
+    so_get_descriptor = (JackDriverDescFunction)
+	dlsym (dlhandle, "driver_get_descriptor");
+
+    if ((dlerr = dlerror ()) != NULL) {
+	jack_error("%s", dlerr);
+	dlclose (dlhandle);
+	free (filename);
+	return NULL;
+    }
+
+    if ((descriptor = so_get_descriptor ()) == NULL) {
+	jack_error ("driver from '%s' returned NULL descriptor\n", filename);
+	dlclose (dlhandle);
+	free (filename);
+	return NULL;
+    }
+
+    if ((err = dlclose (dlhandle)) != 0) {
+	jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
+    }
+
+    /* check it doesn't exist already */
+    for (node = drivers; node; node = jack_slist_next (node)) {
+	other_descriptor = (jack_driver_desc_t *) node->data;
+
+	if (strcmp (descriptor->name, other_descriptor->name) == 0) {
+	    jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
+			other_descriptor->file, filename, other_descriptor->name);
+	    /* FIXME: delete the descriptor */
+	    free (filename);
+	    return NULL;
+	}
+    }
+
+    snprintf (descriptor->file, sizeof(descriptor->file), "%s", filename);
+    free (filename);
+
+    return descriptor;
 }
 
 static JSList *
 jack_drivers_load ()
 {
-	struct dirent * dir_entry;
-	DIR * dir_stream;
-	const char * ptr;
-	int err;
-	JSList * driver_list = NULL;
-	jack_driver_desc_t * desc;
-	char* driver_dir;
+    struct dirent * dir_entry;
+    DIR * dir_stream;
+    const char * ptr;
+    int err;
+    JSList * driver_list = NULL;
+    jack_driver_desc_t * desc;
+    char* driver_dir;
 
-	if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-		driver_dir = ADDON_DIR;
-	}
+    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
+	driver_dir = ADDON_DIR;
+    }
 
-	/* search through the driver_dir and add get descriptors
-	   from the .so files in it */
-	dir_stream = opendir (driver_dir);
-	if (!dir_stream) {
-		jack_error ("could not open driver directory %s: %s\n",
-			    driver_dir, strerror (errno));
-		return NULL;
-	}
+    /* search through the driver_dir and add get descriptors
+       from the .so files in it */
+    dir_stream = opendir (driver_dir);
+    if (!dir_stream) {
+	jack_error ("could not open driver directory %s: %s\n",
+		    driver_dir, strerror (errno));
+	return NULL;
+    }
   
-	while ( (dir_entry = readdir (dir_stream)) ) {
-		/* check the filename is of the right format */
-		if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
-			continue;
-		}
-
-		ptr = strrchr (dir_entry->d_name, '.');
-		if (!ptr) {
-			continue;
-		}
-		ptr++;
-		if (strncmp ("so", ptr, 2) != 0) {
-			continue;
-		}
-
-		desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
-		if (desc) {
-			driver_list = jack_slist_append (driver_list, desc);
-		}
+    while ( (dir_entry = readdir (dir_stream)) ) {
+	/* check the filename is of the right format */
+	if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
+	    continue;
 	}
 
-	err = closedir (dir_stream);
-	if (err) {
-		jack_error ("error closing driver directory %s: %s\n",
-			    driver_dir, strerror (errno));
+	ptr = strrchr (dir_entry->d_name, '.');
+	if (!ptr) {
+	    continue;
+	}
+	ptr++;
+	if (strncmp ("so", ptr, 2) != 0) {
+	    continue;
 	}
 
-	if (!driver_list) {
-		jack_error ("could not find any drivers in %s!\n", driver_dir);
-		return NULL;
+	desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
+	if (desc) {
+	    driver_list = jack_slist_append (driver_list, desc);
 	}
+    }
 
-	return driver_list;
+    err = closedir (dir_stream);
+    if (err) {
+	jack_error ("error closing driver directory %s: %s\n",
+		    driver_dir, strerror (errno));
+    }
+
+    if (!driver_list) {
+	jack_error ("could not find any drivers in %s!\n", driver_dir);
+	return NULL;
+    }
+
+    return driver_list;
 }
 
 static void
 jack_cleanup_files (const char *server_name)
 {
-	DIR *dir;
-	struct dirent *dirent;
-	char dir_name[PATH_MAX+1] = "";
-        jack_server_dir (server_name, dir_name);
+    DIR *dir;
+    struct dirent *dirent;
+    char dir_name[PATH_MAX+1] = "";
+    jack_server_dir (server_name, dir_name);
 
-	/* On termination, we remove all files that jackd creates so
-	 * subsequent attempts to start jackd will not believe that an
-	 * instance is already running.  If the server crashes or is
-	 * terminated with SIGKILL, this is not possible.  So, cleanup
-	 * is also attempted when jackd starts.
-	 *
-	 * There are several tricky issues.  First, the previous JACK
-	 * server may have run for a different user ID, so its files
-	 * may be inaccessible.  This is handled by using a separate
-	 * JACK_TMP_DIR subdirectory for each user.  Second, there may
-	 * be other servers running with different names.  Each gets
-	 * its own subdirectory within the per-user directory.  The
-	 * current process has already registered as `server_name', so
-	 * we know there is no other server actively using that name.
-	 */
+    /* On termination, we remove all files that jackd creates so
+     * subsequent attempts to start jackd will not believe that an
+     * instance is already running.  If the server crashes or is
+     * terminated with SIGKILL, this is not possible.  So, cleanup
+     * is also attempted when jackd starts.
+     *
+     * There are several tricky issues.  First, the previous JACK
+     * server may have run for a different user ID, so its files
+     * may be inaccessible.  This is handled by using a separate
+     * JACK_TMP_DIR subdirectory for each user.  Second, there may
+     * be other servers running with different names.  Each gets
+     * its own subdirectory within the per-user directory.  The
+     * current process has already registered as `server_name', so
+     * we know there is no other server actively using that name.
+     */
 
-	/* nothing to do if the server directory does not exist */
-	if ((dir = opendir (dir_name)) == NULL) {
-		return;
+    /* nothing to do if the server directory does not exist */
+    if ((dir = opendir (dir_name)) == NULL) {
+	return;
+    }
+
+    /* unlink all the files in this directory, they are mine */
+    while ((dirent = readdir (dir)) != NULL) {
+
+	char fullpath[PATH_MAX+1];
+
+	if ((strcmp (dirent->d_name, ".") == 0)
+	    || (strcmp (dirent->d_name, "..") == 0)) {
+	    continue;
 	}
 
-	/* unlink all the files in this directory, they are mine */
-	while ((dirent = readdir (dir)) != NULL) {
+	snprintf (fullpath, sizeof (fullpath), "%s/%s",
+		  dir_name, dirent->d_name);
 
-		char fullpath[PATH_MAX+1];
-
-		if ((strcmp (dirent->d_name, ".") == 0)
-		    || (strcmp (dirent->d_name, "..") == 0)) {
-			continue;
-		}
-
-		snprintf (fullpath, sizeof (fullpath), "%s/%s",
-			  dir_name, dirent->d_name);
-
-		if (unlink (fullpath)) {
-			jack_error ("cannot unlink `%s' (%s)", fullpath,
-				    strerror (errno));
-		}
-	} 
-
-	closedir (dir);
-
-	/* now, delete the per-server subdirectory, itself */
-	if (rmdir (dir_name)) {
- 		jack_error ("cannot remove `%s' (%s)", dir_name,
-			    strerror (errno));
+	if (unlink (fullpath)) {
+	    jack_error ("cannot unlink `%s' (%s)", fullpath,
+			strerror (errno));
 	}
+    } 
 
-	/* finally, delete the per-user subdirectory, if empty */
-	if (rmdir (jack_user_dir ())) {
-		if (errno != ENOTEMPTY) {
-			jack_error ("cannot remove `%s' (%s)",
-				    jack_user_dir (), strerror (errno));
-		}
+    closedir (dir);
+
+    /* now, delete the per-server subdirectory, itself */
+    if (rmdir (dir_name)) {
+	jack_error ("cannot remove `%s' (%s)", dir_name,
+		    strerror (errno));
+    }
+
+    /* finally, delete the per-user subdirectory, if empty */
+    if (rmdir (jack_user_dir ())) {
+	if (errno != ENOTEMPTY) {
+	    jack_error ("cannot remove `%s' (%s)",
+			jack_user_dir (), strerror (errno));
 	}
+    }
 }
 
 static int
@@ -543,7 +542,7 @@ jackctl_drivers_load(
 
         server_ptr->drivers = jack_slist_append(server_ptr->drivers, driver_ptr);
 
-    next:
+      next:
         node_ptr = descriptor_node_ptr;
         descriptor_node_ptr = descriptor_node_ptr->next;
         free(node_ptr);
@@ -612,7 +611,7 @@ jackctl_internals_load(
 
         server_ptr->internals = jack_slist_append(server_ptr->internals, internal_ptr);
 
-    next:
+      next:
         node_ptr = descriptor_node_ptr;
         descriptor_node_ptr = descriptor_node_ptr->next;
         free(node_ptr);
@@ -675,21 +674,21 @@ sigset_t
 jackctl_setup_signals(
     unsigned int flags)
 {
-        if ((waitEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
+    if ((waitEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
         jack_error("CreateEvent fails err = %ld", GetLastError());
         return 0;
     }
 
-        (void) signal(SIGINT, do_nothing_handler);
+    (void) signal(SIGINT, do_nothing_handler);
     (void) signal(SIGABRT, do_nothing_handler);
     (void) signal(SIGTERM, do_nothing_handler);
 
-        return (sigset_t)waitEvent;
+    return (sigset_t)waitEvent;
 }
 
 void jackctl_wait_signals(sigset_t signals)
 {
-        if (WaitForSingleObject(waitEvent, INFINITE) != WAIT_OBJECT_0) {
+    if (WaitForSingleObject(waitEvent, INFINITE) != WAIT_OBJECT_0) {
         jack_error("WaitForSingleObject fails err = %ld", GetLastError());
     }
 }
@@ -730,13 +729,13 @@ jackctl_setup_signals(
        POSIX says that signals are delivered like this:
 
        * if a thread has blocked that signal, it is not
-           a candidate to receive the signal.
-           * of all threads not blocking the signal, pick
-           one at random, and deliver the signal.
+       a candidate to receive the signal.
+       * of all threads not blocking the signal, pick
+       one at random, and deliver the signal.
 
-           this means that a simple-minded multi-threaded program can
-           expect to get POSIX signals delivered randomly to any one
-           of its threads,
+       this means that a simple-minded multi-threaded program can
+       expect to get POSIX signals delivered randomly to any one
+       of its threads,
 
        here, we block all signals that we think we might receive
        and want to catch. all "child" threads will inherit this
@@ -764,7 +763,7 @@ jackctl_setup_signals(
      * explicitly reset it
      */
 
-     pthread_sigmask(SIG_BLOCK, &signals, 0);
+    pthread_sigmask(SIG_BLOCK, &signals, 0);
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -793,11 +792,11 @@ jackctl_wait_signals(sigset_t signals)
     bool waiting = true;
 
     while (waiting) {
-    #if defined(sun) && !defined(__sun__) // SUN compiler only, to check
+#if defined(sun) && !defined(__sun__) // SUN compiler only, to check
         sigwait(&signals);
-    #else
+#else
         sigwait(&signals, &sig);
-    #endif
+#endif
         fprintf(stderr, "jack main caught signal %d\n", sig);
 
         switch (sig) {
@@ -879,7 +878,7 @@ get_realtime_priority_constraint()
 #else
     return NULL
 #endif
-}
+	}
 
 jackctl_server_t * jackctl_server_create(
     bool (* on_device_acquire)(const char * device_name),
@@ -1008,15 +1007,15 @@ jackctl_server_t * jackctl_server_create(
     
     value.ui = 128;
     if (jackctl_add_parameter(
-          &server_ptr->parameters,
-	  'p',
-          "port-max",
-          "Maximum number of ports.",
-          "",
-          JackParamUInt,
-          &server_ptr->port_max,
-          &server_ptr->default_port_max,
-          value, NULL) == NULL)
+	    &server_ptr->parameters,
+	    'p',
+	    "port-max",
+	    "Maximum number of ports.",
+	    "",
+	    JackParamUInt,
+	    &server_ptr->port_max,
+	    &server_ptr->default_port_max,
+	    value, NULL) == NULL)
     {
         goto fail_free_parameters;
     }
@@ -1110,12 +1109,12 @@ jackctl_server_t * jackctl_server_create(
 
     return server_ptr;
 
-fail_free_parameters:
+  fail_free_parameters:
     jackctl_server_free_parameters(server_ptr);
 
     free(server_ptr);
 
-fail:
+  fail:
     return NULL;
 }
 
@@ -1134,8 +1133,8 @@ const JSList * jackctl_server_get_drivers_list(jackctl_server_t *server_ptr)
 
 bool jackctl_server_stop(jackctl_server_t *server_ptr)
 {
-	//jack_engine_driver_exit (server_ptr->engine);
-	jack_engine_cleanup_pp( server_ptr->engine.get() );
+    //jack_engine_driver_exit (server_ptr->engine);
+    jack_engine_cleanup_pp( server_ptr->engine.get() );
 
     /* clean up shared memory and files from this server instance */
     //jack_log("cleaning up shared memory");
@@ -1172,21 +1171,21 @@ jackctl_server_start(
     // TODO:
     int frame_time_offset = 0;
 
-	vector<jack_driver_desc_t*> loaded_drivers;
-	JSList* dli;
+    vector<jack_driver_desc_t*> loaded_drivers;
+    JSList* dli;
 
     rc = jack_register_server (server_ptr->name.str, server_ptr->replace_registry.b);
     switch (rc)
     {
-    case EEXIST:
-        jack_error("`%s' server already active", server_ptr->name.str);
-        goto fail;
-    case ENOSPC:
-        jack_error("too many servers already active");
-        goto fail;
-    case ENOMEM:
-        jack_error("no access to shm registry");
-        goto fail;
+	case EEXIST:
+	    jack_error("`%s' server already active", server_ptr->name.str);
+	    goto fail;
+	case ENOSPC:
+	    jack_error("too many servers already active");
+	    goto fail;
+	case ENOMEM:
+	    jack_error("no access to shm registry");
+	    goto fail;
     }
 
     //jack_log("server `%s' registered", server_ptr->name.str);
@@ -1201,44 +1200,44 @@ jackctl_server_start(
     
     oldsignals = jackctl_block_signals();
 
-	// Hack to support jack_engine_create until I fix up where this is constructing the drivers list
-	dli = drivers;
-	do
-	{
-		loaded_drivers.push_back( (jack_driver_desc_t*)dli->data );
-	}
-	while( dli != NULL );
+    // Hack to support jack_engine_create until I fix up where this is constructing the drivers list
+    dli = drivers;
+    do
+    {
+	loaded_drivers.push_back( (jack_driver_desc_t*)dli->data );
+    }
+    while( dli != NULL );
 
     if ((server_ptr->engine = jack_engine_create_pp( server_ptr->realtime.b, server_ptr->realtime_priority.i, 
-				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
-				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
-				    server_ptr->port_max.i, getpid(), frame_time_offset, 
-				    server_ptr->nozombies.b, server_ptr->timothres.ui, loaded_drivers)) == 0) {
-	    jack_error ("cannot create engine");
-	    goto fail_unregister;
+						     server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
+						     server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
+						     server_ptr->port_max.i, getpid(), frame_time_offset, 
+						     server_ptr->nozombies.b, server_ptr->timothres.ui, loaded_drivers)) == 0) {
+	jack_error ("cannot create engine");
+	goto fail_unregister;
     }
 
     if (jack_engine_load_driver( server_ptr->engine.get(), driver_ptr->desc_ptr, driver_ptr->set_parameters ))
     {
-		jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
-		goto fail_delete;
+	jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
+	goto fail_delete;
     }
 
     if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
-	    jack_error ("cannot start driver");
-	    goto fail_close;
+	jack_error ("cannot start driver");
+	goto fail_close;
     }
 
     jackctl_unblock_signals( oldsignals );
     return true;
 
-fail_close:
+  fail_close:
 
-fail_delete:
+  fail_delete:
     jack_engine_cleanup_pp( server_ptr->engine.get() );
     server_ptr->engine.release();
 
-fail_unregister:
+  fail_unregister:
     //jack_log("cleaning up shared memory");
 
     jack_cleanup_shm();
@@ -1252,7 +1251,7 @@ fail_unregister:
     jack_unregister_server(server_ptr->name.str);
     jackctl_unblock_signals( oldsignals );
 
-fail:
+  fail:
     return false;
 }
 
@@ -1315,21 +1314,21 @@ union jackctl_parameter_value jackctl_parameter_get_enum_constraint_value(jackct
 
     switch (parameter_ptr->type)
     {
-    case JackParamInt:
-        jackctl_value.i = value_ptr->i;
-        break;
-    case JackParamUInt:
-        jackctl_value.ui = value_ptr->ui;
-        break;
-    case JackParamChar:
-        jackctl_value.c = value_ptr->c;
-        break;
-    case JackParamString:
-        strcpy(jackctl_value.str, value_ptr->str);
-        break;
-    default:
-        jack_error("bad driver parameter type %i (enum constraint)", (int)parameter_ptr->type);
-        assert(0);
+	case JackParamInt:
+	    jackctl_value.i = value_ptr->i;
+	    break;
+	case JackParamUInt:
+	    jackctl_value.ui = value_ptr->ui;
+	    break;
+	case JackParamChar:
+	    jackctl_value.c = value_ptr->c;
+	    break;
+	case JackParamString:
+	    strcpy(jackctl_value.str, value_ptr->str);
+	    break;
+	default:
+	    jack_error("bad driver parameter type %i (enum constraint)", (int)parameter_ptr->type);
+	    assert(0);
     }
 
     return jackctl_value;
@@ -1344,17 +1343,17 @@ void jackctl_parameter_get_range_constraint(jackctl_parameter_t *parameter_ptr, 
 {
     switch (parameter_ptr->type)
     {
-    case JackParamInt:
-        min_ptr->i = parameter_ptr->constraint_ptr->constraint.range.min.i;
-        max_ptr->i = parameter_ptr->constraint_ptr->constraint.range.max.i;
-        return;
-    case JackParamUInt:
-        min_ptr->ui = parameter_ptr->constraint_ptr->constraint.range.min.ui;
-        max_ptr->ui = parameter_ptr->constraint_ptr->constraint.range.max.ui;
-        return;
-    default:
-        jack_error("bad driver parameter type %i (range constraint)", (int)parameter_ptr->type);
-        assert(0);
+	case JackParamInt:
+	    min_ptr->i = parameter_ptr->constraint_ptr->constraint.range.min.i;
+	    max_ptr->i = parameter_ptr->constraint_ptr->constraint.range.max.i;
+	    return;
+	case JackParamUInt:
+	    min_ptr->ui = parameter_ptr->constraint_ptr->constraint.range.min.ui;
+	    max_ptr->ui = parameter_ptr->constraint_ptr->constraint.range.max.ui;
+	    return;
+	default:
+	    jack_error("bad driver parameter type %i (range constraint)", (int)parameter_ptr->type);
+	    assert(0);
     }
 }
 
@@ -1421,37 +1420,37 @@ bool jackctl_parameter_set_value(jackctl_parameter_t *parameter_ptr, const union
                 return false;
             }
 
-           parameter_ptr->driver_parameter_ptr->character = parameter_ptr->id;
-           parameter_ptr->driver_ptr->set_parameters = jack_slist_append(parameter_ptr->driver_ptr->set_parameters, parameter_ptr->driver_parameter_ptr);
+	    parameter_ptr->driver_parameter_ptr->character = parameter_ptr->id;
+	    parameter_ptr->driver_ptr->set_parameters = jack_slist_append(parameter_ptr->driver_ptr->set_parameters, parameter_ptr->driver_parameter_ptr);
         }
 
         switch (parameter_ptr->type)
         {
-        case JackParamInt:
-            parameter_ptr->driver_parameter_ptr->value.i = value_ptr->i;
-            break;
-        case JackParamUInt:
-            parameter_ptr->driver_parameter_ptr->value.ui = value_ptr->ui;
-            break;
-        case JackParamChar:
-            parameter_ptr->driver_parameter_ptr->value.c = value_ptr->c;
-            break;
-        case JackParamString:
-            strcpy(parameter_ptr->driver_parameter_ptr->value.str, value_ptr->str);
-            break;
-        case JackParamBool:
-            parameter_ptr->driver_parameter_ptr->value.i = value_ptr->b;
-            break;
-        default:
-            jack_error("unknown parameter type %i", (int)parameter_ptr->type);
-            assert(0);
+	    case JackParamInt:
+		parameter_ptr->driver_parameter_ptr->value.i = value_ptr->i;
+		break;
+	    case JackParamUInt:
+		parameter_ptr->driver_parameter_ptr->value.ui = value_ptr->ui;
+		break;
+	    case JackParamChar:
+		parameter_ptr->driver_parameter_ptr->value.c = value_ptr->c;
+		break;
+	    case JackParamString:
+		strcpy(parameter_ptr->driver_parameter_ptr->value.str, value_ptr->str);
+		break;
+	    case JackParamBool:
+		parameter_ptr->driver_parameter_ptr->value.i = value_ptr->b;
+		break;
+	    default:
+		jack_error("unknown parameter type %i", (int)parameter_ptr->type);
+		assert(0);
 
-            if (new_driver_parameter)
-            {
-                parameter_ptr->driver_ptr->set_parameters = jack_slist_remove(parameter_ptr->driver_ptr->set_parameters, parameter_ptr->driver_parameter_ptr);
-            }
+		if (new_driver_parameter)
+		{
+		    parameter_ptr->driver_ptr->set_parameters = jack_slist_remove(parameter_ptr->driver_ptr->set_parameters, parameter_ptr->driver_parameter_ptr);
+		}
 
-            return false;
+		return false;
         }
     }
 
@@ -1487,24 +1486,24 @@ bool jackctl_server_load_internal(
     jackctl_server_t * server_ptr,
     jackctl_internal_t * internal)
 {
-	return false;
+    return false;
 }
 
 bool jackctl_server_unload_internal(
     jackctl_server_t * server_ptr,
     jackctl_internal_t * internal)
 {
-	return false;
+    return false;
 }
 
 bool jackctl_server_add_slave(jackctl_server_t * server_ptr, jackctl_driver_t * driver_ptr)
 {
-	return false;
+    return false;
 }
 
 bool jackctl_server_remove_slave(jackctl_server_t * server_ptr, jackctl_driver_t * driver_ptr)
 {
-	return false;
+    return false;
 }
 
 bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_t * driver_ptr)
@@ -1512,45 +1511,44 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
     jack_driver_t *old_driver;
 
     if (server_ptr->engine.get() == NULL)
-	    goto fail_nostart;
+	goto fail_nostart;
 
     old_driver = server_ptr->engine->driver;
 
     if (old_driver)
     {
-	    old_driver->stop (old_driver );
-	    old_driver->detach (old_driver, server_ptr->engine.get() );
+	old_driver->stop (old_driver );
+	old_driver->detach (old_driver, server_ptr->engine.get() );
 
-	    pthread_mutex_lock (&server_ptr->engine->request_lock);
-	    jack_lock_graph (server_ptr->engine.get());
-	    jack_remove_client (server_ptr->engine.get(), old_driver->internal_client);
-	    jack_unlock_graph (server_ptr->engine.get());
-	    pthread_mutex_unlock (&server_ptr->engine->request_lock);
+	pthread_mutex_lock (&server_ptr->engine->request_lock);
+	jack_lock_graph (server_ptr->engine.get());
+	jack_remove_client (server_ptr->engine.get(), old_driver->internal_client);
+	jack_unlock_graph (server_ptr->engine.get());
+	pthread_mutex_unlock (&server_ptr->engine->request_lock);
 
-	    server_ptr->engine->driver = NULL;
+	server_ptr->engine->driver = NULL;
 
-	    jack_driver_unload (old_driver);
+	jack_driver_unload (old_driver);
     }
 
     if (jack_engine_load_driver (server_ptr->engine.get(), driver_ptr->desc_ptr, driver_ptr->set_parameters))
     {
-	    jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
-	    goto fail_nodriver;
+	jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
+	goto fail_nodriver;
     }
 
 
     if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
-	    jack_error ("cannot start driver");
-	    jack_use_driver(server_ptr->engine.get(), NULL);
-	    goto fail_nodriver;
+	jack_error ("cannot start driver");
+	jack_use_driver(server_ptr->engine.get(), NULL);
+	goto fail_nodriver;
     }
 
     return true;
 
-fail_nodriver:
+  fail_nodriver:
     jack_error ("could not initialise new driver, leaving without driver");
 
-fail_nostart:
+  fail_nostart:
     return false;
 }
-
