@@ -226,7 +226,7 @@ jack_main( const jack_options & parsed_options,
 		   const vector<string> & slave_driver_names,
 		   const vector<string> & internal_client_names,
 		   jack_driver_desc_t * driver_desc,
-		   JSList * driver_params )
+		   JSList * driver_params_jsl )
 {
 	unique_ptr<jack_engine_t> engine;
 	int sig;
@@ -306,7 +306,7 @@ jack_main( const jack_options & parsed_options,
 
 	jack_info ("loading driver ..");
 	
-	if (jack_engine_load_driver( engine.get(), driver_desc, driver_params )) {
+	if( jack_engine_load_driver_pp( engine.get(), driver_desc, driver_params_jsl )) {
 		jack_error ("cannot load driver module %s",
 			 driver_desc->name);
 		goto error;
@@ -719,10 +719,10 @@ main (int argc, char *argv[])
 	int driver_nargs = options_parser.get_driver_argc();
 	char ** driver_args = options_parser.get_driver_argv();
 
-	JSList * driver_params = NULL;
+	JSList * driver_params_jsl = NULL;
 
-	if (jack_parse_driver_params (desc, driver_nargs,
-								  driver_args, &driver_params)) {
+	if (jack_parse_driver_params( desc, driver_nargs,
+								  driver_args, &driver_params_jsl)) {
 		exit (0);
 	}
 
@@ -756,7 +756,8 @@ main (int argc, char *argv[])
 			   loaded_drivers,
 			   parsed_options.slave_drivers,
 			   parsed_options.internal_clients,
-			   desc, driver_params );
+			   desc,
+			   driver_params_jsl );
 
 	/* clean up shared memory and files from this server instance */
 	if( parsed_options.verbose )

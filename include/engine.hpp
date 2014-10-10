@@ -29,6 +29,7 @@
 
 #include <vector>
 #include <memory>
+#include <string>
 
 // jack_engine_t * jack_engine_new_pp( int real_time, int real_time_priority,
 std::unique_ptr<jack_engine_t> jack_engine_create( int real_time, int real_time_priority,
@@ -41,5 +42,9 @@ std::unique_ptr<jack_engine_t> jack_engine_create( int real_time, int real_time_
 												   const std::vector<jack_driver_desc_t*> & loaded_drivers);
 
 void jack_engine_cleanup( jack_engine_t * );
+
+int jack_engine_load_driver_pp( jack_engine_t *engine,
+								jack_driver_desc_t * driver_desc,
+								JSList * driver_params_jsl );
 
 #endif
