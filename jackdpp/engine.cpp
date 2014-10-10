@@ -19,6 +19,12 @@
 
 */
 
+// C++ bits
+#include <cinttypes>
+#include <vector>
+#include <string>
+#include <iostream>
+
 #include <config.h>
 
 #include <math.h>
@@ -68,11 +74,12 @@
 
 #include "libjack/local.h"
 
-// C++ bits
-#include <cinttypes>
-#include <vector>
-
+using std::string;
 using std::vector;
+using std::unique_ptr;
+using std::make_unique;
+using std::cout;
+using std::endl;
 
 typedef struct {
 
@@ -1743,15 +1750,17 @@ jack_server_thread (void *arg)
 	return 0;
 }
 
-jack_engine_t *
-jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
+//jack_engine_t *
+//jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
+unique_ptr<jack_engine_t>
+jack_engine_create( int realtime, int rtpriority, int do_mlock, int do_unlock,
 					const char *server_name, int temporary, int verbose,
 					int client_timeout, unsigned int port_max, pid_t wait_pid,
 					jack_nframes_t frame_time_offset, int nozombies,
 					int timeout_count_threshold,
 					const vector<jack_driver_desc_t*> & loaded_drivers)
 {
-	jack_engine_t *engine;
+	std::unique_ptr<jack_engine_t> engine = make_unique<jack_engine_t>();
 	unsigned int i;
 	char server_dir[PATH_MAX+1] = "";
 
@@ -1790,7 +1799,7 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	jack_init_time ();
 
 	/* allocate the engine, zero the structure to ease debugging */
-	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
+//	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
 
 	JSList * drivers_jsl = NULL;
 	for( jack_driver_desc_t * od : loaded_drivers ) {
@@ -1823,7 +1832,7 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->temporary = temporary;
 	engine->freewheeling = 0;
 	engine->stop_freewheeling = 0;
-	jack_uuid_clear (&engine->fwclient);
+	jack_uuid_clear( &engine->fwclient );
 	engine->feedbackcount = 0;
 	engine->wait_pid = wait_pid;
 	engine->nozombies = nozombies;
@@ -1839,7 +1848,7 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->midi_out_cnt = 0;
 	engine->midi_in_cnt = 0;
 
-	jack_engine_reset_rolling_usecs (engine);
+	jack_engine_reset_rolling_usecs( engine.get() );
 	engine->max_usecs = 0.0f;
 
 	pthread_rwlock_init (&engine->client_lock, 0);
@@ -1972,11 +1981,11 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->control->xrun_delayed_usecs = 0;
 	engine->control->max_delayed_usecs = 0;
 
-	jack_set_clock_source (clock_source);
+	jack_set_clock_source( clock_source );
 	engine->control->clock_source = clock_source;
 	engine->get_microseconds = jack_get_microseconds_pointer();
 
-	VERBOSE (engine, "clock source = %s", jack_clock_source_name (clock_source));
+	VERBOSE( engine.get(), "clock source = %s", jack_clock_source_name (clock_source) );
 
 	engine->control->frame_timer.frames = frame_time_offset;
 	engine->control->frame_timer.reset_pending = 0;
@@ -1989,8 +1998,8 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 	engine->first_wakeup = 1;
 
 	engine->control->buffer_size = 0;
-	jack_transport_init (engine);
-	jack_set_sample_rate (engine, 0);
+	jack_transport_init( engine.get() );
+	jack_set_sample_rate( engine.get(), 0 );
 	engine->control->internal = 0;
 
 	engine->control->has_capabilities = 0;
@@ -2009,21 +2018,21 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 		
 #ifdef USE_CAPABILITIES
 	if (uid == 0 || euid == 0) {
-		VERBOSE (engine, "running with uid=%d and euid=%d, "
+		VERBOSE( engine.get(), "running with uid=%d and euid=%d, "
 				 "will not try to use capabilites",
 				 uid, euid);
 	} else {
 		/* only try to use capabilities if not running as root */
 		engine->control->has_capabilities = check_capabilities (engine);
 		if (engine->control->has_capabilities == 0) {
-			VERBOSE (engine, "required capabilities not "
+			VERBOSE( engine.get(), "required capabilities not "
 					 "available");
 		}
 		if (engine->verbose) {
 			size_t size;
 			cap_t cap = cap_init();
 			capgetp(0, cap);
-			VERBOSE (engine, "capabilities: %s",
+			VERBOSE( engine.get(), "capabilities: %s",
 					 cap_to_text(cap, &size));
 		}
 	}
@@ -2031,14 +2040,14 @@ jack_engine_new_pp( int realtime, int rtpriority, int do_mlock, int do_unlock,
 
 	engine->control->engine_ok = 1;
 
-	snprintf (engine->fifo_prefix, sizeof (engine->fifo_prefix),
+	snprintf( engine->fifo_prefix, sizeof (engine->fifo_prefix),
 			  "%s/jack-ack-fifo-%d",
 			  jack_server_dir (engine->server_name, server_dir), getpid ());
 
-	(void) jack_get_fifo_fd (engine, 0);
+	(void) jack_get_fifo_fd( engine.get(), 0);
 
-	jack_client_create_thread (NULL, &engine->server_thread, 0, FALSE,
-							   &jack_server_thread, engine);
+	jack_client_create_thread( NULL, &engine->server_thread, 0, FALSE,
+							   &jack_server_thread, engine.get());
 
 	return engine;
 }
@@ -2545,12 +2554,12 @@ jack_run_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 }
 
 void 
-jack_engine_delete (jack_engine_t *engine)
+jack_engine_cleanup( jack_engine_t *engine )
 {
 	if (engine == NULL)
 		return;
 
-	VERBOSE (engine, "starting server engine shutdown");
+	VERBOSE( engine, "starting server engine shutdown" );
 
 	jack_stop_freewheeling (engine, 1);
 
@@ -2614,8 +2623,6 @@ jack_engine_delete (jack_engine_t *engine)
 	jack_destroy_shm (&engine->control_shm);
 
 	VERBOSE (engine, "max usecs: %.3f, engine deleted", engine->max_usecs);
-
-	free (engine);
 
 	jack_messagebuffer_exit();
 }

@@ -45,6 +45,7 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <memory>
 
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
 #pragma GCC diagnostic push
@@ -90,6 +91,7 @@ using std::endl;
 using std::string;
 using std::vector;
 using std::stringstream;
+using std::unique_ptr;
 
 using jack::jack_options;
 using jack::jack_options_parser;
@@ -213,7 +215,7 @@ jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & in
 		}
 
 		pthread_mutex_lock (&engine->request_lock);
-		jack_intclient_load_request (engine, &req);
+		jack_intclient_load_request( engine, &req );
 		pthread_mutex_unlock (&engine->request_lock);
 	}
 }
@@ -226,7 +228,7 @@ jack_main( const jack_options & parsed_options,
 		   jack_driver_desc_t * driver_desc,
 		   JSList * driver_params )
 {
-	jack_engine_t *engine = NULL;
+	unique_ptr<jack_engine_t> engine;
 	int sig;
 	int i;
 	sigset_t allsignals;
@@ -283,7 +285,7 @@ jack_main( const jack_options & parsed_options,
 	pthread_sigmask (SIG_BLOCK, &signals, 0);
 
 	/* get the engine/driver started */
-	if( (engine = jack_engine_new_pp(
+	if( (engine = jack_engine_create(
              parsed_options.realtime,
              parsed_options.realtime_priority,
              parsed_options.memory_locked,
@@ -304,26 +306,26 @@ jack_main( const jack_options & parsed_options,
 
 	jack_info ("loading driver ..");
 	
-	if (jack_engine_load_driver (engine, driver_desc, driver_params)) {
+	if (jack_engine_load_driver( engine.get(), driver_desc, driver_params )) {
 		jack_error ("cannot load driver module %s",
 			 driver_desc->name);
 		goto error;
 	}
 
 	for( const string & slave_driver_name : slave_driver_names ) {
-		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp(loaded_drivers, slave_driver_name );
+		jack_driver_desc_t *sl_desc = jack_find_driver_descriptor_pp( loaded_drivers, slave_driver_name );
 		if (sl_desc) {
-			jack_engine_load_slave_driver(engine, sl_desc, NULL);
+			jack_engine_load_slave_driver( engine.get(), sl_desc, NULL );
 		}
 	}
 
 
-	if (jack_drivers_start (engine) != 0) {
+	if (jack_drivers_start( engine.get() ) != 0) {
 		jack_error ("cannot start driver");
 		goto error;
 	}
 
-	jack_load_internal_clients_pp( engine, internal_client_names );
+	jack_load_internal_clients_pp( engine.get(), internal_client_names );
 
 	/* install a do-nothing handler because otherwise pthreads
 	   behaviour is undefined when we enter sigwait.
@@ -353,7 +355,7 @@ jack_main( const jack_options & parsed_options,
 		
 		switch (sig) {
 		case SIGUSR1:
-			jack_dump_configuration(engine, 1);
+			jack_dump_configuration( engine.get(), 1 );
 			break;
 		case SIGUSR2:
 			/* driver exit */
@@ -374,11 +376,11 @@ jack_main( const jack_options & parsed_options,
 		sigprocmask (SIG_UNBLOCK, &signals, 0);
 	}
 	
-	jack_engine_delete (engine);
+	jack_engine_cleanup( engine.get() );
 	return 1;
 	
 error:
-	jack_engine_delete (engine);
+	jack_engine_cleanup( engine.get() );
 	return -1;
 }
 
