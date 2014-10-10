@@ -35,8 +35,14 @@ jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
 
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
-noinst_HEADERS = jackpp_md5.h md5.h md5_loc.h \
-		 clientengine.h transengine.h
+noinst_HEADERS = jackpp_md5.h \
+	jack_options_parser.hpp \
+	jack_cpp_utils.hpp \
+	md5.h \
+	md5_loc.h \
+	clientengine.h \
+	transengine.h \
+	$(NULL)
 
 BUILT_SOURCES = jackpp_md5.h
 

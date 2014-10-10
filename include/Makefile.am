@@ -7,6 +7,7 @@ noinst_HEADERS =		\
 	driver_interface.h	\
 	driver_parse.h	        \
 	engine.h		\
+	engine.hpp		\
 	hardware.h 		\
 	internal.h 		\
 	intsimd.h 		\

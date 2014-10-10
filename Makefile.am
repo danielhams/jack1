@@ -19,7 +19,7 @@ DIST_SUBDIRS = config libjack libjackpp jackd jackdpp include drivers example-cl
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
 
-EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c jack.spec
+EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c libjackpp/simd.c jack.spec
 
 AUTOMAKE_OPTIONS = foreign
 
