@@ -33,6 +33,7 @@ jack_driver_desc_t * jack_drivers_find_descriptor_pp(
     const std::vector<jack_driver_desc_t*> & loaded_drivers,
     const std::string & name );
 
+/* Should just be internal? */
 jack_driver_desc_t * jack_drivers_find_so_descriptor_pp(
     const std::vector<jack_driver_desc_t*> & loaded_drivers,
     const std::string & so_name,

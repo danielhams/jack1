@@ -60,6 +60,7 @@
 
 #include "jack_options_parser.hpp"
 #include "jack_cpp_utils.hpp"
+#include "jack_drivers.hpp"
 
 using std::vector;
 using std::string;
@@ -71,6 +72,8 @@ using jack::jack_signals_unblock;
 using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
 using jack::jack_options;
+
+using jack::jack_drivers_load_pp;
 
 /*
  * XXX: dont like statics here.
@@ -323,133 +326,6 @@ jackctl_add_driver_parameters(
     return false;
 }
 
-static jack_driver_desc_t *
-jack_drivers_get_descriptor (JSList * drivers, const char * sofile)
-{
-    jack_driver_desc_t * descriptor, * other_descriptor;
-    JackDriverDescFunction so_get_descriptor;
-    JSList * node;
-    void * dlhandle;
-    char * filename;
-    const char * dlerr;
-    int err;
-    char* driver_dir;
-
-    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-	driver_dir = ADDON_DIR;
-    }
-    filename = (char*)malloc (strlen (driver_dir) + 1 + strlen (sofile) + 1);
-    sprintf (filename, "%s/%s", driver_dir, sofile);
-
-//	if (verbose) {
-//		jack_info ("getting driver descriptor from %s", filename);
-//	}
-
-    if ((dlhandle = dlopen (filename, RTLD_NOW|RTLD_GLOBAL)) == NULL) {
-	jack_error ("could not open driver .so '%s': %s\n", filename, dlerror ());
-	free (filename);
-	return NULL;
-    }
-
-    so_get_descriptor = (JackDriverDescFunction)
-	dlsym (dlhandle, "driver_get_descriptor");
-
-    if ((dlerr = dlerror ()) != NULL) {
-	jack_error("%s", dlerr);
-	dlclose (dlhandle);
-	free (filename);
-	return NULL;
-    }
-
-    if ((descriptor = so_get_descriptor ()) == NULL) {
-	jack_error ("driver from '%s' returned NULL descriptor\n", filename);
-	dlclose (dlhandle);
-	free (filename);
-	return NULL;
-    }
-
-    if ((err = dlclose (dlhandle)) != 0) {
-	jack_error ("error closing driver .so '%s': %s\n", filename, dlerror ());
-    }
-
-    /* check it doesn't exist already */
-    for (node = drivers; node; node = jack_slist_next (node)) {
-	other_descriptor = (jack_driver_desc_t *) node->data;
-
-	if (strcmp (descriptor->name, other_descriptor->name) == 0) {
-	    jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
-			other_descriptor->file, filename, other_descriptor->name);
-	    /* FIXME: delete the descriptor */
-	    free (filename);
-	    return NULL;
-	}
-    }
-
-    snprintf (descriptor->file, sizeof(descriptor->file), "%s", filename);
-    free (filename);
-
-    return descriptor;
-}
-
-static JSList *
-jack_drivers_load ()
-{
-    struct dirent * dir_entry;
-    DIR * dir_stream;
-    const char * ptr;
-    int err;
-    JSList * driver_list = NULL;
-    jack_driver_desc_t * desc;
-    char* driver_dir;
-
-    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-	driver_dir = ADDON_DIR;
-    }
-
-    /* search through the driver_dir and add get descriptors
-       from the .so files in it */
-    dir_stream = opendir (driver_dir);
-    if (!dir_stream) {
-	jack_error ("could not open driver directory %s: %s\n",
-		    driver_dir, strerror (errno));
-	return NULL;
-    }
-  
-    while ( (dir_entry = readdir (dir_stream)) ) {
-	/* check the filename is of the right format */
-	if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
-	    continue;
-	}
-
-	ptr = strrchr (dir_entry->d_name, '.');
-	if (!ptr) {
-	    continue;
-	}
-	ptr++;
-	if (strncmp ("so", ptr, 2) != 0) {
-	    continue;
-	}
-
-	desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
-	if (desc) {
-	    driver_list = jack_slist_append (driver_list, desc);
-	}
-    }
-
-    err = closedir (dir_stream);
-    if (err) {
-	jack_error ("error closing driver directory %s: %s\n",
-		    driver_dir, strerror (errno));
-    }
-
-    if (!driver_list) {
-	jack_error ("could not find any drivers in %s!\n", driver_dir);
-	return NULL;
-    }
-
-    return driver_list;
-}
-
 static void
 jack_cleanup_files (const char *server_name)
 {
@@ -520,26 +396,21 @@ jackctl_drivers_load(
     struct jackctl_server * server_ptr)
 {
     struct jackctl_driver * driver_ptr;
-    JSList *node_ptr;
-    JSList *descriptor_node_ptr;
-
-    descriptor_node_ptr = jack_drivers_load();
-    if (descriptor_node_ptr == NULL)
-    {
-        jack_error("could not find any drivers in driver directory!");
-        return false;
+    vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( false );
+    if( loaded_drivers.size() == 0 ) {
+	// Should already have warned from the drivers_load call
+	return false;
     }
 
-    while (descriptor_node_ptr != NULL)
-    {
+    for( jack_driver_desc_t * jdd : loaded_drivers ) {
         driver_ptr = (struct jackctl_driver *)malloc(sizeof(struct jackctl_driver));
         if (driver_ptr == NULL)
         {
             jack_error("memory allocation of jackctl_driver structure failed.");
-            goto next;
+	    continue;
         }
 
-        driver_ptr->desc_ptr = (jack_driver_desc_t *)descriptor_node_ptr->data;
+        driver_ptr->desc_ptr = jdd;
         driver_ptr->parameters = NULL;
         driver_ptr->set_parameters = NULL;
 
@@ -547,15 +418,10 @@ jackctl_drivers_load(
         {
             assert(driver_ptr->parameters == NULL);
             free(driver_ptr);
-            goto next;
+	    continue;
         }
 
         server_ptr->drivers = jack_slist_append(server_ptr->drivers, driver_ptr);
-
-      next:
-        node_ptr = descriptor_node_ptr;
-        descriptor_node_ptr = descriptor_node_ptr->next;
-        free(node_ptr);
     }
 
     return true;
