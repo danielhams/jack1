@@ -100,22 +100,6 @@ using jack::jack_signals_unblock;
 using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
 
-//static JSList *drivers = NULL;
-//static sigset_t signals;
-//static jack_engine_t *engine = NULL;
-//static char *server_name = NULL;
-//static int realtime = 1;
-//static int realtime_priority = 10;
-//static int do_mlock = 1;
-//static int temporary = 0;
-//static int verbose = 0;
-//static int client_timeout = 0; /* msecs; if zero, use period size. */
-//static unsigned int port_max = 256;
-//static int do_unlock = 0;
-//static jack_nframes_t frame_time_offset = 0;
-//static int nozombies = 0;
-//static int timeout_count_threshold = 0;
-
 constexpr const char * jack_addon_dir = ADDON_DIR;
 
 static jack_driver_desc_t *

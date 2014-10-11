@@ -730,18 +730,6 @@ jackctl_wait_signals(sigset_t signals)
 }
 #endif
 
-static sigset_t
-jackctl_block_signals()
-{
-    return jack_signals_block();
-}
-
-static void
-jackctl_unblock_signals( sigset_t signals )
-{
-    jack_signals_unblock( signals );
-}
-
 static
 jack_driver_param_constraint_desc_t *
 get_realtime_priority_constraint()
@@ -1056,8 +1044,7 @@ jackctl_server_start(
     jackctl_driver_t *driver_ptr)
 {
     int rc;
-    sigset_t oldsignals;
-
+    sigset_t signals;
 
     // TODO:
     int frame_time_offset = 0;
@@ -1093,7 +1080,7 @@ jackctl_server_start(
     if (!server_ptr->realtime.b && server_ptr->client_timeout.i == 0)
         server_ptr->client_timeout.i = 500; /* 0.5 sec; usable when non realtime. */
     
-    oldsignals = jackctl_block_signals();
+    signals = jack_signals_block();
 
     // Hack to support jack_engine_create until I fix up where this is constructing the drivers list
     dli = drivers;
@@ -1135,7 +1122,7 @@ jackctl_server_start(
 	goto fail_close;
     }
 
-    jackctl_unblock_signals( oldsignals );
+    jack_signals_unblock( signals );
     return true;
 
   fail_close:
@@ -1156,7 +1143,7 @@ jackctl_server_start(
     //jack_log("unregistering server `%s'", server_ptr->name.str);
 
     jack_unregister_server(server_ptr->name.str);
-    jackctl_unblock_signals( oldsignals );
+    jack_signals_unblock( signals );
 
   fail:
     return false;
