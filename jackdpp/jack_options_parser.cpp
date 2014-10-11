@@ -456,10 +456,6 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 	    cout << "Going out driver argv " << i << " is " << driver_argv_[i] << endl;
 	}
     }
-
-    if( debug ) {
-	cout << options_ << endl;
-    }
 }
 
 void jack_options_parser::display_usage()

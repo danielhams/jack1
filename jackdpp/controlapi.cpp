@@ -669,42 +669,6 @@ jackctl_server_free_parameters(
     }
 }
 
-#ifdef WIN32
-
-static HANDLE waitEvent;
-
-static void do_nothing_handler(int signum)
-{
-    printf("jack main caught signal %d\n", signum);
-    (void) signal(SIGINT, SIG_DFL);
-    SetEvent(waitEvent);
-}
-
-sigset_t
-jackctl_setup_signals(
-    unsigned int flags)
-{
-    if ((waitEvent = CreateEvent(NULL, FALSE, FALSE, NULL)) == NULL) {
-        jack_error("CreateEvent fails err = %ld", GetLastError());
-        return 0;
-    }
-
-    (void) signal(SIGINT, do_nothing_handler);
-    (void) signal(SIGABRT, do_nothing_handler);
-    (void) signal(SIGTERM, do_nothing_handler);
-
-    return (sigset_t)waitEvent;
-}
-
-void jackctl_wait_signals(sigset_t signals)
-{
-    if (WaitForSingleObject(waitEvent, INFINITE) != WAIT_OBJECT_0) {
-        jack_error("WaitForSingleObject fails err = %ld", GetLastError());
-    }
-}
-
-#else
-
 sigset_t
 jackctl_setup_signals(
     unsigned int flags)
@@ -728,7 +692,6 @@ jackctl_wait_signals(sigset_t signals)
 	jack_signals_unblock( signals );
     }
 }
-#endif
 
 static
 jack_driver_param_constraint_desc_t *
