@@ -396,7 +396,7 @@ jackctl_drivers_load(
     struct jackctl_server * server_ptr)
 {
     struct jackctl_driver * driver_ptr;
-    static_drivers = jack_drivers_load_pp( false );
+    static_drivers = jack_drivers_load_pp( server_ptr->verbose.b );
     if( static_drivers.size() == 0 ) {
 	// Should already have warned from the drivers_load call
 	return false;
