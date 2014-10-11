@@ -35,6 +35,8 @@
 namespace jack
 {
 
+using std::cout;
+using std::endl;
 using std::string;
 using std::vector;
 using std::stringstream;
@@ -80,7 +82,7 @@ vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose )
 	    continue;
 	}
 
-	desc = jack_drivers_find_descriptor_pp( loaded_drivers, dir_entry->d_name );
+	desc = jack_drivers_find_so_descriptor_pp( loaded_drivers, dir_entry->d_name, verbose );
 
 	if (desc) {
 	    loaded_drivers.push_back( desc );
