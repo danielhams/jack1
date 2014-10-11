@@ -56,7 +56,7 @@
 /*
  * XXX: dont like statics here.
  */
-static JSList *drivers = NULL;
+static JSList *static_drivers = NULL;
 
 struct jackctl_server
 {
@@ -411,7 +411,7 @@ jack_drivers_load ()
 			continue;
 		}
 
-		desc = jack_drivers_get_descriptor (drivers, dir_entry->d_name);
+		desc = jack_drivers_get_descriptor( static_drivers, dir_entry->d_name );
 		if (desc) {
 			driver_list = jack_slist_append (driver_list, desc);
 		}
@@ -1193,7 +1193,8 @@ jackctl_server_start(
 				    server_ptr->do_mlock.b, server_ptr->do_unlock.b, server_ptr->name.str,
 				    server_ptr->temporary.b, server_ptr->verbose.b, server_ptr->client_timeout.i,
 				    server_ptr->port_max.i, getpid(), frame_time_offset, 
-				    server_ptr->nozombies.b, server_ptr->timothres.ui, drivers)) == 0) {
+				    server_ptr->nozombies.b, server_ptr->timothres.ui,
+					       static_drivers)) == 0) {
 	    jack_error ("cannot create engine");
 	    goto fail_unregister;
     }

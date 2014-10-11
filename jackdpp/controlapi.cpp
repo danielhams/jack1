@@ -78,7 +78,7 @@ using jack::jack_drivers_load_pp;
 /*
  * XXX: dont like statics here.
  */
-static JSList *drivers = NULL;
+static vector<jack_driver_desc_t*> static_drivers;
 
 struct jackctl_server
 {
@@ -396,13 +396,13 @@ jackctl_drivers_load(
     struct jackctl_server * server_ptr)
 {
     struct jackctl_driver * driver_ptr;
-    vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( false );
-    if( loaded_drivers.size() == 0 ) {
+    static_drivers = jack_drivers_load_pp( false );
+    if( static_drivers.size() == 0 ) {
 	// Should already have warned from the drivers_load call
 	return false;
     }
 
-    for( jack_driver_desc_t * jdd : loaded_drivers ) {
+    for( jack_driver_desc_t * jdd : static_drivers ) {
         driver_ptr = (struct jackctl_driver *)malloc(sizeof(struct jackctl_driver));
         if (driver_ptr == NULL)
         {
@@ -878,11 +878,6 @@ jackctl_server_start(
     // TODO:
     int frame_time_offset = 0;
 
-    // Hack to support jack_engine_create until I fix up where this is constructing the drivers list
-    // (see below)
-    vector<jack_driver_desc_t*> loaded_drivers;
-    JSList* dli;
-
     jack_options server_options;
 
     rc = jack_register_server( server_ptr->name.str, server_ptr->replace_registry.b );
@@ -911,14 +906,6 @@ jackctl_server_start(
     
     signals = jack_signals_block();
 
-    // Hack to support jack_engine_create until I fix up where this is constructing the drivers list
-    dli = drivers;
-    do
-    {
-	loaded_drivers.push_back( (jack_driver_desc_t*)dli->data );
-    }
-    while( dli != NULL );
-
     server_options.realtime = server_ptr->realtime.b;
     server_options.realtime_priority = server_ptr->realtime_priority.i;
     server_options.memory_locked = server_ptr->do_mlock.b;
@@ -935,7 +922,7 @@ jackctl_server_start(
     if ((server_ptr->engine = jack_engine_create_pp(
 	     server_options,
 	     getpid(),
-	     loaded_drivers)) == 0 ) {
+	     static_drivers)) == 0 ) {
 	jack_error ("cannot create engine");
 	goto fail_unregister;
     }
