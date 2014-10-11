@@ -29,6 +29,7 @@ AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $
 jackdpp_SOURCES = jackdpp.cpp \
 	jack_options_parser.cpp \
 	jack_cpp_utils.cpp \
+	jack_drivers.cpp \
 	$(NULL)
 
 jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
@@ -38,6 +39,7 @@ jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOS
 noinst_HEADERS = jackpp_md5.h \
 	jack_options_parser.hpp \
 	jack_cpp_utils.hpp \
+	jack_drivers.hpp \
 	md5.h \
 	md5_loc.h \
 	clientengine.h \

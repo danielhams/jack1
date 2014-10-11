@@ -16,24 +16,28 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
-#ifndef JACK_CPP_UTILS_HPP
-#define JACK_CPP_UTILS_HPP
+#ifndef JACK_DRIVERS_HPP
+#define JACK_DRIVERS_HPP
 
-#include <config.h>
-#include <signal.h>
+#include <string>
+#include <vector>
 
 #include "engine.h"
 
 namespace jack
 {
 
-constexpr const char * addon_dir = ADDON_DIR;
+std::vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose );
 
-sigset_t jack_signals_create();
-sigset_t jack_signals_block();
-void jack_signals_unblock( sigset_t & signals );
-void jack_signals_install_do_nothing_action( sigset_t & signals );
-int jack_signals_wait( sigset_t & signals, jack_engine_t * engine );
+jack_driver_desc_t * jack_drivers_find_descriptor_pp(
+    const std::vector<jack_driver_desc_t*> & loaded_drivers,
+    const std::string & name );
+
+jack_driver_desc_t * jack_drivers_find_so_descriptor_pp(
+    const std::vector<jack_driver_desc_t*> & loaded_drivers,
+    const std::string & so_name,
+    bool verbose );
+
 }
 
 #endif

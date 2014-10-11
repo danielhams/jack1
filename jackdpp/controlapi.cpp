@@ -1367,12 +1367,12 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 {
     jack_driver_t *old_driver;
 
-    if (server_ptr->engine.get() == NULL)
+    if( !(server_ptr->engine) )
 	goto fail_nostart;
 
     old_driver = server_ptr->engine->driver;
 
-    if (old_driver)
+    if( old_driver )
     {
 	old_driver->stop (old_driver );
 	old_driver->detach (old_driver, server_ptr->engine.get() );
