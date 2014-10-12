@@ -85,10 +85,46 @@ using jack::jack_drivers_load_pp;
  */
 static vector<jack_driver_desc_t*> static_drivers;
 
+struct jackctl_driver
+{
+    jack_driver_desc_t * desc_ptr;
+    JSList * parameters;
+    JSList * set_parameters;
+};
+
+struct jackctl_internal
+{
+    jack_driver_desc_t * desc_ptr;
+    JSList * parameters;
+    JSList * set_parameters;
+    int refnum;
+};
+
+struct jackctl_parameter
+{
+    const char * name;
+    const char * short_description;
+    const char * long_description;
+    jackctl_param_type_t type;
+    bool is_set;
+    union jackctl_parameter_value * value_ptr;
+    union jackctl_parameter_value * default_value_ptr;
+
+    union jackctl_parameter_value value;
+    union jackctl_parameter_value default_value;
+    struct jackctl_driver * driver_ptr;
+    char id;
+    jack_driver_param_t * driver_parameter_ptr;
+    jack_driver_param_constraint_desc_t * constraint_ptr;
+};
+
 struct jackctl_server
 {
+    vector<struct jackctl_driver*> drivers_vector;
     JSList * drivers;
+    vector<struct jackctl_internal*> internals_vector;
     JSList * internals;
+    vector<struct jackctl_parameter*> parameters_vector;
     JSList * parameters;
 
     std::unique_ptr<jack_engine_t> engine;
@@ -146,42 +182,7 @@ struct jackctl_server
     union jackctl_parameter_value default_timothres;
 };
 
-struct jackctl_driver
-{
-    jack_driver_desc_t * desc_ptr;
-    JSList * parameters;
-    JSList * set_parameters;
-};
-
-struct jackctl_internal
-{
-    jack_driver_desc_t * desc_ptr;
-    JSList * parameters;
-    JSList * set_parameters;
-    int refnum;
-};
-
-struct jackctl_parameter
-{
-    const char * name;
-    const char * short_description;
-    const char * long_description;
-    jackctl_param_type_t type;
-    bool is_set;
-    union jackctl_parameter_value * value_ptr;
-    union jackctl_parameter_value * default_value_ptr;
-
-    union jackctl_parameter_value value;
-    union jackctl_parameter_value default_value;
-    struct jackctl_driver * driver_ptr;
-    char id;
-    jack_driver_param_t * driver_parameter_ptr;
-    jack_driver_param_constraint_desc_t * constraint_ptr;
-};
-
-static
-struct jackctl_parameter *
-jackctl_add_parameter(
+static struct jackctl_parameter * jackctl_add_parameter(
     JSList ** parameters_list_ptr_ptr,
     char id,
     const char * name,
@@ -236,10 +237,7 @@ jackctl_add_parameter(
     return NULL;
 }
 
-static
-void
-jackctl_free_driver_parameters(
-    struct jackctl_driver * driver_ptr)
+static void jackctl_free_driver_parameters( struct jackctl_driver * driver_ptr )
 {
     JSList * next_node_ptr;
 
@@ -260,10 +258,7 @@ jackctl_free_driver_parameters(
     }
 }
 
-static
-bool
-jackctl_add_driver_parameters(
-    struct jackctl_driver * driver_ptr)
+static bool jackctl_add_driver_parameters( struct jackctl_driver * driver_ptr )
 {
     uint32_t i;
     union jackctl_parameter_value jackctl_value;
@@ -331,8 +326,7 @@ jackctl_add_driver_parameters(
     return false;
 }
 
-static void
-jack_cleanup_files (const char *server_name)
+static void jack_cleanup_files( const char *server_name )
 {
     DIR *dir;
     struct dirent *dirent;
@@ -396,9 +390,7 @@ jack_cleanup_files (const char *server_name)
     }
 }
 
-static int
-jackctl_drivers_load(
-    struct jackctl_server * server_ptr)
+static int jackctl_drivers_load( struct jackctl_server * server_ptr )
 {
     struct jackctl_driver * driver_ptr;
     static_drivers = jack_drivers_load_pp( server_ptr->verbose.b );
@@ -426,85 +418,42 @@ jackctl_drivers_load(
 	    continue;
         }
 
+	server_ptr->drivers_vector.push_back( driver_ptr );
         server_ptr->drivers = jack_slist_append(server_ptr->drivers, driver_ptr);
     }
 
     return true;
 }
 
-static
-void
-jackctl_server_free_drivers(
-    struct jackctl_server * server_ptr)
+static void jackctl_server_free_drivers( struct jackctl_server * server_ptr )
 {
-    JSList * next_node_ptr;
-    struct jackctl_driver * driver_ptr;
-
-    while (server_ptr->drivers)
-    {
-        next_node_ptr = server_ptr->drivers->next;
-        driver_ptr = (struct jackctl_driver *)server_ptr->drivers->data;
-
+    for( struct jackctl_driver * driver_ptr : server_ptr->drivers_vector ) {
         jackctl_free_driver_parameters(driver_ptr);
         free(driver_ptr->desc_ptr->params);
         free(driver_ptr->desc_ptr);
         free(driver_ptr);
 
+    }
+    server_ptr->drivers_vector.clear();
+
+    // Free up the JSList
+    JSList * next_node_ptr;
+    while (server_ptr->drivers) {
+        next_node_ptr = server_ptr->drivers->next;
         free(server_ptr->drivers);
         server_ptr->drivers = next_node_ptr;
     }
+    server_ptr->drivers = NULL;
 }
 
-static int
-jackctl_internals_load(
-    struct jackctl_server * server_ptr)
+static int jackctl_internals_load( struct jackctl_server * server_ptr )
 {
-    struct jackctl_internal * internal_ptr;
-    JSList *node_ptr;
-    JSList *descriptor_node_ptr = NULL;
-
     //XXX: jack1 doesnt support internals enumeration.
     //descriptor_node_ptr = jack_internals_load(NULL);
-    if (descriptor_node_ptr == NULL)
-    {
-        return false;
-    }
-
-    while (descriptor_node_ptr != NULL)
-    {     
-        internal_ptr = (struct jackctl_internal *)malloc(sizeof(struct jackctl_internal));
-        if (internal_ptr == NULL)
-        {
-            jack_error("memory allocation of jackctl_driver structure failed.");
-            goto next;
-        }
-
-        internal_ptr->desc_ptr = (jack_driver_desc_t *)descriptor_node_ptr->data;
-        internal_ptr->parameters = NULL;
-        internal_ptr->set_parameters = NULL;
-
-        if (!jackctl_add_driver_parameters((struct jackctl_driver *)internal_ptr))
-        {
-            assert(internal_ptr->parameters == NULL);
-            free(internal_ptr);
-            goto next;
-        }
-
-        server_ptr->internals = jack_slist_append(server_ptr->internals, internal_ptr);
-
-      next:
-        node_ptr = descriptor_node_ptr;
-        descriptor_node_ptr = descriptor_node_ptr->next;
-        free(node_ptr);
-    }
-
-    return true;
+    return false;
 }
 
-static
-void
-jackctl_server_free_internals(
-    struct jackctl_server * server_ptr)
+static void jackctl_server_free_internals( struct jackctl_server * server_ptr )
 {
     JSList * next_node_ptr;
     struct jackctl_internal * internal_ptr;
@@ -524,10 +473,7 @@ jackctl_server_free_internals(
     }
 }
 
-static
-void
-jackctl_server_free_parameters(
-    struct jackctl_server * server_ptr)
+static void jackctl_server_free_parameters( struct jackctl_server * server_ptr )
 {
     JSList * next_node_ptr;
 
@@ -540,9 +486,7 @@ jackctl_server_free_parameters(
     }
 }
 
-sigset_t
-jackctl_setup_signals(
-    unsigned int flags)
+sigset_t jackctl_setup_signals( unsigned int flags )
 {
     sigset_t signals = jack_signals_create();
 
@@ -551,8 +495,7 @@ jackctl_setup_signals(
     return signals;
 }
 
-void
-jackctl_wait_signals(sigset_t signals)
+void jackctl_wait_signals( sigset_t signals )
 {
     int sig = jack_signals_wait( signals, nullptr );
 
@@ -564,9 +507,7 @@ jackctl_wait_signals(sigset_t signals)
     }
 }
 
-static
-jack_driver_param_constraint_desc_t *
-get_realtime_priority_constraint()
+static jack_driver_param_constraint_desc_t * get_realtime_priority_constraint()
 {
 #ifndef __OpenBSD__
     jack_driver_param_constraint_desc_t * constraint_ptr;
@@ -607,8 +548,11 @@ jackctl_server_t * jackctl_server_create(
         goto fail;
     }
 
+    server_ptr->drivers_vector.clear();
     server_ptr->drivers = NULL;
+    server_ptr->internals_vector.clear();
     server_ptr->internals = NULL;
+    server_ptr->parameters_vector.clear();
     server_ptr->parameters = NULL;
 
     strcpy(value.str, jack_default_server_name() );
@@ -872,10 +816,8 @@ const JSList * jackctl_server_get_parameters(jackctl_server_t *server_ptr)
     return server_ptr->parameters;
 }
 
-bool
-jackctl_server_start(
-    jackctl_server_t *server_ptr,
-    jackctl_driver_t *driver_ptr)
+bool jackctl_server_start( jackctl_server_t *server_ptr,
+			   jackctl_driver_t *driver_ptr )
 {
     int rc;
     sigset_t signals;
