@@ -1,6 +1,6 @@
 NULL=
 
-MAINTAINERCLEANFILES = Makefile.in jackdpp.1 jackpp_md5.h
+MAINTAINERCLEANFILES = Makefile.in jackdpp.1 jackpp_md5.hpp
 
 if USE_CAPABILITIES
 CAP_PROGS = jackstartpp
@@ -33,26 +33,26 @@ jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
 
 jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
-noinst_HEADERS = jackpp_md5.h \
+noinst_HEADERS = jackpp_md5.hpp \
 	jack_options_parser.hpp \
 	jack_cpp_utils.hpp \
 	jack_drivers.hpp \
 	jack_engine.hpp \
-	md5.h \
-	md5_loc.h \
-	clientengine.h \
-	transengine.h \
+	md5.hpp \
+	md5_loc.hpp \
+	clientengine.hpp \
+	transengine.hpp \
 	$(NULL)
 
-BUILT_SOURCES = jackpp_md5.h
+BUILT_SOURCES = jackpp_md5.hpp
 
-jackpp_md5.h: jackdpp
+jackpp_md5.hpp: jackdpp
 if STRIPPED_JACKD
 	strip -R .note -R .comment .libs/jackdpp
 endif
-	echo "#define JACKDPP_MD5_SUM \"`md5sum .libs/jackdpp | awk '{print $$1}'`\"" > jackpp_md5.h
+	echo "#define JACKDPP_MD5_SUM \"`md5sum .libs/jackdpp | awk '{print $$1}'`\"" > jackpp_md5.hpp
 
-jackstartpp_SOURCES = jackstartpp.c md5.c
+jackstartpp_SOURCES = jackstartpp.cpp md5.cpp
 jackstartpp_LDFLAGS = -lcap
 
 lib_LTLIBRARIES	= libjackserverpp.la
@@ -64,37 +64,37 @@ libjackserverpp_la_SOURCES = \
 	jack_cpp_utils.cpp \
 	jack_drivers.cpp \
 	jack_engine.cpp \
-	clientengine.c \
-	transengine.c \
+	clientengine.cpp \
+	transengine.cpp \
 	controlapi.cpp \
-	../libjackpp/systemtest.c \
-	../libjackpp/sanitycheck.c \
-	../libjackpp/client.c \
-	../libjackpp/driver.c \
-	../libjackpp/intclient.c \
-	../libjackpp/messagebuffer.c \
-	../libjackpp/pool.c \
-	../libjackpp/port.c \
-	../libjackpp/midiport.c \
-	../libjackpp/ringbuffer.c \
-	../libjackpp/shm.c \
-	../libjackpp/thread.c \
-	../libjackpp/time.c \
-	../libjackpp/transclient.c \
-	../libjackpp/unlock.c \
-	../libjackpp/uuid.c \
-	../libjackpp/metadata.c \
+	../libjackpp/systemtest.cpp \
+	../libjackpp/sanitycheck.cpp \
+	../libjackpp/client.cpp \
+	../libjackpp/driver.cpp \
+	../libjackpp/intclient.cpp \
+	../libjackpp/messagebuffer.cpp \
+	../libjackpp/pool.cpp \
+	../libjackpp/port.cpp \
+	../libjackpp/midiport.cpp \
+	../libjackpp/ringbuffer.cpp \
+	../libjackpp/shm.cpp \
+	../libjackpp/thread.cpp \
+	../libjackpp/time.cpp \
+	../libjackpp/transclient.cpp \
+	../libjackpp/unlock.cpp \
+	../libjackpp/uuid.cpp \
+	../libjackpp/metadata.cpp \
 	$(NULL)
 libjackserverpp_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@ 
 libjackserverpp_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
-simd.lo: $(srcdir)/../libjackpp/simd.c
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjackpp/simd.c
+simd.lo: $(srcdir)/../libjackpp/simd.cpp
+	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjackpp/simd.cpp
 
 man_MANS = jackdpp.1 jackstartpp.1
 EXTRA_DIST = $(man_MANS)
 
 dist-hook:
-	rm -f $(distdir)/jackpp_md5.h
+	rm -f $(distdir)/jackpp_md5.hpp
 distclean-local:
-	rm -f $(top_builddir)/jackdpp/jackpp_md5.h
+	rm -f $(top_builddir)/jackdpp/jackpp_md5.hpp

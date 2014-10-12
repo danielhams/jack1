@@ -10,27 +10,27 @@ install-exec-hook:
 endif
 
 SOURCE_FILES = \
-	client.c \
-	intclient.c \
-	messagebuffer.c \
-	pool.c \
-	port.c \
-	metadata.c \
-	midiport.c \
-	ringbuffer.c \
-	shm.c \
-	thread.c \
-	time.c \
-	transclient.c \
-	unlock.c \
-	uuid.c
+	client.cpp \
+	intclient.cpp \
+	messagebuffer.cpp \
+	pool.cpp \
+	port.cpp \
+	metadata.cpp \
+	midiport.cpp \
+	ringbuffer.cpp \
+	shm.cpp \
+	thread.cpp \
+	time.cpp \
+	transclient.cpp \
+	unlock.cpp \
+	uuid.cpp
 
-simd.lo: $(srcdir)/simd.c
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.c
+simd.lo: $(srcdir)/simd.cpp
+	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.cpp
 
 lib_LTLIBRARIES	= libjackpp.la
 
-noinst_HEADERS	= local.h
+noinst_HEADERS	= local.hpp
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 AM_CXXFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"

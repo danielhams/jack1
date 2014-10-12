@@ -14,7 +14,7 @@ dist-check-doxygen:
 endif
 
 SUBDIRS =      libjack libjackpp jackd jackdpp drivers example-clients tools config $(DOC_DIR) man python
-DIST_SUBDIRS = config libjack libjackpp jackd jackdpp include drivers example-clients tools doc man python
+DIST_SUBDIRS = config libjack libjackpp jackd jackdpp include includecpp drivers example-clients tools doc man python
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
@@ -30,19 +30,19 @@ dist-hook: dist-check-doxygen
 
 libjackincludedir = $(includedir)/jack
 
-libjackinclude_HEADERS =   \
-	jack/intclient.h   \
-	jack/jack.h        \
-	jack/ringbuffer.h  \
-	jack/statistics.h  \
-	jack/session.h     \
-	jack/thread.h      \
-	jack/transport.h   \
-	jack/types.h       \
-	jack/midiport.h    \
-	jack/weakmacros.h  \
-	jack/weakjack.h    \
-	jack/control.h     \
-	jack/metadata.h     \
-	jack/uuid.h     \
+libjackinclude_HEADERS =	\
+	jack/intclient.h	\
+	jack/jack.h		\
+	jack/ringbuffer.h	\
+	jack/statistics.h	\
+	jack/session.h		\
+	jack/thread.h		\
+	jack/transport.h	\
+	jack/types.h		\
+	jack/midiport.h		\
+	jack/weakmacros.h	\
+	jack/weakjack.h		\
+	jack/control.h		\
+	jack/metadata.h		\
+	jack/uuid.h		\
 	jack/jslist.h
