@@ -59,8 +59,6 @@
 #include <jack/intclient.h>
 #include <jack/uuid.h>
 
-#include "engine.h"
-#include "engine.hpp"
 #include "internal.h"
 #include "driver.h"
 #include "shm.h"
@@ -72,6 +70,7 @@
 #include "jack_options_parser.hpp"
 #include "jack_cpp_utils.hpp"
 #include "jack_drivers.hpp"
+#include "jack_engine.hpp"
 
 #ifdef USE_CAPABILITIES
 
@@ -104,6 +103,12 @@ using jack::jack_signals_wait;
 using jack::jack_drivers_load_pp;
 using jack::jack_drivers_find_descriptor_pp;
 using jack::jack_drivers_find_so_descriptor_pp;
+
+//using jack::jack_engine_create;
+//using jack::jack_engine_cleanup;
+//using jack::jack_engine_load_driver;
+//using jack::jack_engine_load_slave_driver;
+//using jack::jack_drivers_start;
 
 static void
 jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
@@ -208,7 +213,7 @@ jack_main( const jack_options & parsed_options,
 
     sigset_t signals = jack_signals_create();
 
-    if( (engine = jack_engine_create_pp(
+    if( (engine = jack_engine_create(
              parsed_options,
              getpid(),
 	     loaded_drivers )) == 0 ) {
@@ -218,7 +223,7 @@ jack_main( const jack_options & parsed_options,
 
     jack_info ("loading driver ..");
 	
-    if( jack_engine_load_driver_pp( engine.get(), driver_desc, driver_params_jsl )) {
+    if( jack_engine_load_driver( engine.get(), driver_desc, driver_params_jsl )) {
 	jack_error ("cannot load driver module %s",
 		    driver_desc->name);
 	goto error;
@@ -258,11 +263,11 @@ jack_main( const jack_options & parsed_options,
 	jack_signals_unblock( signals );
     }
 
-    jack_engine_cleanup_pp( engine.get() );
+    jack_engine_cleanup( engine.get() );
     return 1;
 	
   error:
-    jack_engine_cleanup_pp( engine.get() );
+    jack_engine_cleanup( engine.get() );
     return -1;
 }
 

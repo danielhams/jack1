@@ -189,15 +189,15 @@ jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
 				 int timeout_count_threshold,
 				 JSList *drivers);
 void		jack_engine_delete (jack_engine_t *);
-
-int		jack_run (jack_engine_t *engine);
-int		jack_wait (jack_engine_t *engine);
 int		jack_engine_load_driver (jack_engine_t *engine,
 					 jack_driver_desc_t * driver_desc,
 					 JSList * driver_params);
 int		jack_engine_load_slave_driver (jack_engine_t *engine,
 					       jack_driver_desc_t * driver_desc,
 					       JSList * driver_params);
+
+int		jack_run (jack_engine_t *engine);
+int		jack_wait (jack_engine_t *engine);
 void		jack_dump_configuration(jack_engine_t *engine, int take_lock);
 
 /* private engine functions */
@@ -256,19 +256,13 @@ void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
 void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
 void	jack_sort_graph (jack_engine_t *engine);
 int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
-jack_client_internal_t *
-jack_client_by_name (jack_engine_t *engine, const char *name);
+jack_client_internal_t * jack_client_by_name (jack_engine_t *engine, const char *name);
 
-int  jack_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
-
-void
-jack_engine_signal_problems (jack_engine_t* engine);
-int
-jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
-int
-jack_drivers_start (jack_engine_t *engine);
-int
-jack_add_slave_driver (jack_engine_t *engine, struct _jack_driver *driver);
+void jack_engine_signal_problems (jack_engine_t* engine);
+int jack_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
+int jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
+int jack_drivers_start (jack_engine_t *engine);
+int jack_add_slave_driver (jack_engine_t *engine, struct _jack_driver *driver);
 
 #ifdef __cplusplus
 /* Close of extern "C" { */

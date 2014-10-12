@@ -22,7 +22,7 @@
 #include <config.h>
 #include <signal.h>
 
-#include "engine.h"
+#include "jack_engine.hpp"
 
 namespace jack
 {

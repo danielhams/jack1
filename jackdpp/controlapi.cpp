@@ -44,8 +44,6 @@
 
 #include "driver_interface.h"
 #include "driver.h"
-#include "engine.h"
-#include "engine.hpp"
 #include "clientengine.h"
 
 //#include "JackError.h"
@@ -61,6 +59,7 @@
 #include "jack_options_parser.hpp"
 #include "jack_cpp_utils.hpp"
 #include "jack_drivers.hpp"
+#include "jack_engine.hpp"
 
 using std::vector;
 using std::string;
@@ -74,6 +73,12 @@ using jack::jack_signals_wait;
 using jack::jack_options;
 
 using jack::jack_drivers_load_pp;
+
+//using jack::jack_engine_create;
+//using jack::jack_engine_cleanup;
+//using jack::jack_engine_load_driver;
+//using jack::jack_engine_load_slave_driver;
+//using jack::jack_use_driver;
 
 /*
  * XXX: dont like statics here.
@@ -586,7 +591,7 @@ get_realtime_priority_constraint()
 #else
     return NULL
 #endif
-	}
+}
 
 jackctl_server_t * jackctl_server_create(
     bool (* on_device_acquire)(const char * device_name),
@@ -842,7 +847,7 @@ const JSList * jackctl_server_get_drivers_list(jackctl_server_t *server_ptr)
 bool jackctl_server_stop(jackctl_server_t *server_ptr)
 {
     //jack_engine_driver_exit (server_ptr->engine);
-    jack_engine_cleanup_pp( server_ptr->engine.get() );
+    jack_engine_cleanup( server_ptr->engine.get() );
 
     /* clean up shared memory and files from this server instance */
     //jack_log("cleaning up shared memory");
@@ -919,7 +924,7 @@ jackctl_server_start(
     server_options.no_zombies = server_ptr->nozombies.b;
     server_options.timeout_threshold = server_ptr->timothres.ui;
 
-    if ((server_ptr->engine = jack_engine_create_pp(
+    if ((server_ptr->engine = jack_engine_create(
 	     server_options,
 	     getpid(),
 	     static_drivers)) == 0 ) {
@@ -944,7 +949,7 @@ jackctl_server_start(
   fail_close:
 
   fail_delete:
-    jack_engine_cleanup_pp( server_ptr->engine.get() );
+    jack_engine_cleanup( server_ptr->engine.get() );
     server_ptr->engine.release();
 
   fail_unregister:
