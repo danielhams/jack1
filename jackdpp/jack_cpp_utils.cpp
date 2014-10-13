@@ -27,8 +27,8 @@
 
 #include "jack_options_parser.hpp"
 
-#include "internal.h"
-#include "engine.h"
+#include "internal.hpp"
+#include "engine.hpp"
 
 namespace jack
 {

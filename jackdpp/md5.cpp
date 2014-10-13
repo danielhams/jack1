@@ -49,8 +49,8 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include "md5.h"
-#include "md5_loc.h"
+#include "md5.hpp"
+#include "md5_loc.hpp"
 
 /* static	char	*rcs_id =
 

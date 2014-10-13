@@ -24,7 +24,7 @@ endif
 bin_PROGRAMS = jackdpp $(CAP_PROGS)
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
-AM_CPPFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $(BOOST_PROGRAM_OPTIONS_CPPFLAGS)
+AM_CXXFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $(BOOST_PROGRAM_OPTIONS_CPPFLAGS)
 
 jackdpp_SOURCES = jackdpp.cpp \
 	$(NULL)
@@ -89,7 +89,7 @@ libjackserverpp_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@
 libjackserverpp_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
 simd.lo: $(srcdir)/../libjackpp/simd.cpp
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjackpp/simd.cpp
+	$(LIBTOOL) --mode=compile $(CXX) -I$(top_builddir) $(JACK_CORE_CPPFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/../libjackpp/simd.cpp
 
 man_MANS = jackdpp.1 jackstartpp.1
 EXTRA_DIST = $(man_MANS)

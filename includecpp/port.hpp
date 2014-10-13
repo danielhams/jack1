@@ -21,9 +21,11 @@
 #define __jack_port_h__
 
 #include <pthread.h>
+#include <string.h>
+
 #include <jack/types.h>
 #include <jack/jslist.h>
-#include "shm.h"
+#include "shm.hpp"
 
 #define JACK_PORT_NAME_SIZE 256
 #define JACK_PORT_TYPE_SIZE 32
@@ -64,10 +66,10 @@ typedef int32_t jack_port_type_id_t;
  *  its local memory, using them to attach the corresponding shared
  *  memory segments.
  */
-typedef struct _jack_port_type_info {
-
+struct jack_port_type_info_t
+{
     jack_port_type_id_t ptype_id;
-    const char     type_name[JACK_PORT_TYPE_SIZE];      
+    char     type_name[JACK_PORT_TYPE_SIZE];      
 
     /* If == 1, then a buffer to handle nframes worth of data has
      * sizeof(jack_default_audio_sample_t) * nframes bytes.  
@@ -89,7 +91,18 @@ typedef struct _jack_port_type_info {
 
     jack_shmsize_t zero_buffer_offset;
 
-} POST_PACKED_STRUCTURE jack_port_type_info_t;
+    inline jack_port_type_info_t( jack_port_type_id_t id,
+				  const char * name,
+				  int32_t bsf,
+				  jack_shmsize_t bs ) :
+	ptype_id( id ),
+	buffer_scale_factor( bsf ),
+	buffer_size( bs )
+	{
+	    type_name[0] = 0;
+	    strncpy( type_name, name, JACK_PORT_TYPE_SIZE );
+	};
+} POST_PACKED_STRUCTURE;
 
 /* Allocated by the engine in shared memory. */
 typedef struct _jack_port_shared {

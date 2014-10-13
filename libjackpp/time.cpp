@@ -19,6 +19,9 @@
 
 */
 
+#include <vector>
+#include <string>
+
 #include <config.h>
 
 #include <errno.h>
@@ -31,15 +34,15 @@
 #include <sys/types.h>
 #include <sys/mman.h>
 
-#include "internal.h"
-#include "engine.h"
+#include "internal.hpp"
+#include "engine.hpp"
 
 #include <jack/jack.h>
 
 #include <sysdeps/time.h>
 #include <sysdeps/cycles.h>
 
-#include "local.h"
+#include "local.hpp"
 
 const char*
 jack_clock_source_name (jack_timer_type_t src)

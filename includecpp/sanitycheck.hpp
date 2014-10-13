@@ -1,10 +1,6 @@
 #ifndef __jack_sanitycheck_h__
 #define __jack_sanitycheck_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /**
  * GPL etc.
  *
@@ -20,11 +16,14 @@ extern "C" {
  *
  **/
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 int sanitycheck (int do_realtime_check,
 		 int do_freqscaling_check);
 
 #ifdef __cplusplus
-/* Close of extern "C" { */
 }
 #endif
 

@@ -23,27 +23,30 @@
 
 #include <config.h>
 
+#include <vector>
+#include <string>
+
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <signal.h>
 
-#include "internal.h"
-#include "engine.h"
-#include "messagebuffer.h"
-#include "version.h"
-#include "driver.h"
+#include "internal.hpp"
+#include "engine.hpp"
+#include "messagebuffer.hpp"
+#include "version.hpp"
+#include "driver.hpp"
 #include <sysdeps/poll.h>
 #include <sysdeps/ipc.h>
 
-#include "clientengine.h"
-#include "transengine.h"
+#include "clientengine.hpp"
+#include "transengine.hpp"
 
 #include <jack/uuid.h>
 #include <jack/metadata.h>
 
-#include "libjack/local.h"
+#include "libjackpp/local.hpp"
 
 char * client_state_names[] = {
 		"Not triggered",
@@ -129,7 +132,9 @@ jack_load_client (jack_engine_t *engine, jack_client_internal_t *client,
 		return -1;
 	}
 
-	client->initialize = dlsym (client->handle, "jack_initialize");
+	client->initialize = 
+		(int (*)(jack_client_t*,const char*))
+		dlsym (client->handle, "jack_initialize");
 
 	if ((errstr = dlerror ()) != 0) {
 		jack_error ("%s has no initialize() function\n", so_name);
@@ -550,17 +555,17 @@ jack_client_name_invalid (jack_engine_t *engine, char *name,
 
 	if (jack_client_by_name (engine, name) || jack_client_name_reserved(engine, name )) {
 
-		*status |= JackNameNotUnique;
+		*status = (jack_status_t)(*status | JackNameNotUnique);
 
 		if (options & JackUseExactName) {
 			jack_error ("cannot create new client; %s already"
 				    " exists", name);
-			*status |= JackFailure;
+			*status = (jack_status_t)(*status | JackFailure);
 			return TRUE;
 		}
 
 		if (jack_generate_unique_name(engine, name)) {
-			*status |= JackFailure;
+			*status = (jack_status_t)(*status | JackFailure);
 			return TRUE;
 		}
 	}
@@ -625,7 +630,8 @@ jack_setup_client_control (jack_engine_t *engine, int fd, ClientType type, const
         if (jack_uuid_empty (uuid)) {
                 client->control->uuid = jack_client_uuid_generate ();
         } else {
-                jack_uuid_copy (&client->control->uuid, uuid);
+		jack_uuid_t * jud = (jack_uuid_t*)(&client->control->uuid);
+                jack_uuid_copy( jud, uuid );
         }
 
 	strcpy ((char *) client->control->name, name);
@@ -720,7 +726,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 	/* create a client struct for this name */
 	if ((client = jack_setup_client_control (engine, client_fd,
 						 type, name, uuid)) == NULL) {
-		*status |= (JackFailure|JackInitFailure);
+		*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
 		jack_error ("cannot create new client object");
 		return NULL;
 	}
@@ -731,7 +737,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 			jack_error ("cannot dynamically load client from"
 				    " \"%s\"", object_path);
 			jack_client_delete (engine, client);
-			*status |= (JackFailure|JackLoadFailure);
+			*status = (jack_status_t)(*status | (JackFailure|JackLoadFailure));
 			return NULL;
 		}
 	}
@@ -789,7 +795,7 @@ setup_client (jack_engine_t *engine, ClientType type, char *name,
 				jack_lock_graph (engine);
 				jack_remove_client (engine, client);
 				jack_unlock_graph (engine);
-				*status |= (JackFailure|JackInitFailure);
+				*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
 				client = NULL;
 				//JOQ: not clear that all allocated
 				//storage has been cleaned up properly.
@@ -832,7 +838,7 @@ handle_unload_client (jack_engine_t *engine, jack_uuid_t id)
 {
 	/* called *without* the request_lock */
 	jack_client_internal_t *client;
-	jack_status_t status = (JackNoSuchClient|JackFailure);
+	jack_status_t status = (jack_status_t)(JackNoSuchClient|JackFailure);
 
 	jack_lock_graph (engine);
 
@@ -840,10 +846,10 @@ handle_unload_client (jack_engine_t *engine, jack_uuid_t id)
 		VERBOSE (engine, "unloading client \"%s\"",
 			 client->control->name);
                 if (client->control->type != ClientInternal) {
-                        status = JackFailure|JackInvalidOption;
+                        status = (jack_status_t)(JackFailure|JackInvalidOption);
                 } else {
                         jack_remove_client (engine, client);
-                        status = 0;
+                        status = (jack_status_t)0;
                 }
 	}
 
@@ -877,7 +883,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	jack_client_connect_result_t res;
 	ssize_t nbytes;
 
-	res.status = 0;
+	res.status = (jack_status_t)0;
 
         VALGRIND_MEMSET(&res, 0, sizeof (res));
 
@@ -895,7 +901,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 	    || (nbytes != sizeof (req))) {
 
 		/* JACK protocol incompatibility */
-		res.status |= (JackFailure|JackVersionError);
+		res.status = (jack_status_t)(res.status | (JackFailure|JackVersionError));
 		jack_error ("JACK protocol mismatch (%d vs %d)", req.protocol_v, jack_protocol_version);
 		if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
 			jack_error ("cannot write client connection response");
@@ -930,7 +936,7 @@ jack_client_create (jack_engine_t *engine, int client_fd)
 			       req.object_path, req.object_data);
 	pthread_mutex_unlock (&engine->request_lock);
 	if (client == NULL) {
-		res.status |= JackFailure; /* just making sure */
+		res.status = (jack_status_t)(res.status | JackFailure); /* just making sure */
 		return -1;
 	}
 	res.client_shm_index = client->control_shm.index;
@@ -1141,7 +1147,7 @@ jack_intclient_handle_request (jack_engine_t *engine, jack_request_t *req)
 	if ((client = jack_client_by_name (engine, req->x.intclient.name))) {
 		jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
 	} else {
-		req->status |= (JackNoSuchClient|JackFailure);
+		req->status = (jack_status_t)(req->status | (JackNoSuchClient|JackFailure));
 	}
 }
 
@@ -1150,7 +1156,7 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 {
 	/* called with the request_lock */
 	jack_client_internal_t *client;
-	jack_status_t status = 0;
+	jack_status_t status = (jack_status_t)0;
         jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
 
 	VERBOSE (engine, "load internal client %s from %s, init `%s', "
@@ -1160,12 +1166,14 @@ jack_intclient_load_request (jack_engine_t *engine, jack_request_t *req)
 
         jack_uuid_clear (&empty_uuid);
 
+	jack_options_t client_options = (jack_options_t)(req->x.intclient.options | JackUseExactName);
+
 	client = setup_client (engine, ClientInternal, req->x.intclient.name, empty_uuid,
-			       req->x.intclient.options|JackUseExactName, &status, -1,
+			       client_options, &status, -1,
 			       req->x.intclient.path, req->x.intclient.init);
 
 	if (client == NULL) {
-		status |= JackFailure;	/* just making sure */
+		status = (jack_status_t)(status | JackFailure);	/* just making sure */
 		jack_uuid_clear (&req->x.intclient.uuid);
 		VERBOSE (engine, "load failed, status = 0x%x", status);
 	} else {

@@ -18,6 +18,9 @@
 
 */
 
+#include <string>
+#include <vector>
+
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
@@ -32,13 +35,13 @@
 
 #include <jack/jslist.h>
 
-#include "internal.h"
-#include "engine.h"
-#include "pool.h"
-#include "port.h"
-#include "intsimd.h"
+#include "internal.hpp"
+#include "engine.hpp"
+#include "pool.hpp"
+#include "port.hpp"
+#include "intsimd.hpp"
 
-#include "local.h"
+#include "local.hpp"
 
 static void    jack_generic_buffer_init(void *port_buffer,
                                       size_t buffer_size,
@@ -64,14 +67,9 @@ jack_port_functions_t jack_builtin_NULL_functions = {
 
 /* Only the Audio and MIDI port types are currently built in. */
 jack_port_type_info_t jack_builtin_port_types[] = {
-	{ .type_name = JACK_DEFAULT_AUDIO_TYPE, 
-	  .buffer_scale_factor = 1,
-	},
-	{ .type_name = JACK_DEFAULT_MIDI_TYPE, 
-	  .buffer_scale_factor = -1,
-          .buffer_size = 2048
-	},
-	{ .type_name = "", }
+    jack_port_type_info_t( 0, JACK_DEFAULT_AUDIO_TYPE, 1, 0 ),
+    jack_port_type_info_t( 1, JACK_DEFAULT_MIDI_TYPE, -1, 2048 ),
+    jack_port_type_info_t( 2, "", 0, 0 )
 };
 
 /* these functions have been taken from libDSP X86.c  -jl */
@@ -246,7 +244,7 @@ jack_port_register (jack_client_t *client,
 {
 	jack_request_t req;
 	jack_port_t *port = 0;
-	int length ;
+	size_t length ;
 
         VALGRIND_MEMSET (&req, 0, sizeof (req));
 
@@ -388,7 +386,7 @@ jack_port_get_all_connections (const jack_client_t *client,
 	const char **ret;
 	jack_request_t req;
 	jack_port_t *tmp;
-	unsigned int i;
+	ssize_t i;
 	int need_free = FALSE;
 
 	if (port == NULL) {
@@ -472,7 +470,7 @@ jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 	jack_port_t* port;
 	int need_free = FALSE;
 	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-		port = node->data;
+	    port = (jack_port_t*)node->data;
 		if (port->shared->id == id) { // Found port, return the cached structure
 			return port;
 		}
@@ -511,7 +509,7 @@ jack_port_by_name (jack_client_t *client,  const char *port_name)
 	JSList *node;
 	jack_port_t* port;
 	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-		port = node->data;
+	    port = (jack_port_t*)node->data;
 		if (jack_port_name_equals (port->shared, port_name)) {
 			/* Found port, return the cached structure. */
 			return port;
@@ -844,33 +842,40 @@ jack_port_unset_alias (jack_port_t *port, const char *alias)
 void 
 jack_port_set_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range)
 {
-	if (mode == JackCaptureLatency) {
-		port->shared->capture_latency = *range;
+    if (mode == JackCaptureLatency) {
+	jack_latency_range_t lr = *range;
+	port->shared->capture_latency.min = lr.min;
+	port->shared->capture_latency.min = lr.max;
 
-		/* hack to set port->shared->latency up for 
-		 * backend ports
-		 */
-		if ((port->shared->flags & JackPortIsOutput) && (port->shared->flags & JackPortIsPhysical))
-			port->shared->latency = (range->min + range->max) / 2;
-	} else {
-		port->shared->playback_latency = *range;
+	/* hack to set port->shared->latency up for 
+	 * backend ports
+	 */
+	if ((port->shared->flags & JackPortIsOutput) && (port->shared->flags & JackPortIsPhysical))
+	    port->shared->latency = (range->min + range->max) / 2;
+    } else {
+	jack_latency_range_t lr = *range;
+	port->shared->playback_latency.min = lr.min;
+	port->shared->playback_latency.max = lr.max;
 
-		/* hack to set port->shared->latency up for 
-		 * backend ports
-		 */
-		if ((port->shared->flags & JackPortIsInput) && (port->shared->flags & JackPortIsPhysical))
-			port->shared->latency = (range->min + range->max) / 2;
-
-	}
+	/* hack to set port->shared->latency up for 
+	 * backend ports
+	 */
+	if ((port->shared->flags & JackPortIsInput) && (port->shared->flags & JackPortIsPhysical))
+	    port->shared->latency = (range->min + range->max) / 2;
+    }
 }
 
 void 
 jack_port_get_latency_range (jack_port_t *port, jack_latency_callback_mode_t mode, jack_latency_range_t *range)
 {
-	if (mode == JackCaptureLatency)
-		*range = port->shared->capture_latency;
-	else
-		*range = port->shared->playback_latency;
+    if (mode == JackCaptureLatency) {
+	range->min = port->shared->capture_latency.min;
+	range->max = port->shared->capture_latency.max;
+    }
+    else {
+	range->min = port->shared->playback_latency.min;
+	range->max = port->shared->playback_latency.max;
+    }
 }
 
 /* AUDIO PORT SUPPORT */
@@ -909,7 +914,7 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 
 	node = port->connections;
 	input = (jack_port_t *) node->data;
-	buffer = port->mix_buffer;
+	buffer = (jack_default_audio_sample_t*)port->mix_buffer;
 
 #ifndef USE_DYNSIMD
 	memcpy (buffer, jack_output_port_buffer (input),
@@ -926,7 +931,7 @@ jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 #ifndef USE_DYNSIMD
 		n = nframes;
 		dst = buffer;
-		src = jack_output_port_buffer (input);
+		src = (jack_default_audio_sample_t*)jack_output_port_buffer (input);
 
 		while (n--) {
 			*dst++ += *src++;

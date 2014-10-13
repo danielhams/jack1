@@ -23,8 +23,8 @@
 #include <jack/metadata.h>
 #include <jack/uuid.h>
 
-#include "internal.h"
-#include "local.h"
+#include "internal.hpp"
+#include "local.hpp"
 
 const char* JACK_METADATA_PRETTY_NAME = "http://jackaudio.org/metadata/pretty-name";
 const char* JACK_METADATA_HARDWARE    = "http://jackaudio.org/metadata/hardware";
@@ -145,7 +145,7 @@ make_key_dbt (DBT* dbt, jack_uuid_t subject, const char* key)
         dbt->size = len1 + len2;
         dbt->data = malloc (dbt->size);
         memcpy (dbt->data, ustr, len1);   // copy subject+null
-        memcpy (dbt->data + len1, key, len2); // copy key+null
+        memcpy ((char*)dbt->data + len1, key, len2); // copy key+null
 }
 
 
@@ -264,15 +264,15 @@ jack_get_property (jack_uuid_t subject,
                 return -1;
         }
         
-        len1 = strlen (data.data) + 1;
+        len1 = strlen ((char*)data.data) + 1;
         (*value) = (char *) malloc (len1);
         memcpy (*value, data.data, len1);
 
         if (len1 < data.size) {
-                len2 = strlen (data.data+len1) + 1;
+	    len2 = strlen ((char*)data.data+len1) + 1;
                 
                 (*type) = (char *) malloc (len2);
-                memcpy (*type, data.data+len1, len2);
+                memcpy (*type, (char*)data.data+len1, len2);
         } else {
                 /* no type specified, assume default */
                 *type = NULL;
@@ -370,22 +370,22 @@ jack_get_properties (jack_uuid_t subject,
                 /* copy key (without leading UUID as subject */
 
                 len1 = key.size - JACK_UUID_STRING_SIZE;
-                prop->key = malloc (len1);
+                prop->key = (char*)malloc (len1);
                 memcpy ((char*) prop->key, key.data + JACK_UUID_STRING_SIZE, len1);
                 
                 /* copy data (which contains 1 or 2 null terminated strings, the value
                    and optionally a MIME type.
                  */
 
-                len1 = strlen (data.data) + 1;
+                len1 = strlen ((char*)data.data) + 1;
                 prop->data = (char *) malloc (len1);
                 memcpy ((char*) prop->data, data.data, len1);
                 
                 if (len1 < data.size) {
-                        len2 = strlen (data.data+len1) + 1;
+		    len2 = strlen ((char*)data.data+len1) + 1;
                         
                         prop->type= (char *) malloc (len2);
-                        memcpy ((char*) prop->type, data.data+len1, len2);
+                        memcpy ((char*) prop->type, (char*)data.data+len1, len2);
                 } else {
                         /* no type specified, assume default */
                         prop->type = NULL;
@@ -450,7 +450,7 @@ jack_get_all_properties (jack_description_t** descriptions)
                         continue;
                 }
 
-                if (jack_uuid_parse (key.data, &uuid) != 0) {
+                if (jack_uuid_parse ((char*)key.data, &uuid) != 0) {
                         continue;
                 }
                 
@@ -502,19 +502,19 @@ jack_get_all_properties (jack_description_t** descriptions)
                 /* copy key (without leading UUID) */
 
                 len1 = key.size - JACK_UUID_STRING_SIZE;
-                current_prop->key = malloc (len1);
+                current_prop->key = (char*)malloc (len1);
                 memcpy ((char*) current_prop->key, key.data + JACK_UUID_STRING_SIZE, len1);
                 
                 /* copy data (which contains 1 or 2 null terminated strings, the value
                    and optionally a MIME type.
                  */
 
-                len1 = strlen (data.data) + 1;
+                len1 = strlen ((char*)data.data) + 1;
                 current_prop->data = (char *) malloc (len1);
                 memcpy ((char*) current_prop->data, data.data, len1);
                 
                 if (len1 < data.size) {
-                        len2 = strlen (data.data+len1) + 1;
+		    len2 = strlen ((char*)data.data+len1) + 1;
                         
                         current_prop->type= (char *) malloc (len2);
                         memcpy ((char*) current_prop->type, data.data+len1, len2);

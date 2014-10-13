@@ -21,6 +21,8 @@
 #ifndef __jack_transengine_h__
 #define __jack_transengine_h__
 
+#include "internal.hpp"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

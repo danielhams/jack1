@@ -26,7 +26,7 @@
 #include <jack/jack.h>
 #include <jack/thread.h>
 
-#include "internal.h"
+#include "internal.hpp"
 
 #include <pthread.h>
 #include <sched.h>
@@ -34,7 +34,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "local.h"
+#include "local.hpp"
 
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/pThreadUtilities.h>

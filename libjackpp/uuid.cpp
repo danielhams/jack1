@@ -23,7 +23,7 @@
 #include <jack/types.h>
 #include <jack/uuid.h>
 
-#include "internal.h"
+#include "internal.hpp"
 
 static pthread_mutex_t uuid_lock = PTHREAD_MUTEX_INITIALIZER;
 static uint32_t        uuid_cnt = 0;

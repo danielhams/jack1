@@ -25,7 +25,7 @@
 #include <stdlib.h>
 #include <config.h>
 
-#include "pool.h"
+#include "pool.hpp"
 
 /* XXX need RT-pool based allocator here */
 void *

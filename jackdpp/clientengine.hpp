@@ -22,6 +22,8 @@
 #ifndef __jackd_client_engine_h__
 #define __jackd_client_engine_h__
 
+#include "internal.hpp"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

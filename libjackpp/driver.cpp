@@ -19,6 +19,10 @@
 */
 
 #include <config.h>
+
+#include <string>
+#include <vector>
+
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
@@ -28,9 +32,9 @@
 
 #include <jack/thread.h>
 
-#include "internal.h"
-#include "driver.h"
-#include "engine.h"
+#include "internal.hpp"
+#include "driver.hpp"
+#include "engine.hpp"
 
 #ifdef USE_MLOCK
 #include <sys/mman.h>

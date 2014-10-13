@@ -26,19 +26,6 @@
 
 #include <config.h>
 
-#include <stdio.h>
-#include <ctype.h>
-#include <signal.h>
-#include <getopt.h>
-#include <sys/types.h>
-#include <sys/shm.h>
-#include <sys/wait.h>
-#include <string.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <dlfcn.h>
-
 // CPlusPlus bits
 #include <string>
 #include <vector>
@@ -55,17 +42,32 @@
 #pragma GCC diagnostic pop
 #endif
 
+#include <stdio.h>
+#include <ctype.h>
+#include <signal.h>
+#include <getopt.h>
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <dlfcn.h>
+
 #include <jack/midiport.h>
 #include <jack/intclient.h>
 #include <jack/uuid.h>
 
-#include "internal.h"
-#include "driver.h"
-#include "shm.h"
-#include "driver_parse.h"
-#include "messagebuffer.h"
-#include "clientengine.h"
-#include "sanitycheck.h"
+#include "driver.hpp"
+#include "shm.hpp"
+#include "driver_parse.hpp"
+#include "messagebuffer.hpp"
+#include "engine.hpp"
+#include "clientengine.hpp"
+#include "sanitycheck.hpp"
+
+//#include "internal.hpp"
 
 #include "jack_options_parser.hpp"
 #include "jack_cpp_utils.hpp"
@@ -200,13 +202,12 @@ jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & in
     }
 }
 
-static int
-jack_main( const jack_options & parsed_options,
-	   const vector<jack_driver_desc_t*> & loaded_drivers,
-	   const vector<string> & slave_driver_names,
-	   const vector<string> & internal_client_names,
-	   jack_driver_desc_t * driver_desc,
-	   JSList * driver_params_jsl )
+static int jack_main( const jack_options & parsed_options,
+		      const vector<jack_driver_desc_t*> & loaded_drivers,
+		      const vector<string> & slave_driver_names,
+		      const vector<string> & internal_client_names,
+		      jack_driver_desc_t * driver_desc,
+		      JSList * driver_params_jsl )
 {
     unique_ptr<jack_engine_t> engine;
     int sig;
@@ -281,8 +282,7 @@ static void copyright( ostream & os)
 }
 
 
-static void
-jack_cleanup_files (const char *server_name)
+static void jack_cleanup_files (const char *server_name)
 {
     DIR *dir;
     struct dirent *dirent;

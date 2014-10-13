@@ -32,7 +32,6 @@
 
 #include "config.h"
 
-#include "internal.h"
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
@@ -42,9 +41,11 @@
 #include "jack/jslist.h"
 #include "jack/control.h"
 
-#include "driver_interface.h"
-#include "driver.h"
-#include "clientengine.h"
+#include "internal.hpp"
+#include "driver_interface.hpp"
+#include "driver.hpp"
+#include "clientengine.hpp"
+#include "engine.hpp"
 
 //#include "JackError.h"
 //#include "JackServer.h"

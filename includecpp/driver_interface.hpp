@@ -20,14 +20,10 @@
 #ifndef __jack_driver_interface_h__
 #define __jack_driver_interface_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <limits.h>
 
 #include <jack/jack.h>
-#include "internal.h"
+#include "internal.hpp"
 
 #define JACK_DRIVER_NAME_MAX          15
 #define JACK_DRIVER_PARAM_NAME_MAX    15
@@ -110,13 +106,6 @@ typedef struct
   jack_driver_param_desc_t * params;        /**< An array of parameter descriptors */
   
 } jack_driver_desc_t;
-
-
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* __jack_driver_interface_h__ */
 

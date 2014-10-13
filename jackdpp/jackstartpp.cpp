@@ -38,8 +38,8 @@
 #include <sys/capability.h>
 
 #include "jack/start.h"
-#include "md5.h"
-#include "jack_md5.h"
+#include "md5.hpp"
+#include "jackpp_md5.hpp"
 
 #define READ_BLOCKSIZE 4096
 

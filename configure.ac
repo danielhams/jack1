@@ -303,6 +303,10 @@ JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
 -I\$(top_srcdir) -I\$(top_srcdir)/include \ 
 -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
+JACK_CORE_CPPFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
+-I\$(top_srcdir) -I\$(top_srcdir)/includecpp \ 
+-D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
+
 JACK_LIBC_HELPER_FLAGS=
 AC_ARG_ENABLE(ancient_libc,
 	AC_HELP_STRING([--enable-ancient-libc],[Add required CFLAGS for libc versions too old to expose PThread R/W Lock and other modern code]),
@@ -310,7 +314,7 @@ AC_ARG_ENABLE(ancient_libc,
 	JACK_LIBC_HELPER_FLAGS=""
 	)
 	 
-JACK_CORE_CPPFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
+JACK_CORE_CPPFLAGS="$JACK_CORE_CPPFLAGS $JACK_LIBC_HELPER_FLAGS"
 JACK_CORE_CFLAGS="$JACK_CORE_CFLAGS $JACK_LIBC_HELPER_FLAGS"
 
 case $build_os in
@@ -982,6 +986,8 @@ jackdpp/Makefile
 jackdpp/jackdpp.1
 include/version.h
 include/Makefile
+includecpp/version.hpp
+includecpp/Makefile
 libjack/Makefile
 libjackpp/Makefile
 python/Makefile

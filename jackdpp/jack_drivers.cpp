@@ -22,7 +22,8 @@
 #include "jack_drivers.hpp"
 #include "jack_cpp_utils.hpp"
 
-#include "driver.h"
+#include "internal.hpp"
+#include "driver.hpp"
 
 #include <errno.h>
 #include <dirent.h>

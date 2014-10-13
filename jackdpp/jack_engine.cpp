@@ -27,16 +27,17 @@
 #include <sstream>
 #include <vector>
 
-#include "internal.h"
-#include "driver.h"
+#include "internal.hpp"
+#include "driver.hpp"
 #include "jack/uuid.h"
-#include "shm.h"
-#include "transengine.h"
-#include "clientengine.h"
+#include "shm.hpp"
+#include "engine.hpp"
+#include "transengine.hpp"
+#include "clientengine.hpp"
 #include "jack/types.h"
-#include "messagebuffer.h"
+#include "messagebuffer.hpp"
 
-#include "libjack/local.h"
+#include "libjackpp/local.hpp"
 
 #include <sys/socket.h>
 #include <sys/un.h>

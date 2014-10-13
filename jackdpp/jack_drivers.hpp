@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 
+#include "internal.hpp"
 #include "jack_engine.hpp"
 
 namespace jack

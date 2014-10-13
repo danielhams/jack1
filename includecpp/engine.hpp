@@ -23,18 +23,12 @@
 #define __jack_engine_hpp__
 
 #include <jack/jack.h>
-#include <internal.h>
-#include <driver_interface.h>
+#include <internal.hpp>
+#include <driver_interface.hpp>
 
 #include <vector>
 #include <memory>
 #include <string>
-
-#include "jack_options_parser.hpp"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct _jack_driver;
 struct _jack_client_internal;
@@ -283,9 +277,5 @@ int jack_engine_load_driver( jack_engine_t *engine,
 			     JSList * driver_params_jsl );
 
 */
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

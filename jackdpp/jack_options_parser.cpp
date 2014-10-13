@@ -26,7 +26,7 @@
 #include <vector>
 #include <sstream>
 
-#include "internal.h"
+#include "internal.hpp"
 
 namespace jack
 {

@@ -19,16 +19,19 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#include <vector>
+#include <string>
+
 #include <config.h>
 #include <errno.h>
 #include <assert.h>
 #include <string.h>
 #include <stdio.h>
 
-#include "internal.h"
-#include "engine.h"
-#include "messagebuffer.h"
-#include "transengine.h"
+#include "internal.hpp"
+#include "engine.hpp"
+#include "messagebuffer.hpp"
+#include "transengine.hpp"
 
 /********************** internal functions **********************/
 
@@ -180,7 +183,7 @@ jack_timebase_reset (jack_engine_t *engine, jack_uuid_t client_id)
 		client->control->is_timebase = 0;
 		client->control->timebase_new = 0;
 		engine->timebase_client = NULL;
-		ectl->pending_time.valid = 0;
+		ectl->pending_time.valid = (jack_position_bits_t)0;
 		VERBOSE (engine, "%s resigned as timebase master",
 			 client->control->name);
 		ret = 0;
@@ -298,8 +301,8 @@ jack_transport_client_exit (jack_engine_t *engine,
 			engine->timebase_client = NULL;
 			VERBOSE (engine, "timebase master exit");
 		}
-		engine->control->current_time.valid = 0;
-		engine->control->pending_time.valid = 0;
+		engine->control->current_time.valid = (jack_position_bits_t)0;
+		engine->control->pending_time.valid = (jack_position_bits_t)0;
 	}
 
 	if (client->control->is_slowsync) {

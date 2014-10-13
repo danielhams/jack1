@@ -25,6 +25,7 @@
 
 #include "jack_options_parser.hpp"
 
+#include "internal.hpp"
 #include "engine.hpp"
 
 #include <stdarg.h>

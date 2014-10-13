@@ -27,9 +27,9 @@
 
 #include <jack/uuid.h>
 
-#include "atomicity.h"
-#include "internal.h"
-#include "local.h"
+#include "atomicity.hpp"
+#include "internal.hpp"
+#include "local.hpp"
 
 
 /********************* Internal functions *********************/
@@ -440,7 +440,7 @@ jack_transport_locate (jack_client_t *client, jack_nframes_t frame)
 	jack_position_t pos;
 
 	pos.frame = frame;
-	pos.valid = 0;
+	pos.valid = (jack_position_bits_t)0;
 	return jack_transport_request_new_pos (client, &pos);
 }
 
@@ -517,7 +517,7 @@ jack_get_transport_info (jack_client_t *client,
 	info->frame_rate = ectl->current_time.frame_rate;
 	info->transport_state = ectl->transport_state;
 	info->frame = ectl->current_time.frame;
-	info->valid = (ectl->current_time.valid |
+	info->valid = (jack_transport_bits_t)(ectl->current_time.valid |
 		       JackTransportState | JackTransportPosition);
 
 	if (info->valid & JackTransportBBT) {

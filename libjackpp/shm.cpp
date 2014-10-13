@@ -47,9 +47,9 @@
 #include <sys/sem.h>
 #include <sysdeps/ipc.h>
 
-#include "shm.h"
-#include "internal.h"
-#include "version.h"
+#include "shm.hpp"
+#include "internal.hpp"
+#include "version.hpp"
 
 #ifdef USE_POSIX_SHM
 static jack_shmtype_t jack_shmtype = shm_POSIX;
@@ -108,7 +108,7 @@ static int semid = -1;
 
 /* all semaphore errors are fatal -- issue message, but do not return */
 static void
-semaphore_error (char *msg)
+semaphore_error(const char *msg)
 {
 	jack_error ("Fatal JACK semaphore error: %s (%s)",
 		    msg, strerror (errno));
@@ -807,7 +807,7 @@ jack_access_registry (jack_shm_info_t *ri)
 
 	/* set up global pointers */
 	ri->index = JACK_SHM_REGISTRY_INDEX;
-	jack_shm_header = ri->attached_at;
+	jack_shm_header = (jack_shm_header_t*)ri->attached_at;
 	jack_shm_registry = (jack_shm_registry_t *) (jack_shm_header + 1);
 
 	return 0;
@@ -840,7 +840,7 @@ jack_create_registry (jack_shm_info_t *ri)
 
 	/* set up global pointers */
 	ri->index = JACK_SHM_REGISTRY_INDEX;
-	jack_shm_header = ri->attached_at;
+	jack_shm_header = (jack_shm_header_t*)ri->attached_at;
 	jack_shm_registry = (jack_shm_registry_t *) (jack_shm_header + 1);
 
 	/* initialize registry contents */

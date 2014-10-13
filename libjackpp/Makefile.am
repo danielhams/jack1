@@ -26,14 +26,14 @@ SOURCE_FILES = \
 	uuid.cpp
 
 simd.lo: $(srcdir)/simd.cpp
-	$(LIBTOOL) --mode=compile $(CC) -I$(top_builddir) $(JACK_CORE_CFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.cpp
+	$(LIBTOOL) --mode=compile $(CXX) -I$(top_builddir) $(JACK_CORE_CPPFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.cpp
 
 lib_LTLIBRARIES	= libjackpp.la
 
 noinst_HEADERS	= local.hpp
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
-AM_CXXFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
+AM_CXXFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
 libjackpp_la_CFLAGS = $(AM_CFLAGS)
 libjackpp_la_CXXFLAGS = $(AM_CXXFLAGS)

@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Internal shared data and functions.
 
@@ -26,10 +25,6 @@
 #ifndef __jack_internal_h__
 #define __jack_internal_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdlib.h>
 #include <unistd.h>
 #include <limits.h>
@@ -37,11 +32,18 @@ extern "C" {
 #include <pthread.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <stdarg.h>
 
 /* Needed by <sysdeps/time.h> */
+extern "C" {
+
 extern void jack_error (const char *fmt, ...);
 
 extern void jack_info (const char *fmt, ...);
+
+}
+
+//#define jack_error( ... ) /* S */
 
 #include <jack/jack.h>
 #include <jack/types.h>
@@ -50,7 +52,7 @@ extern void jack_info (const char *fmt, ...);
 #include <jack/thread.h>
 #include <jack/metadata.h>
 
-#include "port.h"
+#include "port.hpp"
 
 extern jack_thread_creator_t jack_thread_creator;
 
@@ -564,11 +566,6 @@ extern int jack_client_handle_latency_callback (jack_client_t *client, jack_even
 #define VALGRIND_MEMSET(ptr,val,size) memset ((ptr),(val),(size))
 #else
 #define VALGRIND_MEMSET(ptr,val,size) 
-#endif
-
-#ifdef __cplusplus
-/* Close of extern "C" { */
-}
 #endif
 
 #endif /* __jack_internal_h__ */

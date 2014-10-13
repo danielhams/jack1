@@ -20,10 +20,6 @@
 #ifndef __jack_varargs_h__
 #define __jack_varargs_h__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /* variable argument structure */
 typedef struct {
 	char *server_name;		/* server name */
@@ -57,9 +53,5 @@ jack_varargs_parse (jack_options_t options, va_list ap, jack_varargs_t *va)
 	if ((options & JackSessionID))
 		va->sess_uuid = va_arg(ap, char *);
 }
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* __jack_varargs_h__ */
