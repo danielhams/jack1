@@ -37,8 +37,7 @@ namespace jack
 
 #else
 
-static void 
-do_nothing_handler (int sig)
+static void do_nothing_handler (int sig)
 {
     /* this is used by the child (active) process, but it never
        gets called unless we are already shutting down after

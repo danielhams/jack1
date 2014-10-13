@@ -30,12 +30,6 @@
 
 #include <stdarg.h>
 
-/*
-#ifdef __cplusplus
-extern "C" {
-#endif
-*/
-
 std::unique_ptr<jack_engine_t> jack_engine_create(
     const jack::jack_options & parsed_options,
     pid_t waitpid,
@@ -55,11 +49,5 @@ int jack_drivers_start (jack_engine_t *engine);
 int jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
 
 int jack_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
-
-/*
-#ifdef __cplusplus
-}
-#endif
-*/
 
 #endif

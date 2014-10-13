@@ -204,8 +204,6 @@ jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & in
 
 static int jack_main( const jack_options & parsed_options,
 		      const vector<jack_driver_desc_t*> & loaded_drivers,
-		      const vector<string> & slave_driver_names,
-		      const vector<string> & internal_client_names,
 		      jack_driver_desc_t * driver_desc,
 		      JSList * driver_params_jsl )
 {
@@ -230,7 +228,7 @@ static int jack_main( const jack_options & parsed_options,
 	goto error;
     }
 
-    for( const string & slave_driver_name : slave_driver_names ) {
+    for( const string & slave_driver_name : parsed_options.slave_drivers ) {
 	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor_pp( loaded_drivers, slave_driver_name );
 	if (sl_desc) {
 	    jack_engine_load_slave_driver( engine.get(), sl_desc, NULL );
@@ -243,7 +241,7 @@ static int jack_main( const jack_options & parsed_options,
 	goto error;
     }
 
-    jack_load_internal_clients_pp( engine.get(), internal_client_names );
+    jack_load_internal_clients_pp( engine.get(), parsed_options.internal_clients );
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -504,8 +502,6 @@ main (int argc, char *argv[])
     /* run the server engine until it terminates */
     jack_main( parsed_options,
 	       loaded_drivers,
-	       parsed_options.slave_drivers,
-	       parsed_options.internal_clients,
 	       desc,
 	       driver_params_jsl );
 

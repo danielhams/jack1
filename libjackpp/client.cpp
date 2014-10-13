@@ -71,8 +71,7 @@
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
 
-static int
-jack_client_close_aux (jack_client_t *client);
+static int jack_client_close_aux (jack_client_t *client);
 
 #define EVENT_POLL_INDEX 0
 #define WAIT_POLL_INDEX 1
@@ -91,8 +90,7 @@ typedef struct {
 
 int cpu_type = 0;
 
-static void
-init_cpu ()
+static void init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
 #if 0
@@ -108,8 +106,7 @@ init_cpu ()
 
 #else /* ARCH_X86 */
 
-static void
-init_cpu ()
+static void init_cpu ()
 {
 	jack_port_set_funcs();
 }
@@ -120,8 +117,7 @@ init_cpu ()
 
 char *jack_tmpdir = DEFAULT_TMP_DIR;
 
-static int
-jack_get_tmpdir ()
+static int jack_get_tmpdir ()
 {
 	FILE* in;
 	size_t len;
@@ -378,8 +374,7 @@ jack_client_t * jack_client_alloc ()
 /*
  * Build the jack_client_t structure for an internal client.
  */
-jack_client_t *
-jack_client_alloc_internal (jack_client_control_t *cc, jack_engine_t* engine)
+jack_client_t * jack_client_alloc_internal( jack_client_control_t *cc, jack_engine_t* engine )
 {
 	jack_client_t* client;
 
@@ -678,8 +673,7 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 
 #if JACK_USE_MACH_THREADS
 
-static int 
-jack_handle_reorder (jack_client_t *client, jack_event_t *event)
+static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
 	client->pollmax = 1;
 
@@ -696,8 +690,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 #else
 
-static int 
-jack_handle_reorder (jack_client_t *client, jack_event_t *event)
+static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
 	char path[PATH_MAX+1];
 
@@ -752,8 +745,7 @@ jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 #endif
 		
-static int
-server_connect (const char *server_name)
+static int server_connect (const char *server_name)
 {
 	int fd;
 	struct sockaddr_un addr;
@@ -782,8 +774,7 @@ server_connect (const char *server_name)
 	return fd;
 }
 
-static int
-server_event_connect (jack_client_t *client, const char *server_name)
+static int server_event_connect (jack_client_t *client, const char *server_name)
 {
 	int fd;
 	struct sockaddr_un addr;
@@ -836,8 +827,7 @@ server_event_connect (jack_client_t *client, const char *server_name)
 }
 
 /* Exec the JACK server in this process.  Does not return. */
-static void
-_start_server (const char *server_name)
+static void _start_server (const char *server_name)
 {
 	FILE* fp = 0;
 	char filename[255];
@@ -946,8 +936,7 @@ failure:
 	fprintf (stderr, "exec of JACK server (command = \"%s\") failed: %s\n", command, strerror (errno));
 }
 
-int
-start_server (const char *server_name, jack_options_t options)
+int start_server (const char *server_name, jack_options_t options)
 {
         int status;
         pid_t first_child_pid;
@@ -991,8 +980,7 @@ start_server (const char *server_name, jack_options_t options)
 	return 0;			/* (probably) successful */
 }
 
-static int
-jack_request_client (ClientType type,
+static int jack_request_client (ClientType type,
 		     const char* client_name, jack_options_t options,
 		     jack_status_t *status, jack_varargs_t *va,
 		     jack_client_connect_result_t *res, int *req_fd)
@@ -1129,8 +1117,7 @@ jack_request_client (ClientType type,
 	return -1;
 }
 
-int
-jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
+int jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 {
 	/* Lookup, attach and register the port/buffer segments in use
 	 * right now. 
@@ -1180,8 +1167,7 @@ jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
 	return 0;
 }
 
-jack_client_t *
-jack_client_open_aux (const char *client_name,
+jack_client_t * jack_client_open_aux (const char *client_name,
 		  jack_options_t options,
 		  jack_status_t *status, va_list ap)
 {
@@ -1346,7 +1332,7 @@ jack_client_open_aux (const char *client_name,
 	return NULL;
 }
 
-jack_client_t* jack_client_open(const char* ext_client_name, jack_options_t options, jack_status_t* status, ...)
+jack_client_t * jack_client_open(const char* ext_client_name, jack_options_t options, jack_status_t* status, ...)
 {
 	va_list ap;
 	va_start(ap, status);
@@ -1355,8 +1341,7 @@ jack_client_t* jack_client_open(const char* ext_client_name, jack_options_t opti
 	return res;
 }
 
-jack_client_t *
-jack_client_new (const char *client_name)
+jack_client_t * jack_client_new (const char *client_name)
 {
     jack_options_t options = JackUseExactName;
     if (getenv("JACK_START_SERVER") == NULL) {
@@ -1365,14 +1350,12 @@ jack_client_new (const char *client_name)
     return jack_client_open (client_name, options, NULL);
 }
 
-char *
-jack_get_client_name (jack_client_t *client)
+char * jack_get_client_name (jack_client_t *client)
 {
 	return client->name;
 }
 
-int
-jack_internal_client_new (const char *client_name,
+int jack_internal_client_new (const char *client_name,
 			  const char *so_name, const char *so_data)
 {
 	jack_client_connect_result_t res;
@@ -1393,8 +1376,7 @@ jack_internal_client_new (const char *client_name,
 				    options, &status, &va, &res, &req_fd);
 }
 
-char *
-jack_default_server_name (void)
+char * jack_default_server_name (void)
 {
 	char *server_name;
 	if ((server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
@@ -1403,8 +1385,7 @@ jack_default_server_name (void)
 }
 
 /* returns the name of the per-user subdirectory of jack_tmpdir */
-char *
-jack_user_dir (void)
+char * jack_user_dir (void)
 {
 	static char user_dir[PATH_MAX+1] = "";
 
@@ -1423,8 +1404,7 @@ jack_user_dir (void)
 }
 
 /* returns the name of the per-server subdirectory of jack_user_dir() */
-char *
-jack_server_dir (const char *server_name, char *server_dir)
+char * jack_server_dir (const char *server_name, char *server_dir)
 {
 	/* format the path name into the suppled server_dir char array,
 	 * assuming that server_dir is at least as large as PATH_MAX+1 */
@@ -1440,8 +1420,7 @@ jack_server_dir (const char *server_name, char *server_dir)
 	return server_dir;
 }
 
-void
-jack_internal_client_close (const char *client_name)
+void jack_internal_client_close (const char *client_name)
 {
 	jack_client_connect_request_t req;
 	int fd;
@@ -1465,8 +1444,7 @@ jack_internal_client_close (const char *client_name)
 	return;
 }
 
-int
-jack_recompute_total_latencies (jack_client_t* client)
+int jack_recompute_total_latencies (jack_client_t* client)
 {
 	jack_request_t request;
         VALGRIND_MEMSET (&request, 0, sizeof (request));
@@ -1475,8 +1453,7 @@ jack_recompute_total_latencies (jack_client_t* client)
 	return jack_client_deliver_request (client, &request);
 }
 
-int
-jack_recompute_total_latency (jack_client_t* client, jack_port_t* port)
+int jack_recompute_total_latency (jack_client_t* client, jack_port_t* port)
 {
 	jack_request_t request;
         VALGRIND_MEMSET (&request, 0, sizeof (request));
@@ -1486,8 +1463,7 @@ jack_recompute_total_latency (jack_client_t* client, jack_port_t* port)
 	return jack_client_deliver_request (client, &request);
 }
 
-int
-jack_set_freewheel (jack_client_t* client, int onoff)
+int jack_set_freewheel (jack_client_t* client, int onoff)
 {
 	jack_request_t request;
         VALGRIND_MEMSET (&request, 0, sizeof (request));
@@ -1497,8 +1473,7 @@ jack_set_freewheel (jack_client_t* client, int onoff)
 	return jack_client_deliver_request (client, &request);
 }
 
-int
-jack_session_reply (jack_client_t *client, jack_session_event_t *event )
+int jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 {
 	int retval = 0;
 
@@ -1527,8 +1502,7 @@ jack_session_reply (jack_client_t *client, jack_session_event_t *event )
 	return retval;
 }
 
-void
-jack_session_event_free (jack_session_event_t *event)
+void jack_session_event_free (jack_session_event_t *event)
 {
 	if (event->command_line)
 		free (event->command_line);
@@ -1538,8 +1512,7 @@ jack_session_event_free (jack_session_event_t *event)
 	free (event);
 }
 
-void
-jack_session_commands_free (jack_session_command_t *cmds)
+void jack_session_commands_free (jack_session_command_t *cmds)
 {
 	int i=0;
 	while(1) {
@@ -1558,8 +1531,7 @@ jack_session_commands_free (jack_session_command_t *cmds)
 	free(cmds);
 }
 
-jack_session_command_t *
-jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
+jack_session_command_t * jack_session_notify (jack_client_t* client, const char *target, jack_session_event_type_t code, const char *path )
 {
 	jack_request_t request;
 	jack_session_command_t *retval = NULL;
@@ -1642,8 +1614,7 @@ out:
 	return NULL;
 }
 
-int
-jack_client_has_session_callback (jack_client_t *client, const char *client_name)
+int jack_client_has_session_callback (jack_client_t *client, const char *client_name)
 {
 	jack_request_t request;
 	int retval;
@@ -1657,8 +1628,7 @@ jack_client_has_session_callback (jack_client_t *client, const char *client_name
 	return retval;
 }
 
-void
-jack_start_freewheel (jack_client_t* client)
+void jack_start_freewheel (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
@@ -1675,8 +1645,7 @@ jack_start_freewheel (jack_client_t* client)
 	}
 }
 
-void
-jack_stop_freewheel (jack_client_t* client)
+void jack_stop_freewheel (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
@@ -1695,8 +1664,7 @@ jack_stop_freewheel (jack_client_t* client)
 	}
 }
 
-static void
-jack_client_thread_suicide (jack_client_t* client, const char* reason)
+static void jack_client_thread_suicide (jack_client_t* client, const char* reason)
 {
 #ifdef JACK_USE_MACH_THREADS
         client->rt_thread_ok = FALSE;
@@ -1720,8 +1688,7 @@ jack_client_thread_suicide (jack_client_t* client, const char* reason)
 	/*NOTREACHED*/
 }
 
-static int
-jack_client_process_events (jack_client_t* client)
+static int jack_client_process_events (jack_client_t* client)
 {
 	jack_event_t event;
 	char status = 0;
@@ -1878,8 +1845,7 @@ jack_client_process_events (jack_client_t* client)
 }
 
 
-static int
-jack_wake_next_client (jack_client_t* client)
+static int jack_wake_next_client (jack_client_t* client)
 {
 #ifndef JACK_USE_MACH_THREADS
 	struct pollfd pfds[1];
@@ -1930,8 +1896,7 @@ jack_wake_next_client (jack_client_t* client)
 
 #ifdef JACK_USE_MACH_THREADS
 
-static void*
-jack_osx_event_thread_work (void* arg)
+static void * jack_osx_event_thread_work (void* arg)
 {
 	/* this is OS X: this is NOT the process() thread, but instead
 	   just waits for events/callbacks from the server and processes them.
@@ -1990,8 +1955,7 @@ jack_osx_event_thread_work (void* arg)
 
 #else /* !JACK_USE_MACH_THREADS */
 
-static int
-jack_client_core_wait (jack_client_t* client)
+static int jack_client_core_wait (jack_client_t* client)
 {
 	jack_client_control_t *control = client->control;
 
@@ -2081,8 +2045,7 @@ jack_client_core_wait (jack_client_t* client)
 
 #endif
 
-static void* 
-jack_process_thread_work (void* arg)
+static void * jack_process_thread_work (void* arg)
 {
 	/* this is the RT process thread used to handle process()
 	   callbacks, and on non-OSX systems, server events/callbacks
@@ -2155,8 +2118,7 @@ jack_process_thread_work (void* arg)
 	return 0;
 }
 
-jack_nframes_t
-jack_thread_wait (jack_client_t* client, int status)
+jack_nframes_t jack_thread_wait (jack_client_t* client, int status)
 {
         static int msg_delivered = 0;
         if (!msg_delivered) {
@@ -2251,8 +2213,7 @@ void jack_cycle_signal (jack_client_t* client, int status)
         }
 }
 
-static int
-jack_start_thread (jack_client_t *client)
+static int jack_start_thread (jack_client_t *client)
 {
 #ifdef USE_MLOCK
  	if (client->engine->real_time) {
@@ -2314,8 +2275,7 @@ jack_start_thread (jack_client_t *client)
 	return 0;
 }
 
-int 
-jack_activate (jack_client_t *client)
+int jack_activate (jack_client_t *client)
 {
 	jack_request_t req;
 
@@ -2394,8 +2354,7 @@ jack_activate (jack_client_t *client)
 	return jack_client_deliver_request (client, &req);
 }
 
-static int 
-jack_deactivate_aux (jack_client_t *client)
+static int jack_deactivate_aux (jack_client_t *client)
 {
 	jack_request_t req;
 	int rc = ESRCH;			/* already shut down */
@@ -2412,14 +2371,12 @@ jack_deactivate_aux (jack_client_t *client)
 	return rc;
 }
 
-int 
-jack_deactivate (jack_client_t *client)
+int jack_deactivate (jack_client_t *client)
 {
 	return jack_deactivate_aux(client);
 }
 
-static int
-jack_client_close_aux (jack_client_t *client)
+static int jack_client_close_aux (jack_client_t *client)
 {
 	JSList *node;
 	void *status;
@@ -2503,26 +2460,22 @@ jack_client_close_aux (jack_client_t *client)
 	return rc;
 }
 
-int
-jack_client_close (jack_client_t *client)
+int jack_client_close (jack_client_t *client)
 {
 	return jack_client_close_aux(client);
 }	
 
-int 
-jack_is_realtime (jack_client_t *client)
+int jack_is_realtime (jack_client_t *client)
 {
 	return client->engine->real_time;
 }
 
-jack_nframes_t 
-jack_get_buffer_size (jack_client_t *client)
+jack_nframes_t jack_get_buffer_size (jack_client_t *client)
 {
 	return client->engine->buffer_size;
 }
 
-int
-jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
+int jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
 {
 #ifdef DO_BUFFER_RESIZE
 	jack_request_t req;
@@ -2543,8 +2496,7 @@ jack_set_buffer_size (jack_client_t *client, jack_nframes_t nframes)
 #endif /* DO_BUFFER_RESIZE */
 }
 
-int 
-jack_connect (jack_client_t *client, const char *source_port,
+int jack_connect (jack_client_t *client, const char *source_port,
 	      const char *destination_port)
 {
 	jack_request_t req;
@@ -2562,8 +2514,7 @@ jack_connect (jack_client_t *client, const char *source_port,
 	return jack_client_deliver_request (client, &req);
 }
 
-int
-jack_port_disconnect (jack_client_t *client, jack_port_t *port)
+int jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 {
 	jack_request_t req;
 
@@ -2584,8 +2535,7 @@ jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 	return jack_client_deliver_request (client, &req);
 }
 
-int 
-jack_disconnect (jack_client_t *client, const char *source_port,
+int jack_disconnect (jack_client_t *client, const char *source_port,
 		 const char *destination_port)
 {
 	jack_request_t req;
@@ -2603,20 +2553,17 @@ jack_disconnect (jack_client_t *client, const char *source_port,
 	return jack_client_deliver_request (client, &req);
 }
 
-void
-jack_set_error_function (void (*func) (const char *))
+void jack_set_error_function (void (*func) (const char *))
 {
 	jack_error_callback = func;
 }
 
-void
-jack_set_info_function (void (*func) (const char *))
+void jack_set_info_function (void (*func) (const char *))
 {
 	jack_info_callback = func;
 }
 
-int 
-jack_set_graph_order_callback (jack_client_t *client,
+int jack_set_graph_order_callback (jack_client_t *client,
 			       JackGraphOrderCallback callback, void *arg)
 {
 	if (client->control->active) {
@@ -2629,8 +2576,7 @@ jack_set_graph_order_callback (jack_client_t *client,
 	return 0;
 }
 
-int 
-jack_set_latency_callback (jack_client_t *client,
+int jack_set_latency_callback (jack_client_t *client,
 			       JackLatencyCallback callback, void *arg)
 {
 	if (client->control->active) {
@@ -2657,8 +2603,7 @@ int jack_set_xrun_callback (jack_client_t *client,
 	return 0;       
 }
 
-int
-jack_set_process_callback (jack_client_t *client,
+int jack_set_process_callback (jack_client_t *client,
 			   JackProcessCallback callback, void *arg)
 
 {
@@ -2678,8 +2623,7 @@ jack_set_process_callback (jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_thread_init_callback (jack_client_t *client,
+int jack_set_thread_init_callback (jack_client_t *client,
 			       JackThreadInitCallback callback, void *arg)
 
 {
@@ -2698,8 +2642,7 @@ jack_set_thread_init_callback (jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_freewheel_callback (jack_client_t *client,
+int jack_set_freewheel_callback (jack_client_t *client,
 			     JackFreewheelCallback callback, void *arg)
 {
 	if (client->control->active) {
@@ -2712,8 +2655,7 @@ jack_set_freewheel_callback (jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_buffer_size_callback (jack_client_t *client,
+int jack_set_buffer_size_callback (jack_client_t *client,
 			       JackBufferSizeCallback callback, void *arg)
 {
 	client->bufsize_arg = arg;
@@ -2722,8 +2664,7 @@ jack_set_buffer_size_callback (jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_port_registration_callback(jack_client_t *client,
+int jack_set_port_registration_callback(jack_client_t *client,
 				    JackPortRegistrationCallback callback,
 				    void *arg)
 {
@@ -2737,8 +2678,7 @@ jack_set_port_registration_callback(jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_port_connect_callback(jack_client_t *client,
+int jack_set_port_connect_callback(jack_client_t *client,
 			       JackPortConnectCallback callback,
 			       void *arg)
 {
@@ -2752,8 +2692,7 @@ jack_set_port_connect_callback(jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_client_registration_callback(jack_client_t *client,
+int jack_set_client_registration_callback(jack_client_t *client,
 				      JackClientRegistrationCallback callback,
 				      void *arg)
 {
@@ -2767,8 +2706,7 @@ jack_set_client_registration_callback(jack_client_t *client,
 	return 0;
 }
 
-int
-jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void *arg)
+int jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void *arg)
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");
@@ -2786,8 +2724,7 @@ jack_set_process_thread(jack_client_t* client, JackThreadCallback callback, void
 	return 0;
 }
 
-int
-jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, void *arg)
+int jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, void *arg)
 {
 	if (client->control->active) {
 		jack_error ("You cannot set callbacks on an active client.");
@@ -2800,28 +2737,24 @@ jack_set_session_callback(jack_client_t* client, JackSessionCallback callback, v
 	return 0;
 }
 
-int
-jack_get_process_done_fd (jack_client_t *client)
+int jack_get_process_done_fd (jack_client_t *client)
 {
 	return client->graph_next_fd;
 }
 
-void
-jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
+void jack_on_shutdown (jack_client_t *client, void (*function)(void *arg), void *arg)
 {
 	client->on_shutdown = function;
 	client->on_shutdown_arg = arg;
 }
 
-void
-jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, const char*, void *arg), void *arg)
+void jack_on_info_shutdown (jack_client_t *client, void (*function)(jack_status_t, const char*, void *arg), void *arg)
 {
 	client->on_info_shutdown = function;
 	client->on_info_shutdown_arg = arg;
 }
 
-char *
-jack_get_client_name_by_uuid (jack_client_t *client, const char *uuid_str)
+char * jack_get_client_name_by_uuid (jack_client_t *client, const char *uuid_str)
 { 
 	jack_request_t request;
         
@@ -2838,8 +2771,7 @@ jack_get_client_name_by_uuid (jack_client_t *client, const char *uuid_str)
 	return strdup  (request.x.port_info.name);
 }
 
-char*
-jack_get_uuid_for_client_name (jack_client_t *client, const char *client_name)
+char* jack_get_uuid_for_client_name (jack_client_t *client, const char *client_name)
 {
 	jack_request_t request;
 	size_t len = strlen(client_name) + 1;
@@ -2860,16 +2792,14 @@ jack_get_uuid_for_client_name (jack_client_t *client, const char *client_name)
         return strdup (buf);
 }
 
-char *
-jack_client_get_uuid (jack_client_t *client)
+char * jack_client_get_uuid (jack_client_t *client)
 { 
 	char retval[37];
         jack_uuid_unparse (client->control->uuid, retval);
 	return strdup (retval);
 }
 
-int
-jack_reserve_client_name (jack_client_t *client, const char *name, const char *uuid_str)
+int jack_reserve_client_name (jack_client_t *client, const char *name, const char *uuid_str)
 { 
 	jack_request_t request;
 
@@ -2884,8 +2814,7 @@ jack_reserve_client_name (jack_client_t *client, const char *name, const char *u
 	return jack_client_deliver_request (client, &request);
 }
 
-const char **
-jack_get_ports (jack_client_t *client,
+const char ** jack_get_ports (jack_client_t *client,
 		const char *port_name_pattern,
 		const char *type_name_pattern,
 		unsigned long flags)
@@ -2966,32 +2895,27 @@ jack_get_ports (jack_client_t *client,
 	return matching_ports;
 }
 
-float
-jack_cpu_load (jack_client_t *client)
+float jack_cpu_load (jack_client_t *client)
 {
 	return client->engine->cpu_load;
 }
 
-float
-jack_get_xrun_delayed_usecs (jack_client_t *client)
+float jack_get_xrun_delayed_usecs (jack_client_t *client)
 {
 	return client->engine->xrun_delayed_usecs;
 }
 
-float
-jack_get_max_delayed_usecs (jack_client_t *client)
+float jack_get_max_delayed_usecs (jack_client_t *client)
 {
 	return client->engine->max_delayed_usecs;
 }
 
-void
-jack_reset_max_delayed_usecs (jack_client_t *client)
+void jack_reset_max_delayed_usecs (jack_client_t *client)
 {
 	client->engine->max_delayed_usecs =  0.0f;
 }
 
-pthread_t
-jack_client_thread_id (jack_client_t *client)
+pthread_t jack_client_thread_id (jack_client_t *client)
 {
         if (client->control->type != ClientExternal) {
                 /* Internal and driver clients run in ... ??? */
@@ -3001,32 +2925,27 @@ jack_client_thread_id (jack_client_t *client)
 	return client->thread_id;
 }
 
-int
-jack_client_name_size(void)
+int jack_client_name_size(void)
 {
 	return JACK_CLIENT_NAME_SIZE;
 }
 
-int
-jack_port_name_size(void)
+int jack_port_name_size(void)
 {
 	return JACK_PORT_NAME_SIZE;
 }
 
-int
-jack_port_type_size(void)
+int jack_port_type_size(void)
 {
 	return JACK_PORT_TYPE_SIZE;
 }
 
-void
-jack_free (void* ptr)
+void jack_free (void* ptr)
 {
 	free (ptr);
 }
 
-const char*
-jack_event_type_name (JackEventType type)
+const char* jack_event_type_name (JackEventType type)
 {
         switch (type) {
         case BufferSizeChange:

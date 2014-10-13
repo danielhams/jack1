@@ -4610,3 +4610,4 @@ void jack_client_registration_notify( jack_engine_t *engine,
 	}
     }
 }
+
