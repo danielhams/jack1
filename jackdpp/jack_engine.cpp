@@ -20,7 +20,7 @@
 #include <config.h>
 
 #include "jack_engine.hpp"
-#include "jack_cpp_utils.hpp"
+#include "jack_signals.hpp"
 
 #include <string>
 #include <iostream>
@@ -1388,9 +1388,13 @@ static int make_sockets (const char *server_name, int fd[2])
 
     addr.sun_family = AF_UNIX;
     for (i = 0; i < 999; i++) {
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-		  "%s/jack_%d", jack_server_dir (server_name, server_dir), i);
-	if (access (addr.sun_path, F_OK) != 0) {
+	stringstream ss( stringstream::out );
+	ss << jack_server_dir( server_name, server_dir ) << "/jack_" << i;
+
+	string path_to_check( ss.str() );
+
+	if (access( path_to_check.c_str(), F_OK) != 0) {
+	    strncpy(addr.sun_path, path_to_check.c_str(), sizeof( addr.sun_path ) - 1 );
 	    break;
 	}
     }
@@ -1426,9 +1430,13 @@ static int make_sockets (const char *server_name, int fd[2])
 
     addr.sun_family = AF_UNIX;
     for (i = 0; i < 999; i++) {
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1,
-		  "%s/jack_ack_%d", jack_server_dir (server_name, server_dir), i);
-	if (access (addr.sun_path, F_OK) != 0) {
+	stringstream ss( stringstream::out );
+	ss << jack_server_dir( server_name, server_dir ) << "/jack_ack_" << i;
+
+	string path_to_check( ss.str() );
+
+	if (access( path_to_check.c_str(), F_OK) != 0) {
+	    strncpy( addr.sun_path, path_to_check.c_str(), sizeof( addr.sun_path ) - 1 );
 	    break;
 	}
     }

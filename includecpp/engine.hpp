@@ -264,18 +264,4 @@ void		jack_engine_reset_rolling_usecs (jack_engine_t *engine);
 int		internal_client_request (void* ptr, jack_request_t *request);
 int		jack_get_fifo_fd (jack_engine_t *engine,
 				  unsigned int which_fifo);
-/*
-std::unique_ptr<jack_engine_t> jack_engine_create(
-    const jack::jack_options & parsed_options,
-    pid_t waitpid,
-    const std::vector<jack_driver_desc_t*> & loaded_drivers );
-
-void jack_engine_cleanup( jack_engine_t * );
-
-int jack_engine_load_driver( jack_engine_t *engine,
-			     jack_driver_desc_t * driver_desc,
-			     JSList * driver_params_jsl );
-
-*/
-
 #endif

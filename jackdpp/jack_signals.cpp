@@ -17,18 +17,7 @@
 
 */
 
-#include <config.h>
-
-#ifndef WIN32
-#include <pthread.h>
-#endif
-
-#include <signal.h>
-
-#include "jack_options_parser.hpp"
-
-#include "internal.hpp"
-#include "engine.hpp"
+#include "jack_signals.hpp"
 
 namespace jack
 {

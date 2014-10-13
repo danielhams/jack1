@@ -24,23 +24,21 @@
 
 #include "internal.hpp"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
 
-static inline int 
-jack_client_is_internal (jack_client_internal_t *client)
+static inline int jack_client_is_internal (jack_client_internal_t *client)
 {
-	return (client->control->type == ClientInternal) ||
-		(client->control->type == ClientDriver);
+    return (client->control->type == ClientInternal) ||
+	(client->control->type == ClientDriver);
 }
 
-extern char * client_state_names[];
+extern const char * client_state_names[];
 
-static inline char *
-jack_client_state_name (jack_client_internal_t *client)
+static inline const char * jack_client_state_name (jack_client_internal_t *client)
 {
-	return client_state_names[client->control->state];
+    return client_state_names[client->control->state];
 }
 
 #define JACK_ERROR_WITH_SOCKETS 10000000
@@ -65,13 +63,13 @@ int	jack_check_clients (jack_engine_t* engine, int with_timeout_check);
 void	jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling);
 void    jack_client_registration_notify (jack_engine_t *engine,
 					 const char* name, int yn);
-void jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
+void    jack_property_change_notify (jack_engine_t *engine, jack_property_change_t change, jack_uuid_t uuid, const char* key);
 
-void jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
+void    jack_remove_client (jack_engine_t *engine, jack_client_internal_t *client);
 
-#ifdef __cplusplus
-/* Close of extern "C" { */
-}
-#endif
+//#ifdef __cplusplus
+///* Close of extern "C" { */
+//}
+//#endif
 
 #endif

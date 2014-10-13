@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINERCLEANFILES = Makefile.in version.hpp
 
 noinst_HEADERS =		\
@@ -20,4 +22,6 @@ noinst_HEADERS =		\
 	systemtest.hpp          \
 	unlock.hpp		\
 	varargs.hpp		\
-	version.hpp
+	version.hpp		\
+	jack_constants.hpp	\
+	$(NULL)

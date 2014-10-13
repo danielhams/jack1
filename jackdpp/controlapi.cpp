@@ -58,7 +58,8 @@
 //#include "JackServerGlobals.h"
 
 #include "jack_options_parser.hpp"
-#include "jack_cpp_utils.hpp"
+#include "jack_constants.hpp"
+#include "jack_signals.hpp"
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
 

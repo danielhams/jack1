@@ -16,8 +16,8 @@
   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
-#ifndef JACK_CPP_UTILS_HPP
-#define JACK_CPP_UTILS_HPP
+#ifndef JACK_SIGNALS_HPP
+#define JACK_SIGNALS_HPP
 
 #include <config.h>
 #include <signal.h>
@@ -26,8 +26,6 @@
 
 namespace jack
 {
-
-constexpr const char * addon_dir = ADDON_DIR;
 
 sigset_t jack_signals_create();
 sigset_t jack_signals_block();

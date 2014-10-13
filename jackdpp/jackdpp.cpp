@@ -1,22 +1,22 @@
 /*
-    Original file (jackd.c):
-    Copyright (C) 2001-2005 Paul Davis
-	C++ Conversion And Modifications:
-	Copyright (C) 2014 Daniel Hams
+  Original file (jackd.c):
+  Copyright (C) 2001-2005 Paul Davis
+  C++ Conversion And Modifications:
+  Copyright (C) 2014 Daniel Hams
     
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.	See the
+  GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
 */
 
@@ -66,11 +66,10 @@
 #include "engine.hpp"
 #include "clientengine.hpp"
 #include "sanitycheck.hpp"
-
-//#include "internal.hpp"
+#include "jack_constants.hpp"
 
 #include "jack_options_parser.hpp"
-#include "jack_cpp_utils.hpp"
+#include "jack_signals.hpp"
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
 
@@ -112,8 +111,7 @@ using jack::jack_drivers_find_so_descriptor_pp;
 //using jack::jack_engine_load_slave_driver;
 //using jack::jack_drivers_start;
 
-static void
-jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
+static void jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
 	jack_request_t req;
@@ -213,8 +211,8 @@ static int jack_main( const jack_options & parsed_options,
     sigset_t signals = jack_signals_create();
 
     if( (engine = jack_engine_create(
-             parsed_options,
-             getpid(),
+	     parsed_options,
+	     getpid(),
 	     loaded_drivers )) == 0 ) {
 	jack_error ("cannot create engine");
 	return -1;
@@ -293,10 +291,10 @@ static void jack_cleanup_files (const char *server_name)
      * terminated with SIGKILL, this is not possible.  So, cleanup
      * is also attempted when jackd starts.
      *
-     * There are several tricky issues.  First, the previous JACK
+     * There are several tricky issues. First, the previous JACK
      * server may have run for a different user ID, so its files
      * may be inaccessible.  This is handled by using a separate
-     * JACK_TMP_DIR subdirectory for each user.  Second, there may
+     * JACK_TMP_DIR subdirectory for each user.	 Second, there may
      * be other servers running with different names.  Each gets
      * its own subdirectory within the per-user directory.  The
      * current process has already registered as `server_name', so
@@ -310,19 +308,18 @@ static void jack_cleanup_files (const char *server_name)
 
     /* unlink all the files in this directory, they are mine */
     while ((dirent = readdir (dir)) != NULL) {
-
-	char fullpath[PATH_MAX+1];
-
 	if ((strcmp (dirent->d_name, ".") == 0)
 	    || (strcmp (dirent->d_name, "..") == 0)) {
 	    continue;
 	}
 
-	snprintf (fullpath, sizeof (fullpath), "%s/%s",
-		  dir_name, dirent->d_name);
+	stringstream ss( stringstream::out );
+	ss << dir_name << '/' << dirent->d_name;
 
-	if (unlink (fullpath)) {
-	    jack_error ("cannot unlink `%s' (%s)", fullpath,
+	string fullpath( ss.str() );
+
+	if (unlink (fullpath.c_str())) {
+	    jack_error ("cannot unlink `%s' (%s)", fullpath.c_str(),
 			strerror (errno));
 	}
     } 
@@ -344,8 +341,7 @@ static void jack_cleanup_files (const char *server_name)
     }
 }
 
-static void
-maybe_use_capabilities ()
+static void maybe_use_capabilities ()
 {
 #ifdef USE_CAPABILITIES
     int status;
@@ -382,15 +378,13 @@ maybe_use_capabilities ()
 #endif /* USE_CAPABILITIES */
 }
 
-static
-void display_version( ostream & os )
+static void display_version( ostream & os )
 {
     os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
 	" protocol " << PROTOCOL_VERSION << endl;
 }
 
-int	       
-main (int argc, char *argv[])
+int main (int argc, char *argv[])
 {
     jack_driver_desc_t * desc;
 

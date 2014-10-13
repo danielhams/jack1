@@ -35,7 +35,7 @@ jackdpp_LDADD = libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOS
 
 noinst_HEADERS = jackpp_md5.hpp \
 	jack_options_parser.hpp \
-	jack_cpp_utils.hpp \
+	jack_signals.hpp \
 	jack_drivers.hpp \
 	jack_engine.hpp \
 	md5.hpp \
@@ -61,7 +61,7 @@ libjackserverpp_la_CFLAGS = $(AM_CFLAGS)
 
 libjackserverpp_la_SOURCES = \
 	jack_options_parser.cpp \
-	jack_cpp_utils.cpp \
+	jack_signals.cpp \
 	jack_drivers.cpp \
 	jack_engine.cpp \
 	clientengine.cpp \

@@ -26,6 +26,10 @@
 #include "port.hpp"
 #include "driver_interface.hpp"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef float         gain_t;
 typedef unsigned long channel_t;
 
@@ -300,5 +304,9 @@ typedef struct _jack_driver_nt {
 
 void jack_driver_nt_init   (jack_driver_nt_t * driver);
 void jack_driver_nt_finish (jack_driver_nt_t * driver);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __jack_driver_h__ */
