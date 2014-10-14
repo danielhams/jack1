@@ -993,6 +993,7 @@ driverspp/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
 tools/zalsa/Makefile
+tools/zalsapp/Makefile
 man/Makefile
 jack.pc
 jack.spec
