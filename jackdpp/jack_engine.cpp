@@ -4185,8 +4185,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     /* allocate internal port structures so that we can keep track
      * of port connections.
      */
-    engine->internal_ports = (jack_port_internal_t *)
-	malloc (sizeof (jack_port_internal_t) * engine->port_max);
+    engine->internal_ports.resize( engine->port_max );
 
     for (i = 0; i < engine->port_max; i++) {
 	engine->internal_ports[i].connections = 0;

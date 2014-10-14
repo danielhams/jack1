@@ -150,7 +150,7 @@ struct _jack_engine {
     JSList	   *clients_waiting;
     JSList	   *reserved_client_names;
 
-    jack_port_internal_t    *internal_ports;
+    std::vector<jack_port_internal_t> internal_ports;
     jack_client_internal_t  *timebase_client;
     jack_port_buffer_info_t *silent_buffer;
     jack_client_internal_t  *current_client;
