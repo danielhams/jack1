@@ -153,7 +153,7 @@ int jack_signals_wait( sigset_t & signals, jack_engine_t * engine )
 	switch (sig) {
 	    case SIGUSR1:
 		if( engine != nullptr ) {
-		    jack_dump_configuration( engine, 1 );
+		    jack_engine_dump_configuration( *engine, 1 );
 		}
 		break;
 	    case SIGUSR2:

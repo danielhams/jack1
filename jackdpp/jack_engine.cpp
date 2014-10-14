@@ -1686,8 +1686,8 @@ int jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int inter
     }
 
     jack_lock_graph (engine);
-    if ((client = jack_client_internal_by_id (engine,
-					      req->x.port_info.client_id))
+    if ((client = jack_engine_client_internal_by_id( *engine,
+						     req->x.port_info.client_id))
 	== NULL) {
 	jack_error ("unknown client id in port registration request");
 	jack_unlock_graph (engine);
@@ -2158,11 +2158,11 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 		jack_client_internal_t *src;
 		jack_client_internal_t *dst;
 			
-		src = jack_client_internal_by_id 
-		    (engine, srcport->shared->client_id);
+		src = jack_engine_client_internal_by_id 
+		    (*engine, srcport->shared->client_id);
 
-		dst =  jack_client_internal_by_id
-		    (engine, dstport->shared->client_id);
+		dst =  jack_engine_client_internal_by_id
+		    (*engine, dstport->shared->client_id);
 								    
 		src->truefeeds = jack_slist_remove
 		    (src->truefeeds, dst);
@@ -2249,7 +2249,7 @@ int jack_port_do_unregister( jack_engine_t *engine, jack_request_t *req )
     jack_uuid_copy (&uuid, shared->uuid);
 
     jack_lock_graph (engine);
-    if ((client = jack_client_internal_by_id (engine, shared->client_id))
+    if ((client = jack_engine_client_internal_by_id(*engine, shared->client_id))
 	== NULL) {
 	jack_error ("unknown client id in port registration request");
 	jack_unlock_graph (engine);
@@ -2304,7 +2304,7 @@ static int jack_send_connection_notification (jack_engine_t *engine,
  
     VALGRIND_MEMSET(&event, 0, sizeof(event));
 
-    if ((client = jack_client_internal_by_id (engine, client_id)) == NULL) {
+    if ((client = jack_engine_client_internal_by_id( *engine, client_id)) == NULL) {
 	jack_error ("no such client %" PRIu32
 		    " during connection notification", client_id);
 	return -1;
@@ -2344,8 +2344,8 @@ static void jack_notify_all_port_interested_clients(
     /* GRAPH MUST BE LOCKED : see callers of jack_send_connection_notification() 
      */
 
-    jack_client_internal_t* src_client = jack_client_internal_by_id (engine, src);
-    jack_client_internal_t* dst_client = jack_client_internal_by_id (engine, dst);
+    jack_client_internal_t* src_client = jack_engine_client_internal_by_id( *engine, src);
+    jack_client_internal_t* dst_client = jack_engine_client_internal_by_id( *engine, dst);
 
     for (node = engine->clients; node; node = jack_slist_next (node)) {
 	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
@@ -2360,7 +2360,7 @@ static void jack_notify_all_port_interested_clients(
 /**
  * Dumps current engine configuration.
  */
-void jack_dump_configuration(jack_engine_t *engine, int take_lock)
+void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 {
     JSList *clientnode, *portnode, *connectionnode;
     jack_client_internal_t *client;
@@ -2372,10 +2372,10 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
     jack_info ("engine.c: <-- dump begins -->");
 
     if (take_lock) {
-	jack_rdlock_graph (engine);
+	jack_rdlock_graph( (&engine) );
     }
 
-    for (n = 0, clientnode = engine->clients; clientnode;
+    for (n = 0, clientnode = engine.clients; clientnode;
 	 clientnode = jack_slist_next (clientnode)) {
 	client = (jack_client_internal_t *) clientnode->data;
 	ctl = client->control;
@@ -2416,7 +2416,7 @@ void jack_dump_configuration(jack_engine_t *engine, int take_lock)
     }
 
     if (take_lock) {
-	jack_unlock_graph (engine);
+	jack_unlock_graph( (&engine) );
     }
 
 	
@@ -2466,8 +2466,8 @@ static int jack_port_do_connect (jack_engine_t *engine,
 	return -1;
     }
 
-    if ((srcclient = jack_client_internal_by_id (engine,
-						 srcport->shared->client_id))
+    if ((srcclient = jack_engine_client_internal_by_id( *engine,
+							srcport->shared->client_id))
 	== 0) {
 	jack_error ("unknown client set as owner of port - "
 		    "cannot connect");
@@ -2480,8 +2480,8 @@ static int jack_port_do_connect (jack_engine_t *engine,
 	return -1;
     }
 
-    if ((dstclient = jack_client_internal_by_id (engine,
-						 dstport->shared->client_id))
+    if ((dstclient = jack_engine_client_internal_by_id( *engine,
+							dstport->shared->client_id))
 	== 0) {
 	jack_error ("unknown client set as owner of port - cannot "
 		    "connect");
@@ -2906,7 +2906,7 @@ static void* jack_engine_freewheel( void *arg )
        have to do anything about scheduling.
     */
 
-    client = jack_client_internal_by_id (engine, engine->fwclient);
+    client = jack_engine_client_internal_by_id( *engine, engine->fwclient);
 
     while (!engine->stop_freewheeling) {
 
@@ -2948,7 +2948,7 @@ static int jack_start_freewheeling( jack_engine_t* engine, jack_uuid_t client_id
 	return -1;
     }
 
-    client = jack_client_internal_by_id (engine, client_id);
+    client = jack_engine_client_internal_by_id( *engine, client_id);
 
     if (client->control->process_cbset || client->control->thread_cb_cbset) {
 	jack_uuid_copy (&engine->fwclient, client_id);
@@ -3386,7 +3386,7 @@ static void jack_do_session_reply (jack_engine_t *engine, jack_request_t *req )
     jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
 
     jack_uuid_copy (&client_id, req->x.client_id);
-    client = jack_client_internal_by_id (engine, client_id);
+    client = jack_engine_client_internal_by_id( *engine, client_id);
     jack_uuid_clear (&finalizer);
 
     req->status = 0;
@@ -3762,7 +3762,7 @@ static int handle_client_ack_connection (jack_engine_t *engine, int client_fd)
 	return -1;
     }
 
-    if ((client = jack_client_internal_by_id (engine, req.client_id))
+    if ((client = jack_engine_client_internal_by_id( *engine, req.client_id))
 	== NULL) {
 	jack_error ("unknown client ID in ACK connection request");
 	return -1;
@@ -4635,5 +4635,23 @@ jack_client_internal_t * jack_engine_client_by_name( jack_engine_t & engine, con
     }
 
     jack_unlock_graph( (&engine) );
+    return client;
+}
+
+jack_client_internal_t * jack_engine_client_internal_by_id( jack_engine_t & engine, jack_uuid_t id )
+{
+    jack_client_internal_t *client = NULL;
+    JSList *node;
+
+    /* call tree ***MUST HOLD*** the graph lock */
+
+    for (node = engine.clients; node; node = jack_slist_next (node)) {
+
+	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, id) == 0) {
+	    client = (jack_client_internal_t *) node->data;
+	    break;
+	}
+    }
+
     return client;
 }

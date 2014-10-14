@@ -451,24 +451,6 @@ static int jack_client_id_by_name (jack_engine_t *engine, const char *name, jack
         return ret;
 }
 
-jack_client_internal_t * jack_client_internal_by_id (jack_engine_t *engine, jack_uuid_t id)
-{
-	jack_client_internal_t *client = NULL;
-	JSList *node;
-
-	/* call tree ***MUST HOLD*** the graph lock */
-
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-
-		if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, id) == 0) {
-			client = (jack_client_internal_t *) node->data;
-			break;
-		}
-	}
-
-	return client;
-}
-
 int jack_client_name_reserved( jack_engine_t *engine, const char *name )
 {
 	JSList *node;
@@ -815,7 +797,7 @@ static jack_status_t handle_unload_client (jack_engine_t *engine, jack_uuid_t id
 
 	jack_lock_graph (engine);
 
-	if ((client = jack_client_internal_by_id (engine, id))) {
+	if ((client = jack_engine_client_internal_by_id( *engine, id))) {
 		VERBOSE (engine, "unloading client \"%s\"",
 			 client->control->name);
                 if (client->control->type != ClientInternal) {
@@ -966,7 +948,7 @@ int jack_client_activate( jack_engine_t * engine, jack_uuid_t id )
 
 	jack_lock_graph (engine);
 
-	if ((client = jack_client_internal_by_id (engine, id)))
+	if ((client = jack_engine_client_internal_by_id( *engine, id)))
 	{
 		client->control->active = TRUE;
 
@@ -1153,7 +1135,7 @@ void jack_intclient_name_request (jack_engine_t *engine, jack_request_t *req)
 	jack_client_internal_t *client;
 
 	jack_rdlock_graph (engine);
-	if ((client = jack_client_internal_by_id (engine,
+	if ((client = jack_engine_client_internal_by_id( *engine,
 						  req->x.intclient.uuid))) {
 		strncpy ((char *) req->x.intclient.name,
 			 (char *) client->control->name,
