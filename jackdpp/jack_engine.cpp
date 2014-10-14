@@ -141,21 +141,21 @@ static inline int jack_rolling_interval( jack_time_t period_usecs )
     return floor ((JACK_ENGINE_ROLLING_INTERVAL * 1000.0f) / period_usecs);
 }
 
-void jack_engine_reset_rolling_usecs( jack_engine_t *engine )
+void jack_engine_reset_rolling_usecs( jack_engine_t & engine )
 {
-    memset (engine->rolling_client_usecs, 0,
-	    sizeof (engine->rolling_client_usecs));
-    engine->rolling_client_usecs_index = 0;
-    engine->rolling_client_usecs_cnt = 0;
+    memset (engine.rolling_client_usecs, 0,
+	    sizeof (engine.rolling_client_usecs));
+    engine.rolling_client_usecs_index = 0;
+    engine.rolling_client_usecs_cnt = 0;
 
-    if (engine->driver) {
-	engine->rolling_interval =
-	    jack_rolling_interval (engine->driver->period_usecs);
+    if (engine.driver) {
+	engine.rolling_interval =
+	    jack_rolling_interval (engine.driver->period_usecs);
     } else {
-	engine->rolling_interval = JACK_ENGINE_ROLLING_INTERVAL;
+	engine.rolling_interval = JACK_ENGINE_ROLLING_INTERVAL;
     }
 
-    engine->spare_usecs = 0;
+    engine.spare_usecs = 0;
 }
 
 void jack_engine_place_port_buffers (jack_engine_t* engine, 
@@ -280,259 +280,260 @@ linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, jack_time_t
 }
 #endif
 
-int jack_deliver_event( jack_engine_t *engine,
-			jack_client_internal_t *client,
-			const jack_event_t *event, ...)
+int jack_engine_deliver_event(
+    jack_engine_t & engine,
+    jack_client_internal_t *client,
+    const jack_event_t *event, ...)
 {
-        va_list ap;
-	char status=0;
-        char* key = 0;
-        size_t keylen = 0;
+    va_list ap;
+    char status=0;
+    char* key = 0;
+    size_t keylen = 0;
 
-        va_start (ap, event);
+    va_start (ap, event);
 
-	/* caller must hold the graph lock */
+    /* caller must hold the graph lock */
 
-	DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
+    DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
 
-	/* we are not RT-constrained here, so use kill(2) to beef up
-	   our check on a client's continued well-being
-	*/
+    /* we are not RT-constrained here, so use kill(2) to beef up
+       our check on a client's continued well-being
+    */
 
-	if (client->control->dead || client->error >= JACK_ERROR_WITH_SOCKETS 
-	    || (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
-		DEBUG ("client %s is dead - no event sent",
-		       client->control->name);
-		return 0;
-	}
+    if (client->control->dead || client->error >= JACK_ERROR_WITH_SOCKETS 
+	|| (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
+	DEBUG ("client %s is dead - no event sent",
+	       client->control->name);
+	return 0;
+    }
 
-	DEBUG ("client %s is still alive", client->control->name);
+    DEBUG ("client %s is still alive", client->control->name);
 
-        /* Check property change events for matching key_size and keys */
+    /* Check property change events for matching key_size and keys */
 
-        if (event->type == PropertyChange) {
-                key = va_arg (ap, char*);
-                if (key && key[0] != '\0') {
-                        keylen = strlen (key) + 1;
-                        if (event->y.key_size != keylen) {
-                                jack_error ("property change key %s sent with wrong length (%d vs %d)", key, event->y.key_size, keylen);
-                                return -1;
-                        }
-                }
-        }
-
-        va_end (ap);
-
-	if (jack_client_is_internal (client)) {
-	    switch (event->type) {
-		case PortConnected:
-		case PortDisconnected:
-		    jack_client_handle_port_connection( client->private_client,
-							(jack_event_t*)event);
-		    break;
-		case BufferSizeChange:
-		    jack_client_fix_port_buffers (client->private_client);
-
-		    if (client->control->bufsize_cbset) {
-			if (event->x.n < 16) {
-			    abort ();
-			}
-			client->private_client->bufsize
-			    (event->x.n, client->private_client->bufsize_arg);
-		    }
-		    break;
-
-		case SampleRateChange:
-		    if (client->control->srate_cbset) {
-			client->private_client->srate
-			    (event->x.n,
-			     client->private_client->srate_arg);
-		    }
-		    break;
-
-		case GraphReordered:
-		    if (client->control->graph_order_cbset) {
-			client->private_client->graph_order
-			    (client->private_client->graph_order_arg);
-		    }
-		    break;
-
-		case XRun:
-		    if (client->control->xrun_cbset) {
-			client->private_client->xrun
-			    (client->private_client->xrun_arg);
-		    }
-		    break;
-
-                case PropertyChange:
-		    if (client->control->property_cbset) {
-			client->private_client->property_cb
-			    (event->x.uuid, key, event->z.property_change, client->private_client->property_cb_arg);
-		    }
-		    break;
-
-		case LatencyCallback:
-		    jack_client_handle_latency_callback( client->private_client,
-							 (jack_event_t*)event,
-							 (client->control->type == ClientDriver));
-		    break;
-
-		default:
-		    /* internal clients don't need to know */
-		    break;
+    if (event->type == PropertyChange) {
+	key = va_arg (ap, char*);
+	if (key && key[0] != '\0') {
+	    keylen = strlen (key) + 1;
+	    if (event->y.key_size != keylen) {
+		jack_error ("property change key %s sent with wrong length (%d vs %d)", key, event->y.key_size, keylen);
+		return -1;
 	    }
-	} else {
-		if (client->control->active) {
+	}
+    }
 
-			/* there's a thread waiting for events, so
-			 * it's worth telling the client */
+    va_end (ap);
 
-			DEBUG ("engine writing on event fd");
+    if (jack_client_is_internal (client)) {
+	switch (event->type) {
+	    case PortConnected:
+	    case PortDisconnected:
+		jack_client_handle_port_connection( client->private_client,
+						    (jack_event_t*)event);
+		break;
+	    case BufferSizeChange:
+		jack_client_fix_port_buffers (client->private_client);
 
-			if (write (client->event_fd, event, sizeof (*event))
-			    != sizeof (*event)) {
-				jack_error ("cannot send event to client [%s]"
-					    " (%s)", client->control->name,
-					    strerror (errno));
-				client->error += JACK_ERROR_WITH_SOCKETS;
-				jack_engine_signal_problems (engine);
-			}
+		if (client->control->bufsize_cbset) {
+		    if (event->x.n < 16) {
+			abort ();
+		    }
+		    client->private_client->bufsize
+			(event->x.n, client->private_client->bufsize_arg);
+		}
+		break;
 
-                        /* for property changes, deliver the extra data representing
-                           the variable length "key" that has changed in some way.
-                        */
+	    case SampleRateChange:
+		if (client->control->srate_cbset) {
+		    client->private_client->srate
+			(event->x.n,
+			 client->private_client->srate_arg);
+		}
+		break;
+
+	    case GraphReordered:
+		if (client->control->graph_order_cbset) {
+		    client->private_client->graph_order
+			(client->private_client->graph_order_arg);
+		}
+		break;
+
+	    case XRun:
+		if (client->control->xrun_cbset) {
+		    client->private_client->xrun
+			(client->private_client->xrun_arg);
+		}
+		break;
+
+	    case PropertyChange:
+		if (client->control->property_cbset) {
+		    client->private_client->property_cb
+			(event->x.uuid, key, event->z.property_change, client->private_client->property_cb_arg);
+		}
+		break;
+
+	    case LatencyCallback:
+		jack_client_handle_latency_callback( client->private_client,
+						     (jack_event_t*)event,
+						     (client->control->type == ClientDriver));
+		break;
+
+	    default:
+		/* internal clients don't need to know */
+		break;
+	}
+    } else {
+	if (client->control->active) {
+
+	    /* there's a thread waiting for events, so
+	     * it's worth telling the client */
+
+	    DEBUG ("engine writing on event fd");
+
+	    if (write (client->event_fd, event, sizeof (*event))
+		!= sizeof (*event)) {
+		jack_error ("cannot send event to client [%s]"
+			    " (%s)", client->control->name,
+			    strerror (errno));
+		client->error += JACK_ERROR_WITH_SOCKETS;
+		jack_engine_signal_problems( &engine );
+	    }
+
+	    /* for property changes, deliver the extra data representing
+	       the variable length "key" that has changed in some way.
+	    */
                         
-                        if (event->type == PropertyChange) {
-			    if (write (client->event_fd, key, keylen) != (ssize_t)keylen) {
-                                        jack_error ("cannot send property change key to client [%s] (%s)",
-                                                    client->control->name,
-                                                    strerror (errno));
-                                        client->error += JACK_ERROR_WITH_SOCKETS;
-                                        jack_engine_signal_problems (engine);
-                                }
-                        }
+	    if (event->type == PropertyChange) {
+		if (write (client->event_fd, key, keylen) != (ssize_t)keylen) {
+		    jack_error ("cannot send property change key to client [%s] (%s)",
+				client->control->name,
+				strerror (errno));
+		    client->error += JACK_ERROR_WITH_SOCKETS;
+		    jack_engine_signal_problems( &engine );
+		}
+	    }
 
- 			if (client->error) {
- 				status = -1;
- 			} else {
- 				// then we check whether there really is an error.... :)
+	    if (client->error) {
+		status = -1;
+	    } else {
+		// then we check whether there really is an error.... :)
  
- 				struct pollfd pfd[1];
- 				pfd[0].fd = client->event_fd;
- 				pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
- 				jack_time_t poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
- 				int poll_ret;
-				jack_time_t then = jack_get_microseconds ();
-				jack_time_t now;
+		struct pollfd pfd[1];
+		pfd[0].fd = client->event_fd;
+		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+		jack_time_t poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
+		int poll_ret;
+		jack_time_t then = jack_get_microseconds ();
+		jack_time_t now;
 				
-                                /* if we're not running realtime and there is a client timeout set
-                                   that exceeds the default client event timeout (which is not
-                                   bound by RT limits, then use the larger timeout.
-                                */
+		/* if we're not running realtime and there is a client timeout set
+		   that exceeds the default client event timeout (which is not
+		   bound by RT limits, then use the larger timeout.
+		*/
 
-                                if (!engine->control->real_time && ((size_t)engine->client_timeout_msecs > poll_timeout)) {
-                                        poll_timeout = engine->client_timeout_msecs;
-                                }
+		if (!engine.control->real_time && ((size_t)engine.client_timeout_msecs > poll_timeout)) {
+		    poll_timeout = engine.client_timeout_msecs;
+		}
 
 #ifdef __linux
-			again:
+	      again:
 #endif
-				VERBOSE(engine,"client event poll on %d for %s starts at %lld", 
-					client->event_fd, client->control->name, then);
- 				if ((poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
- 					DEBUG ("client event poll not ok! (-1) poll returned an error");
- 					jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
- 					status = -1; 
- 				} else {
+		VERBOSE( &engine,"client event poll on %d for %s starts at %lld", 
+			client->event_fd, client->control->name, then);
+		if ((poll_ret = poll (pfd, 1, poll_timeout)) < 0) {
+		    DEBUG ("client event poll not ok! (-1) poll returned an error");
+		    jack_error ("poll on subgraph processing failed (%s)", strerror (errno));
+		    status = -1; 
+		} else {
  
- 					DEBUG ("\n\n\n\n\n back from client event poll, revents = 0x%x\n\n\n", pfd[0].revents);
-					now = jack_get_microseconds();
-					VERBOSE(engine,"back from client event poll after %lld usecs", now - then);
+		    DEBUG ("\n\n\n\n\n back from client event poll, revents = 0x%x\n\n\n", pfd[0].revents);
+		    now = jack_get_microseconds();
+		    VERBOSE( &engine,"back from client event poll after %lld usecs", now - then);
 
- 					if (pfd[0].revents & ~POLLIN) {
+		    if (pfd[0].revents & ~POLLIN) {
 
-						/* some kind of OOB socket event */
+			/* some kind of OOB socket event */
 
- 						DEBUG ("client event poll not ok! (-2), revents = %d\n", pfd[0].revents);
- 						jack_error ("subgraph starting at %s lost client", client->control->name);
- 						status = -2; 
+			DEBUG ("client event poll not ok! (-2), revents = %d\n", pfd[0].revents);
+			jack_error ("subgraph starting at %s lost client", client->control->name);
+			status = -2; 
 
- 					} else if (pfd[0].revents & POLLIN) {
+		    } else if (pfd[0].revents & POLLIN) {
 
-						/* client responded normally */
+			/* client responded normally */
 
- 						DEBUG ("client event poll ok!");
- 						status = 0;
+			DEBUG ("client event poll ok!");
+			status = 0;
 
- 					} else if (poll_ret == 0) {
+		    } else if (poll_ret == 0) {
 
-						/* no events, no errors, we woke up because poll()
-						   decided that time was up ...
-						*/
+			/* no events, no errors, we woke up because poll()
+			   decided that time was up ...
+			*/
 						
 #ifdef __linux		
-						if (linux_poll_bug_encountered (engine, then, &poll_timeout)) {
-							goto again;
-						}
-						
-						if (poll_timeout < 200) {
-							VERBOSE (engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout);
-							status = 0;
-						} else {
-#endif
-							DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
-							VERBOSE (engine,"client %s did not respond to event type %d in time"
-								    "(fd=%d, revents = 0x%04x, timeout was %lld)", 
-								    client->control->name, event->type,
-								    client->event_fd,
-								    pfd[0].revents,
-								    poll_timeout);
-							status = -2;
-#ifdef __linux
-						}
-#endif
- 					}
- 				}
-  			}
-                        
- 			if (status == 0) {
- 				if (read (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
- 					jack_error ("cannot read event response from "
- 							"client [%s] (%s)",
- 							client->control->name,
- 							strerror (errno));
-					status = -1;
- 				} 
-
- 			} else {
-                                switch (status) {
-                                case -1:
-                                        jack_error ("internal poll failure reading response from client %s to a %s event",
-                                                    client->control->name,
-                                                    jack_event_type_name (event->type));
-                                        break;
-                                case -2:
-                                        jack_error ("timeout waiting for client %s to handle a %s event",
-                                                    client->control->name,
-                                                    jack_event_type_name (event->type));
-                                        break;
-                                default:
-                                        jack_error ("bad status (%d) from client %s while handling a %s event",
-                                                    (int) status, 
-                                                    client->control->name,
-                                                    jack_event_type_name (event->type));
-                                }
-  			}
-
-			if (status<0) {
-				client->error += JACK_ERROR_WITH_SOCKETS;
-				jack_engine_signal_problems (engine);
+			if (linux_poll_bug_encountered( &engine, then, &poll_timeout)) {
+			    goto again;
 			}
+						
+			if (poll_timeout < 200) {
+			    VERBOSE( &engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout);
+			    status = 0;
+			} else {
+#endif
+			    DEBUG ("client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret);
+			    VERBOSE( &engine,"client %s did not respond to event type %d in time"
+				     "(fd=%d, revents = 0x%04x, timeout was %lld)", 
+				     client->control->name, event->type,
+				     client->event_fd,
+				     pfd[0].revents,
+				     poll_timeout);
+			    status = -2;
+#ifdef __linux
+			}
+#endif
+		    }
 		}
-	}
-	DEBUG ("event delivered");
+	    }
+                        
+	    if (status == 0) {
+		if (read (client->event_fd, &status, sizeof (status)) != sizeof (status)) {
+		    jack_error ("cannot read event response from "
+				"client [%s] (%s)",
+				client->control->name,
+				strerror (errno));
+		    status = -1;
+		} 
 
-	return status;
+	    } else {
+		switch (status) {
+		    case -1:
+			jack_error ("internal poll failure reading response from client %s to a %s event",
+				    client->control->name,
+				    jack_event_type_name (event->type));
+			break;
+		    case -2:
+			jack_error ("timeout waiting for client %s to handle a %s event",
+				    client->control->name,
+				    jack_event_type_name (event->type));
+			break;
+		    default:
+			jack_error ("bad status (%d) from client %s while handling a %s event",
+				    (int) status, 
+				    client->control->name,
+				    jack_event_type_name (event->type));
+		}
+	    }
+
+	    if (status<0) {
+		client->error += JACK_ERROR_WITH_SOCKETS;
+		jack_engine_signal_problems( &engine );
+	    }
+	}
+    }
+    DEBUG ("event delivered");
+
+    return status;
 }
 
 static void jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *event)
@@ -541,9 +542,9 @@ static void jack_deliver_event_to_all (jack_engine_t *engine, jack_event_t *even
 
     jack_rdlock_graph (engine);
     for (node = engine->clients; node; node = jack_slist_next (node)) {
-	jack_deliver_event (engine,
-			    (jack_client_internal_t *) node->data,
-			    event);
+	jack_engine_deliver_event( *engine,
+				   (jack_client_internal_t *) node->data,
+				   event);
     }
     jack_unlock_graph (engine);
 }
@@ -1560,7 +1561,7 @@ void jack_property_change_notify (jack_engine_t *engine,
 	}
 
 	if (client->control->property_cbset) {
-	    if (jack_deliver_event (engine, client, &event, key)) {
+	    if (jack_engine_deliver_event( *engine, client, &event, key)) {
 		jack_error ("cannot send property change notification to %s (%s)",
 			    client->control->name,
 			    strerror (errno));
@@ -1620,7 +1621,7 @@ void jack_port_registration_notify( jack_engine_t *engine,
 	}
 
 	if (client->control->port_register_cbset) {
-	    if (jack_deliver_event (engine, client, &event)) {
+	    if (jack_engine_deliver_event( *engine, client, &event)) {
 		jack_error ("cannot send port registration"
 			    " notification to %s (%s)",
 			    client->control->name,
@@ -1813,13 +1814,13 @@ static void jack_clear_fifos (jack_engine_t *engine)
     }
 }
 
-int jack_get_fifo_fd( jack_engine_t *engine, unsigned int which_fifo )
+int jack_engine_get_fifo_fd( jack_engine_t & engine, unsigned int which_fifo )
 {
     /* caller must hold client_lock */
     char path[PATH_MAX+1];
     struct stat statbuf;
 
-    snprintf (path, sizeof (path), "%s-%d", engine->fifo_prefix,
+    snprintf (path, sizeof (path), "%s-%d", engine.fifo_prefix,
 	      which_fifo);
 
     DEBUG ("%s", path);
@@ -1846,30 +1847,30 @@ int jack_get_fifo_fd( jack_engine_t *engine, unsigned int which_fifo )
 	}
     }
 
-    if (which_fifo >= engine->fifo_size) {
+    if (which_fifo >= engine.fifo_size) {
 	unsigned int i;
 
-	engine->fifo = (int *)
-	    realloc (engine->fifo,
-		     sizeof (int) * (engine->fifo_size + 16));
-	for (i = engine->fifo_size; i < engine->fifo_size + 16; i++) {
-	    engine->fifo[i] = -1;
+	engine.fifo = (int *)
+	    realloc (engine.fifo,
+		     sizeof (int) * (engine.fifo_size + 16));
+	for (i = engine.fifo_size; i < engine.fifo_size + 16; i++) {
+	    engine.fifo[i] = -1;
 	}
-	engine->fifo_size += 16;
+	engine.fifo_size += 16;
     }
 
-    if (engine->fifo[which_fifo] < 0) {
-	if ((engine->fifo[which_fifo] =
+    if (engine.fifo[which_fifo] < 0) {
+	if ((engine.fifo[which_fifo] =
 	     open (path, O_RDWR|O_CREAT|O_NONBLOCK, 0666)) < 0) {
 	    jack_error ("cannot open fifo [%s] (%s)", path,
 			strerror (errno));
 	    return -1;
 	}
-	DEBUG ("opened engine->fifo[%d] == %d (%s)",
-	       which_fifo, engine->fifo[which_fifo], path);
+	DEBUG ("opened engine.fifo[%d] == %d (%s)",
+	       which_fifo, engine.fifo[which_fifo], path);
     }
 
-    return engine->fifo[which_fifo];
+    return engine.fifo[which_fifo];
 }
 
 int jack_rechain_graph (jack_engine_t *engine)
@@ -1936,7 +1937,7 @@ int jack_rechain_graph (jack_engine_t *engine)
 				
 		if (subgraph_client) {
 		    subgraph_client->subgraph_wait_fd =
-			jack_get_fifo_fd (engine, n);
+			jack_engine_get_fifo_fd( *engine, n );
 		    VERBOSE (engine, "client %s: wait_fd="
 			     "%d, execution_order="
 			     "%lu.", 
@@ -1956,7 +1957,7 @@ int jack_rechain_graph (jack_engine_t *engine)
 		 * internal clients too 
 		 */
 
-		jack_deliver_event (engine, client, &event);
+		jack_engine_deliver_event( *engine, client, &event);
 
 		subgraph_client = 0;
 
@@ -1972,7 +1973,7 @@ int jack_rechain_graph (jack_engine_t *engine)
 					
 		    subgraph_client = client;
 		    subgraph_client->subgraph_start_fd =
-			jack_get_fifo_fd (engine, n);
+			jack_engine_get_fifo_fd( *engine, n );
 		    VERBOSE (engine, "client %s: "
 			     "start_fd=%d, execution"
 			     "_order=%lu.",
@@ -2011,11 +2012,11 @@ int jack_rechain_graph (jack_engine_t *engine)
 		/* make sure fifo for 'n + 1' exists
 		 * before issuing client reorder
 		 */
-		(void) jack_get_fifo_fd(
-		    engine, client->execution_order + 1);
+		(void) jack_engine_get_fifo_fd( *engine,
+					 client->execution_order + 1);
 		event.x.n = client->execution_order;
 		event.y.n = upstream_is_jackd;
-		jack_deliver_event (engine, client, &event);
+		jack_engine_deliver_event( *engine, client, &event);
 		n++;
 	    }
 	}
@@ -2023,7 +2024,7 @@ int jack_rechain_graph (jack_engine_t *engine)
 
     if (subgraph_client) {
 	subgraph_client->subgraph_wait_fd =
-	    jack_get_fifo_fd (engine, n);
+	    jack_engine_get_fifo_fd( *engine, n );
 	VERBOSE (engine, "client %s: wait_fd=%d, "
 		 "execution_order=%lu (last client).", 
 		 subgraph_client->control->name,
@@ -2080,18 +2081,18 @@ static int jack_client_sort( jack_client_internal_t *a, jack_client_internal_t *
  *
  */ 
 
-void jack_sort_graph (jack_engine_t *engine)
+void jack_engine_sort_graph( jack_engine_t & engine )
 {
     /* called, obviously, must hold engine->client_lock */
 
-    VERBOSE (engine, "++ jack_sort_graph");
-    engine->clients = jack_slist_sort (engine->clients,
-				       (JCompareFunc) jack_client_sort);
-    jack_compute_all_port_total_latencies (engine);
-    jack_compute_new_latency (engine);
-    jack_rechain_graph (engine);
-    engine->timeout_count = 0;
-    VERBOSE (engine, "-- jack_sort_graph");
+    VERBOSE( &engine, "++ jack_engine_sort_graph");
+    engine.clients = jack_slist_sort( engine.clients,
+				      (JCompareFunc) jack_client_sort);
+    jack_compute_all_port_total_latencies( &engine );
+    jack_compute_new_latency( &engine );
+    jack_rechain_graph( &engine );
+    engine.timeout_count = 0;
+    VERBOSE( &engine, "-- jack_engine_sort_graph");
 }
 
 int jack_port_disconnect_internal (jack_engine_t *engine, 
@@ -2195,7 +2196,7 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 	jack_check_acyclic (engine);
     }
 	
-    jack_sort_graph (engine);
+    jack_engine_sort_graph( *engine );
 
     return ret;
 }
@@ -2313,7 +2314,7 @@ static int jack_send_connection_notification (jack_engine_t *engine,
 	event.x.self_id = self_id;
 	event.y.other_id = other_id;
 		
-	if (jack_deliver_event (engine, client, &event)) {
+	if (jack_engine_deliver_event( *engine, client, &event)) {
 	    jack_error ("cannot send port connection notification"
 			" to client %s (%s)", 
 			client->control->name, strerror (errno));
@@ -2350,7 +2351,7 @@ static void jack_notify_all_port_interested_clients(
 	if (src_client != client &&  dst_client  != client && client->control->port_connect_cbset != FALSE) {
 			
 	    /* one of the ports belong to this client or it has a port connect callback */
-	    jack_deliver_event (engine, client, &event);
+	    jack_engine_deliver_event( *engine, client, &event);
 	} 
     }
 }
@@ -2614,7 +2615,7 @@ static int jack_port_do_connect (jack_engine_t *engine,
 
 	jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 1);
 
-	jack_sort_graph (engine);
+	jack_engine_sort_graph( *engine );
     }
 
     jack_unlock_graph (engine);
@@ -2636,7 +2637,7 @@ static int jack_port_do_disconnect_all (jack_engine_t *engine,
 
     jack_lock_graph (engine);
     jack_port_clear_connections (engine, &engine->internal_ports[port_id]);
-    jack_sort_graph (engine);
+    jack_engine_sort_graph( *engine );
     jack_unlock_graph (engine);
 
     return 0;
@@ -3010,11 +3011,11 @@ static void jack_compute_new_latency( jack_engine_t *engine )
 
 	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
 	reverse_list = jack_slist_prepend (reverse_list, client);
-	jack_deliver_event (engine, client, &event);
+	jack_engine_deliver_event( *engine, client, &event);
     }
 
     if (engine->driver) {
-	jack_deliver_event (engine, engine->driver->internal_client, &event);
+	jack_engine_deliver_event( *engine, engine->driver->internal_client, &event);
     }
 
     /* now issue playback latency callbacks in reverse graphorder
@@ -3022,11 +3023,11 @@ static void jack_compute_new_latency( jack_engine_t *engine )
     event.x.n  = 1;
     for (node = reverse_list; node; node = jack_slist_next(node)) {
 	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
-	jack_deliver_event (engine, client, &event);
+	jack_engine_deliver_event( *engine, client, &event);
     }
 
     if (engine->driver) {
-	jack_deliver_event (engine, engine->driver->internal_client, &event);
+	jack_engine_deliver_event( *engine, engine->driver->internal_client, &event);
     }
 
     jack_slist_free (reverse_list);
@@ -3331,7 +3332,7 @@ static int jack_do_session_notify (jack_engine_t *engine, jack_request_t *req, i
 			    event.x.name, client->control->name, strerror (errno));
 		break;
 	    }
-	    reply = jack_deliver_event (engine, client, &event);
+	    reply = jack_engine_deliver_event( *engine, client, &event);
 
 	    if (reply == 1) {
 		// delayed reply
@@ -3657,7 +3658,7 @@ static void do_request (jack_engine_t *engine, jack_request_t *req, int *reply_f
     DEBUG ("status of request: %d", req->status);
 }
 
-int internal_client_request (void* ptr, jack_request_t *request)
+int internal_client_request( void * ptr, jack_request_t * request )
 {
     do_request ((jack_engine_t*) ptr, request, NULL);
     return request->status;
@@ -4086,7 +4087,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     engine->midi_out_cnt = 0;
     engine->midi_in_cnt = 0;
 
-    jack_engine_reset_rolling_usecs( engine.get() );
+    jack_engine_reset_rolling_usecs( *engine );
     engine->max_usecs = 0.0f;
 
     pthread_rwlock_init (&engine->client_lock, 0);
@@ -4281,7 +4282,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
 	      "%s/jack-ack-fifo-%d",
 	      jack_server_dir (engine->server_name, server_dir), getpid ());
 
-    (void) jack_get_fifo_fd( engine.get(), 0);
+    (void) jack_engine_get_fifo_fd( *engine, 0);
 
     jack_client_create_thread( NULL, &engine->server_thread, 0, FALSE,
 			       &jack_server_thread, engine.get());
@@ -4606,7 +4607,7 @@ void jack_client_registration_notify( jack_engine_t *engine,
 	}
 
 	if (client->control->client_register_cbset) {
-	    if (jack_deliver_event (engine, client, &event)) {
+	    if (jack_engine_deliver_event( *engine, client, &event)) {
 		jack_error ("cannot send client registration"
 			    " notification to %s (%s)",
 			    client->control->name,

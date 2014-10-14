@@ -49,6 +49,7 @@
 #include "libjackpp/local.hpp"
 
 #include "jack_constants.hpp"
+#include "jack_engine.hpp"
 
 using std::string;
 using std::stringstream;
@@ -102,7 +103,7 @@ int jack_client_do_deactivate (jack_engine_t *engine,
     }
 	
     if (sort_graph) {
-	jack_sort_graph (engine);
+	jack_engine_sort_graph( *engine );
     }
     return 0;
 }
@@ -179,7 +180,7 @@ static void jack_zombify_client (jack_engine_t *engine, jack_client_internal_t *
 
     /* caller must hold the client_lock */
 
-    /* this stops jack_deliver_event() from contacing this client */
+    /* this stops jack_engine_deliver_event() from contacing this client */
 
     client->control->dead = TRUE;
 
@@ -417,10 +418,10 @@ void jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_don
 	}
 
 	if (need_sort) {
-		jack_sort_graph (engine);
+		jack_engine_sort_graph( *engine );
 	}
 	
-	jack_engine_reset_rolling_usecs (engine);
+	jack_engine_reset_rolling_usecs( *engine );
 
 	VERBOSE (engine, "-- Removing failed clients ...");
 }
@@ -766,7 +767,7 @@ static jack_client_internal_t * setup_client(
 	/* add new client to the clients list */
 	jack_lock_graph (engine);
  	engine->clients = jack_slist_prepend (engine->clients, client);
-	jack_engine_reset_rolling_usecs (engine);
+	jack_engine_reset_rolling_usecs( *engine );
 	
 	if (jack_client_is_internal(client)) {
 
@@ -973,7 +974,7 @@ int jack_client_create (jack_engine_t *engine, int client_fd)
 	return 0;
 }
 
-int jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
+int jack_client_activate( jack_engine_t * engine, jack_uuid_t id )
 {
 	jack_client_internal_t *client;
 	JSList *node;
@@ -997,20 +998,20 @@ int jack_client_activate (jack_engine_t *engine, jack_uuid_t id)
 		 * this point.
 		 */
 
-		jack_get_fifo_fd (engine,
-				++engine->external_client_cnt);
-		jack_sort_graph (engine);
+		jack_engine_get_fifo_fd( *engine,
+					 ++engine->external_client_cnt);
+		jack_engine_sort_graph( *engine );
 
 
 		for (i = 0; i < engine->control->n_port_types; ++i) {
 			event.type = AttachPortSegment;
 			event.y.ptid = i;
-			jack_deliver_event (engine, client, &event);
+			jack_engine_deliver_event( *engine, client, &event);
 		}
 
 		event.type = BufferSizeChange;
                 event.x.n = engine->control->buffer_size;
-		jack_deliver_event (engine, client, &event);
+		jack_engine_deliver_event( *engine, client, &event);
 
 		// send delayed notifications for ports.
 		for (node = client->ports; node; node = jack_slist_next (node)) {

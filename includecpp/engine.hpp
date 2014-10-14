@@ -206,6 +206,17 @@ int		jack_engine_load_slave_driver (jack_engine_t *engine,
 int jack_drivers_start (jack_engine_t *engine);
 
 int jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
+
+void jack_engine_sort_graph (jack_engine_t *engine);
+
+int jack_engine_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
+
+
+// private engine functions (are used by clients)
+void		jack_engine_reset_rolling_usecs (jack_engine_t *engine);
+int		internal_client_request (void* ptr, jack_request_t *request);
+int		jack_get_fifo_fd (jack_engine_t *engine,
+				  unsigned int which_fifo);
 */
 
 int		jack_run (jack_engine_t *engine);
@@ -261,17 +272,10 @@ void	jack_port_clear_connections (jack_engine_t *engine,
 				     jack_port_internal_t *port);
 void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
 void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
-void	jack_sort_graph (jack_engine_t *engine);
 int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
 jack_client_internal_t * jack_client_by_name (jack_engine_t *engine, const char *name);
 
 void jack_engine_signal_problems (jack_engine_t* engine);
-int jack_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
 int jack_add_slave_driver (jack_engine_t *engine, struct _jack_driver *driver);
 
-// private engine functions (are used by clients)
-void		jack_engine_reset_rolling_usecs (jack_engine_t *engine);
-int		internal_client_request (void* ptr, jack_request_t *request);
-int		jack_get_fifo_fd (jack_engine_t *engine,
-				  unsigned int which_fifo);
 #endif
