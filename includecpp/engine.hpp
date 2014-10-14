@@ -267,15 +267,4 @@ static inline unsigned int jack_power_of_two (unsigned int n)
 	return !(n & (n - 1));
 }
 
-/* Internal port handling interfaces for JACK engine. */
-void	jack_port_clear_connections (jack_engine_t *engine,
-				     jack_port_internal_t *port);
-void	jack_port_registration_notify (jack_engine_t *, jack_port_id_t, int);
-void	jack_port_release (jack_engine_t *engine, jack_port_internal_t *);
-int     jack_stop_freewheeling (jack_engine_t* engine, int engine_exiting);
-jack_client_internal_t * jack_client_by_name (jack_engine_t *engine, const char *name);
-
-void jack_engine_signal_problems (jack_engine_t* engine);
-int jack_add_slave_driver (jack_engine_t *engine, struct _jack_driver *driver);
-
 #endif

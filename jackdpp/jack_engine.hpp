@@ -49,7 +49,7 @@ int jack_engine_drivers_start( jack_engine_t & engine );
 
 int jack_engine_use_driver( jack_engine_t & engine, struct _jack_driver *driver );
 
-int jack_engine_deliver_event (jack_engine_t &, jack_client_internal_t *, const jack_event_t *, ...);
+int jack_engine_deliver_event( jack_engine_t &, jack_client_internal_t *, const jack_event_t *, ...);
 
 void jack_engine_sort_graph( jack_engine_t & engine );
 
@@ -59,5 +59,16 @@ void jack_engine_reset_rolling_usecs( jack_engine_t & engine );
 int internal_client_request( void * ptr, jack_request_t * request );
 
 int jack_engine_get_fifo_fd( jack_engine_t & engine, unsigned int which_fifo );
+
+/* Internal port handling interfaces for JACK engine. */
+
+void jack_engine_port_clear_connections( jack_engine_t & engine, jack_port_internal_t *port );
+void jack_engine_port_registration_notify( jack_engine_t &, jack_port_id_t, int );
+void jack_engine_port_release( jack_engine_t & engine, jack_port_internal_t * );
+int jack_engine_stop_freewheeling( jack_engine_t & engine, int engine_exiting );
+jack_client_internal_t * jack_engine_client_by_name( jack_engine_t & engine, const char *name );
+
+void jack_engine_signal_problems( jack_engine_t & engine );
+int jack_engine_add_slave_driver( jack_engine_t & engine, struct _jack_driver *driver );
 
 #endif

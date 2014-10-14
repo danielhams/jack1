@@ -72,9 +72,9 @@ static void jack_client_disconnect_ports(
 
     for (node = client->ports; node; node = jack_slist_next (node)) {
 	port = (jack_port_internal_t *) node->data;
-	jack_port_clear_connections (engine, port);
-	jack_port_registration_notify (engine, port->shared->id, FALSE);
-	jack_port_release (engine, port);
+	jack_engine_port_clear_connections( *engine, port);
+	jack_engine_port_registration_notify( *engine, port->shared->id, FALSE);
+	jack_engine_port_release( *engine, port );
     }
 
     jack_slist_free (client->ports);
@@ -346,7 +346,7 @@ int jack_check_clients (jack_engine_t* engine, int with_timeout_check)
 	}
 		
 	if (errs) {
-		jack_engine_signal_problems (engine);
+		jack_engine_signal_problems( *engine );
 	}
 
 	return errs;
@@ -426,26 +426,6 @@ void jack_remove_clients (jack_engine_t* engine, int* exit_freewheeling_when_don
 	VERBOSE (engine, "-- Removing failed clients ...");
 }
 
-jack_client_internal_t * jack_client_by_name (jack_engine_t *engine, const char *name)
-{
-	jack_client_internal_t *client = NULL;
-	JSList *node;
-
-	jack_rdlock_graph (engine);
-
-	for (node = engine->clients; node; node = jack_slist_next (node)) {
-		if (strcmp ((const char *) ((jack_client_internal_t *)
-					    node->data)->control->name,
-			    name) == 0) {
-			client = (jack_client_internal_t *) node->data;
-			break;
-		}
-	}
-
-	jack_unlock_graph (engine);
-	return client;
-}
-
 static int jack_client_id_by_name (jack_engine_t *engine, const char *name, jack_uuid_t id)
 {
 	JSList *node;
@@ -522,7 +502,7 @@ static inline int jack_generate_unique_name (jack_engine_t *engine, char *name)
 	name[tens] = '0';
 	name[ones] = '1';
 	name[length] = '\0';
-	while (jack_client_by_name (engine, name) || jack_client_name_reserved( engine, name )) {
+	while (jack_engine_client_by_name( *engine, name ) || jack_client_name_reserved( engine, name )) {
 		if (name[ones] == '9') {
 			if (name[tens] == '9') {
 				jack_error ("client %s has 99 extra"
@@ -549,7 +529,7 @@ static int jack_client_name_invalid (jack_engine_t *engine, char *name,
 	 * startup.  There are no other clients at that point, anyway.
 	 */
 
-	if (jack_client_by_name (engine, name) || jack_client_name_reserved(engine, name )) {
+	if( jack_engine_client_by_name( *engine, name ) || jack_client_name_reserved(engine, name )) {
 
 		*status = (jack_status_t)(*status | JackNameNotUnique);
 
@@ -1016,7 +996,7 @@ int jack_client_activate( jack_engine_t * engine, jack_uuid_t id )
 		// send delayed notifications for ports.
 		for (node = client->ports; node; node = jack_slist_next (node)) {
 			jack_port_internal_t *port = (jack_port_internal_t *) node->data;
-			jack_port_registration_notify (engine, port->shared->id, TRUE);
+			jack_engine_port_registration_notify( *engine, port->shared->id, TRUE);
 		}
 
 		ret = 0;
@@ -1047,7 +1027,7 @@ int jack_client_deactivate (jack_engine_t *engine, jack_uuid_t id)
 			for (portnode = client->ports; portnode;
 			     portnode = jack_slist_next (portnode)) {
 				port = (jack_port_internal_t *) portnode->data;
-				jack_port_clear_connections (engine, port);
+				jack_engine_port_clear_connections( *engine, port );
  			}
 
 			ret = jack_client_do_deactivate (engine, client, TRUE);
@@ -1130,7 +1110,7 @@ void jack_intclient_handle_request (jack_engine_t *engine, jack_request_t *req)
 	jack_client_internal_t *client;
 
 	req->status = 0;
-	if ((client = jack_client_by_name (engine, req->x.intclient.name))) {
+	if ((client = jack_engine_client_by_name( *engine, req->x.intclient.name))) {
 		jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
 	} else {
 		req->status = (jack_status_t)(req->status | (JackNoSuchClient|JackFailure));
