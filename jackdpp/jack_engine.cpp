@@ -669,18 +669,23 @@ static void jack_engine_delay (jack_engine_t *engine, float delayed_usecs)
     jack_deliver_event_to_all (engine, &event);
 }
 
-static int jack_drivers_read (jack_engine_t *engine, jack_nframes_t nframes)
+static int jack_engine_drivers_read( jack_engine_t & engine, jack_nframes_t nframes )
 {
-    JSList *node;
     /* first read the slave drivers */
+    for( jack_driver_t * sdriver : engine.slave_drivers ) {
+	sdriver->read( sdriver, nframes );
+    }
+    /*
+    JSList *node;
     for (node=engine->slave_drivers; node; node=jack_slist_next(node))
     {
 	jack_driver_t *sdriver = (jack_driver_t*)node->data;
 	sdriver->read (sdriver, nframes);
     }
+    */
 
     /* now the master driver is read */
-    return engine->driver->read(engine->driver, nframes);
+    return engine.driver->read( engine.driver, nframes );
 }
 
 static JSList * jack_process_internal(jack_engine_t *engine, JSList *node,
@@ -989,18 +994,23 @@ static int jack_engine_process (jack_engine_t *engine, jack_nframes_t nframes)
     return engine->process_errors > 0;
 }
 
-static int jack_drivers_write (jack_engine_t *engine, jack_nframes_t nframes)
+static int jack_engine_drivers_write( jack_engine_t & engine, jack_nframes_t nframes )
 {
-    JSList *node;
     /* first start the slave drivers */
+    for( jack_driver_t * sdriver : engine.slave_drivers ) {
+	sdriver->write( sdriver, nframes );
+    }
+    /*
+    JSList *node;
     for (node=engine->slave_drivers; node; node=jack_slist_next(node))
     {
 	jack_driver_t *sdriver = (jack_driver_t*)node->data;
 	sdriver->write (sdriver, nframes);
     }
+    */
 
     /* now the master driver is written */
-    return engine->driver->write(engine->driver, nframes);
+    return engine.driver->write( engine.driver, nframes );
 }
 
 static void jack_calc_cpu_load(jack_engine_t *engine)
@@ -1139,7 +1149,7 @@ static int jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
 		
     if (!engine->freewheeling) {
 	DEBUG("waiting for driver read\n");
-	if (jack_drivers_read (engine, nframes)) {
+	if (jack_engine_drivers_read( *engine, nframes )) {
 	    goto unlock;
 	}
     }
@@ -1152,7 +1162,7 @@ static int jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
     }
 		
     if (!engine->freewheeling) {
-	if (jack_drivers_write (engine, nframes)) {
+	if (jack_engine_drivers_write( *engine, nframes )) {
 	    goto unlock;
 	}
     }
@@ -2862,18 +2872,23 @@ int jack_do_get_port_connections( jack_engine_t *engine, jack_request_t *req,
     return ret;
 }
 
-static int jack_drivers_stop (jack_engine_t *engine)
+static int jack_engine_drivers_stop( jack_engine_t & engine )
 {
-    JSList *node;
     /* first stop the master driver */
-    int retval = engine->driver->stop(engine->driver);
+    int retval = engine.driver->stop( engine.driver );
 
     /* now the slave drivers are stopped */
+    for( jack_driver_t * sdriver : engine.slave_drivers ) {
+	sdriver->stop( sdriver );
+    }
+    /*
+    JSList *node;
     for (node=engine->slave_drivers; node; node=jack_slist_next(node))
     {
 	jack_driver_t *sdriver = (jack_driver_t*)node->data;
 	sdriver->stop( sdriver );
     }
+    */
 
     return retval;
 }
@@ -2926,7 +2941,7 @@ static int jack_start_freewheeling( jack_engine_t* engine, jack_uuid_t client_id
        there are no more process() calls being handled.
     */
 
-    if (jack_drivers_stop (engine)) {
+    if (jack_engine_drivers_stop( *engine )) {
 	jack_error ("could not stop driver for freewheeling");
 	return -1;
     }
@@ -3443,7 +3458,7 @@ int jack_stop_freewheeling( jack_engine_t* engine, int engine_exiting )
 		
 	/* restart the driver */
 		
-	if (jack_drivers_start (engine)) {
+	if (jack_engine_drivers_start( *engine )) {
 	    jack_error ("could not restart driver after freewheeling");
 	    return -1;
 	}
@@ -4033,17 +4048,19 @@ unique_ptr<jack_engine_t> jack_engine_create(
     /* allocate the engine, zero the structure to ease debugging */
 //	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
 
-    JSList * drivers_jsl = NULL;
-    for( jack_driver_desc_t * od : loaded_drivers ) {
-	drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
-    }
+    engine->drivers = loaded_drivers;
 
-    engine->drivers = drivers_jsl;
+//    JSList * drivers_jsl = NULL;
+//    for( jack_driver_desc_t * od : loaded_drivers ) {
+//	drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
+//    }
+//    engine->drivers_jsl = drivers_jsl;
+
     engine->driver = NULL;
     engine->driver_desc = NULL;
     engine->driver_params = NULL;
 
-    engine->slave_drivers = NULL;
+//    engine->slave_drivers_jsl = NULL;
 
     engine->set_sample_rate = jack_set_sample_rate;
     engine->set_buffer_size = jack_driver_buffer_size;
@@ -4284,86 +4301,86 @@ unique_ptr<jack_engine_t> jack_engine_create(
     return engine;
 }
 
-void jack_engine_cleanup( jack_engine_t *engine )
+void jack_engine_cleanup( jack_engine_t & engine )
 {
-    if (engine == NULL)
-	return;
+//    if (engine == NULL)
+//	return;
 
-    VERBOSE( engine, "starting server engine shutdown" );
+    VERBOSE( &engine, "starting server engine shutdown" );
 
-    jack_stop_freewheeling (engine, 1);
+    jack_stop_freewheeling( &engine, 1 );
 
-    engine->control->engine_ok = 0;	/* tell clients we're going away */
+    engine.control->engine_ok = 0;	/* tell clients we're going away */
 
     /* this will wake the server thread and cause it to exit */
 
-    close (engine->cleanup_fifo[0]);
-    close (engine->cleanup_fifo[1]);
+    close( engine.cleanup_fifo[0]);
+    close( engine.cleanup_fifo[1]);
 
     /* shutdown master socket to prevent new clients arriving */
-    shutdown (engine->fds[0], SHUT_RDWR);
+    shutdown( engine.fds[0], SHUT_RDWR);
     // close (engine->fds[0]);
 
     /* now really tell them we're going away */
 
-    for ( size_t i = 0; i < engine->pfd_max; ++i) {
-	shutdown (engine->pfd[i].fd, SHUT_RDWR);
+    for ( size_t i = 0; i < engine.pfd_max; ++i) {
+	shutdown( engine.pfd[i].fd, SHUT_RDWR );
     }
 
-    if (engine->driver) {
-	jack_driver_t* driver = engine->driver;
+    if( engine.driver ) {
+	jack_driver_t* driver = engine.driver;
 
-	VERBOSE (engine, "stopping driver");
-	driver->stop (driver);
+	VERBOSE( &engine, "stopping driver");
+	driver->stop( driver );
 	// VERBOSE (engine, "detaching driver");
 	// driver->detach (driver, engine);
-	VERBOSE (engine, "unloading driver");
-	jack_driver_unload (driver);
-	engine->driver = NULL;
+	VERBOSE( &engine, "unloading driver");
+	jack_driver_unload( driver );
+	engine.driver = NULL;
     }
 
-    VERBOSE (engine, "freeing shared port segments");
-    for ( ssize_t i = 0; i < engine->control->n_port_types; ++i) {
-	jack_release_shm (&engine->port_segment[i]);
-	jack_destroy_shm (&engine->port_segment[i]);
+    VERBOSE( &engine, "freeing shared port segments");
+    for ( ssize_t i = 0; i < engine.control->n_port_types; ++i) {
+	jack_release_shm( &engine.port_segment[i] );
+	jack_destroy_shm( &engine.port_segment[i] );
     }
 
     /* stop the other engine threads */
-    VERBOSE (engine, "stopping server thread");
+    VERBOSE( &engine, "stopping server thread");
 
 #if JACK_USE_MACH_THREADS 
     // MacOSX pthread_cancel still not implemented correctly in Darwin
-    mach_port_t machThread = pthread_mach_thread_np (engine->server_thread);
-    thread_terminate (machThread);
+    mach_port_t machThread = pthread_mach_thread_np( &engine.server_thread);
+    thread_terminate( machThread );
 #else
-    pthread_cancel (engine->server_thread);
-    pthread_join (engine->server_thread, NULL);
+    pthread_cancel( engine.server_thread );
+    pthread_join( engine.server_thread, NULL );
 #endif
 
-    VERBOSE (engine, "last xrun delay: %.3f usecs",
-	     engine->control->xrun_delayed_usecs);
-    VERBOSE (engine, "max delay reported by backend: %.3f usecs",
-	     engine->control->max_delayed_usecs);
+    VERBOSE( &engine, "last xrun delay: %.3f usecs",
+	     engine.control->xrun_delayed_usecs);
+    VERBOSE( &engine, "max delay reported by backend: %.3f usecs",
+	     engine.control->max_delayed_usecs);
 
     /* free engine control shm segment */
-    engine->control = NULL;
-    VERBOSE (engine, "freeing engine shared memory");
-    jack_release_shm (&engine->control_shm);
-    jack_destroy_shm (&engine->control_shm);
+    engine.control = NULL;
+    VERBOSE( &engine, "freeing engine shared memory");
+    jack_release_shm( &engine.control_shm);
+    jack_destroy_shm( &engine.control_shm);
 
-    VERBOSE (engine, "max usecs: %.3f, engine deleted", engine->max_usecs);
+    VERBOSE( &engine, "max usecs: %.3f, engine deleted", engine.max_usecs);
 
     jack_messagebuffer_exit();
 }
 
-static jack_driver_info_t * jack_load_driver (jack_engine_t *engine, jack_driver_desc_t * driver_desc)
+static jack_driver_info_t * jack_engine_load_driver_so( jack_engine_t & engine, jack_driver_desc_t * driver_desc )
 {
     const char *errstr;
     jack_driver_info_t *info;
 
     info = (jack_driver_info_t *) calloc (1, sizeof (*info));
 
-    info->handle = dlopen (driver_desc->file, RTLD_NOW|RTLD_GLOBAL);
+    info->handle = dlopen( driver_desc->file, RTLD_NOW|RTLD_GLOBAL );
 	
     if (info->handle == NULL) {
 	if ((errstr = dlerror ()) != 0) {
@@ -4376,25 +4393,25 @@ static jack_driver_info_t * jack_load_driver (jack_engine_t *engine, jack_driver
 	goto fail;
     }
 
-    info->initialize = (jack_driver_info_init_callback_t)dlsym (info->handle, "driver_initialize");
+    info->initialize = (jack_driver_info_init_callback_t)dlsym(info->handle, "driver_initialize");
 
-    if ((errstr = dlerror ()) != 0) {
+    if ((errstr = dlerror()) != 0) {
 	jack_error ("no initialize function in shared object %s\n",
 		    driver_desc->file);
 	goto fail;
     }
 
-    info->finish = (jack_driver_info_finish_callback_t)dlsym (info->handle, "driver_finish");
+    info->finish = (jack_driver_info_finish_callback_t)dlsym(info->handle, "driver_finish");
 
-    if ((errstr = dlerror ()) != 0) {
+    if ((errstr = dlerror()) != 0) {
 	jack_error ("no finish function in in shared driver object %s",
 		    driver_desc->file);
 	goto fail;
     }
 
-    info->client_name = (char *) dlsym (info->handle, "driver_client_name");
+    info->client_name = (char *)dlsym(info->handle, "driver_client_name");
 
-    if ((errstr = dlerror ()) != 0) {
+    if ((errstr = dlerror()) != 0) {
 	jack_error ("no client name in in shared driver object %s",
 		    driver_desc->file);
 	goto fail;
@@ -4418,7 +4435,7 @@ void jack_driver_unload (jack_driver_t *driver)
     dlclose (handle);
 }
 
-int jack_engine_load_driver( jack_engine_t *engine,
+int jack_engine_load_driver( jack_engine_t & engine,
 			     jack_driver_desc_t * driver_desc,
 			     JSList * driver_params_jsl )
 {
@@ -4426,16 +4443,16 @@ int jack_engine_load_driver( jack_engine_t *engine,
     jack_driver_t *driver;
     jack_driver_info_t *info;
 
-    if ((info = jack_load_driver (engine, driver_desc)) == NULL) {
+    if ((info = jack_engine_load_driver_so( engine, driver_desc )) == NULL) {
 	return -1;
     }
 
-    if ((client = jack_create_driver_client (engine, info->client_name)
+    if ((client = jack_create_driver_client( &engine, info->client_name )
 	    ) == NULL) {
 	return -1;
     }
 
-    if ((driver = info->initialize (client->private_client,
+    if ((driver = info->initialize( client->private_client,
 				    driver_params_jsl)) == NULL) {
 	free (info);
 	return -1;
@@ -4446,13 +4463,13 @@ int jack_engine_load_driver( jack_engine_t *engine,
     driver->internal_client = client;
     free (info);
 
-    if (jack_use_driver (engine, driver) < 0) {
-	jack_remove_client (engine, client);
+    if (jack_engine_use_driver( engine, driver ) < 0) {
+	jack_remove_client( &engine, client );
 	return -1;
     }
 
-    engine->driver_desc   = driver_desc;
-    engine->driver_params = driver_params_jsl;
+    engine.driver_desc   = driver_desc;
+    engine.driver_params = driver_params_jsl;
 
     return 0;
 }
@@ -4465,13 +4482,14 @@ int jack_add_slave_driver( jack_engine_t *engine, jack_driver_t *driver )
 	    return -1;
 	}
 
-	engine->slave_drivers = jack_slist_append (engine->slave_drivers, driver);
+	engine->slave_drivers.push_back( driver );
+//	engine->slave_drivers_jsl = jack_slist_append( engine->slave_drivers_jsl, driver );
     }
 
     return 0;
 }
 
-int jack_engine_load_slave_driver (jack_engine_t *engine,
+int jack_engine_load_slave_driver (jack_engine_t & engine,
 				   jack_driver_desc_t * driver_desc,
 				   JSList * driver_params)
 {
@@ -4479,18 +4497,18 @@ int jack_engine_load_slave_driver (jack_engine_t *engine,
     jack_driver_t *driver;
     jack_driver_info_t *info;
 
-    if ((info = jack_load_driver (engine, driver_desc)) == NULL) {
+    if ((info = jack_engine_load_driver_so( engine, driver_desc )) == NULL) {
 	jack_info ("Loading slave failed\n");
 	return -1;
     }
 
-    if ((client = jack_create_driver_client (engine, info->client_name)
+    if ((client = jack_create_driver_client( &engine, info->client_name)
 	    ) == NULL) {
 	jack_info ("Creating slave failed\n");
 	return -1;
     }
 
-    if ((driver = info->initialize (client->private_client,
+    if ((driver = info->initialize( client->private_client,
 				    driver_params)) == NULL) {
 	free (info);
 	jack_info ("Initializing slave failed\n");
@@ -4502,9 +4520,9 @@ int jack_engine_load_slave_driver (jack_engine_t *engine,
     driver->internal_client = client;
     free (info);
 
-    if (jack_add_slave_driver (engine, driver) < 0) {
+    if (jack_add_slave_driver( &engine, driver) < 0) {
 	jack_info ("Adding slave failed\n");
-	jack_client_delete (engine, client);
+	jack_client_delete( &engine, client);
 	return -1;
     }
 
@@ -4514,56 +4532,73 @@ int jack_engine_load_slave_driver (jack_engine_t *engine,
     return 0;
 }
 
-static void jack_slave_driver_remove(jack_engine_t *engine, jack_driver_t *sdriver)
+static void jack_engine_slave_driver_remove( jack_engine_t & engine, jack_driver_t * sdriver )
 {
-    sdriver->detach (sdriver, engine);
-    engine->slave_drivers = jack_slist_remove(engine->slave_drivers, sdriver);
+    sdriver->detach( sdriver, &engine );
+    auto sdFinder = std::find(engine.slave_drivers.begin(), engine.slave_drivers.end(), sdriver );
+    if( sdFinder != engine.slave_drivers.end() ) {
+	engine.slave_drivers.erase( sdFinder );
+    }
+//    engine.slave_drivers_jsl = jack_slist_remove( engine.slave_drivers_jsl, sdriver );
 
     jack_driver_unload(sdriver);
 }
 
-int jack_drivers_start (jack_engine_t *engine)
+int jack_engine_drivers_start( jack_engine_t & engine )
 {
+    vector<jack_driver_t*> failed_drivers;
+    /* first start the slave drivers */
+    for( jack_driver_t * sdriver : engine.slave_drivers ) {
+	if( sdriver->start( sdriver ) ) {
+	    failed_drivers.push_back( sdriver );
+	}
+    }
+    /*
     JSList *node;
     JSList *failed_drivers = NULL;
-    /* first start the slave drivers */
-    for (node=engine->slave_drivers; node; node=jack_slist_next(node))
+    for (node=engine.slave_drivers; node; node=jack_slist_next(node))
     {
 	jack_driver_t *sdriver = (jack_driver_t*)node->data;
 	if (sdriver->start (sdriver)) {
 	    failed_drivers = jack_slist_append(failed_drivers, sdriver);
 	}
     }
+    */
 
     // Clean up drivers which failed to start.
+    /*
     for (node=failed_drivers; node; node=jack_slist_next(node))
     {
 	jack_driver_t *sdriver = (jack_driver_t*)node->data;
 	jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
-	jack_slave_driver_remove(engine, sdriver);
+	jack_slave_driver_remove( &engine, sdriver);
     }
-
+    */
+    for( jack_driver_t * sdriver : failed_drivers ) {
+	jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
+	jack_engine_slave_driver_remove( engine, sdriver);
+    }
     /* now the master driver is started */
-    return engine->driver->start(engine->driver);
+    return engine.driver->start( engine.driver );
 }
 
-int jack_use_driver (jack_engine_t *engine, jack_driver_t *driver)
+int jack_engine_use_driver( jack_engine_t & engine, jack_driver_t *driver )
 {
-    if (engine->driver) {
-	engine->driver->detach (engine->driver, engine);
-	engine->driver = 0;
+    if (engine.driver) {
+	engine.driver->detach( engine.driver, &engine );
+	engine.driver = 0;
     }
 
     if (driver) {
-	engine->driver = driver;
+	engine.driver = driver;
 
-	if (driver->attach (driver, engine)) {
-	    engine->driver = 0;
+	if( driver->attach( driver, &engine)) {
+	    engine.driver = 0;
 	    return -1;
 	}
 
-	engine->rolling_interval =
-	    jack_rolling_interval (driver->period_usecs);
+	engine.rolling_interval =
+	    jack_rolling_interval( driver->period_usecs );
     }
 
     return 0;

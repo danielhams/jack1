@@ -105,12 +105,6 @@ using jack::jack_drivers_load_pp;
 using jack::jack_drivers_find_descriptor_pp;
 using jack::jack_drivers_find_so_descriptor_pp;
 
-//using jack::jack_engine_create;
-//using jack::jack_engine_cleanup;
-//using jack::jack_engine_load_driver;
-//using jack::jack_engine_load_slave_driver;
-//using jack::jack_drivers_start;
-
 static void jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
@@ -220,7 +214,7 @@ static int jack_main( const jack_options & parsed_options,
 
     jack_info ("loading driver ..");
 	
-    if( jack_engine_load_driver( engine.get(), driver_desc, driver_params_jsl )) {
+    if( jack_engine_load_driver( *engine, driver_desc, driver_params_jsl )) {
 	jack_error ("cannot load driver module %s",
 		    driver_desc->name);
 	goto error;
@@ -229,12 +223,12 @@ static int jack_main( const jack_options & parsed_options,
     for( const string & slave_driver_name : parsed_options.slave_drivers ) {
 	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor_pp( loaded_drivers, slave_driver_name );
 	if (sl_desc) {
-	    jack_engine_load_slave_driver( engine.get(), sl_desc, NULL );
+	    jack_engine_load_slave_driver( *engine, sl_desc, NULL );
 	}
     }
 
 
-    if (jack_drivers_start( engine.get() ) != 0) {
+    if (jack_engine_drivers_start( *engine ) != 0) {
 	jack_error ("cannot start driver");
 	goto error;
     }
@@ -260,11 +254,11 @@ static int jack_main( const jack_options & parsed_options,
 	jack_signals_unblock( signals );
     }
 
-    jack_engine_cleanup( engine.get() );
+    jack_engine_cleanup( *engine );
     return 1;
 	
   error:
-    jack_engine_cleanup( engine.get() );
+    jack_engine_cleanup( *engine );
     return -1;
 }
 

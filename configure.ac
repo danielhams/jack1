@@ -631,11 +631,16 @@ AC_ARG_ENABLE(stripped-jackd,
 )
 
 # plugins go in the addon dir.
+# D Hams - added a second parallel add on directory for the cpp version
 
 ADDON_DIR='${libdir}/jack'
+ADDONPP_DIR='${libdir}/jackpp'
 AC_SUBST(ADDON_DIR)
+AC_SUBST(ADDONPP_DIR)
 AS_AC_EXPAND(ADDON_DIR_EXPANDED,${libdir}/jack)
+AS_AC_EXPAND(ADDONPP_DIR_EXPANDED,${libdir}/jackpp)
 AC_DEFINE_UNQUOTED(ADDON_DIR,"$ADDON_DIR_EXPANDED",[Directory for plugins])
+AC_DEFINE_UNQUOTED(ADDONPP_DIR,"$ADDONPP_DIR_EXPANDED",[Directory for plugins pp])
 
 AC_ARG_WITH(html-dir,
 		AC_HELP_STRING([--with-html-dir=PATH],[where to install the html documentation]))
@@ -974,6 +979,17 @@ drivers/coreaudio/Makefile
 drivers/freebob/Makefile
 drivers/firewire/Makefile
 drivers/netjack/Makefile
+driverspp/Makefile
+driverspp/alsa/Makefile
+driverspp/alsa_midi/Makefile
+driverspp/dummy/Makefile
+driverspp/oss/Makefile
+driverspp/sun/Makefile
+driverspp/portaudio/Makefile
+driverspp/coreaudio/Makefile
+driverspp/freebob/Makefile
+driverspp/firewire/Makefile
+driverspp/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
 tools/zalsa/Makefile

@@ -35,18 +35,19 @@ std::unique_ptr<jack_engine_t> jack_engine_create(
     pid_t waitpid,
     const std::vector<jack_driver_desc_t*> & loaded_drivers );
 
-void jack_engine_cleanup( jack_engine_t * );
+void jack_engine_cleanup( jack_engine_t & );
 
-int jack_engine_load_driver( jack_engine_t *engine,
+int jack_engine_load_driver( jack_engine_t & engine,
 			     jack_driver_desc_t * driver_desc,
 			     JSList * driver_params_jsl );
 
-int jack_engine_load_slave_driver( jack_engine_t *engine,
+int jack_engine_load_slave_driver( jack_engine_t & engine,
 				   jack_driver_desc_t * driver_desc,
 				   JSList * driver_params_jsl );
 
-int jack_drivers_start (jack_engine_t *engine);
-int jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
+int jack_engine_drivers_start( jack_engine_t & engine );
+
+int jack_engine_use_driver( jack_engine_t & engine, struct _jack_driver *driver );
 
 int jack_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
 

@@ -793,7 +793,7 @@ const JSList * jackctl_server_get_drivers_list(jackctl_server_t *server_ptr)
 bool jackctl_server_stop(jackctl_server_t *server_ptr)
 {
     //jack_engine_driver_exit (server_ptr->engine);
-    jack_engine_cleanup( server_ptr->engine.get() );
+    jack_engine_cleanup( *server_ptr->engine );
 
     /* clean up shared memory and files from this server instance */
     //jack_log("cleaning up shared memory");
@@ -876,7 +876,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
 	goto fail_unregister;
     }
 
-    if (jack_engine_load_driver( server_ptr->engine.get(), driver_ptr->desc_ptr, driver_ptr->set_parameters ))
+    if (jack_engine_load_driver( *server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters ))
     {
 	jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
 	goto fail_delete;
@@ -893,7 +893,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
   fail_close:
 
   fail_delete:
-    jack_engine_cleanup( server_ptr->engine.get() );
+    jack_engine_cleanup( *server_ptr->engine );
     server_ptr->engine.release();
 
   fail_unregister:
@@ -1190,16 +1190,16 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 	jack_driver_unload (old_driver);
     }
 
-    if (jack_engine_load_driver (server_ptr->engine.get(), driver_ptr->desc_ptr, driver_ptr->set_parameters))
+    if (jack_engine_load_driver( *server_ptr->engine, driver_ptr->desc_ptr, driver_ptr->set_parameters))
     {
 	jack_error ("cannot load driver module %s", driver_ptr->desc_ptr->name);
 	goto fail_nodriver;
     }
 
 
-    if (server_ptr->engine->driver->start (server_ptr->engine->driver) != 0) {
+    if (server_ptr->engine->driver->start( server_ptr->engine->driver ) != 0) {
 	jack_error ("cannot start driver");
-	jack_use_driver(server_ptr->engine.get(), NULL);
+	jack_engine_use_driver( *server_ptr->engine, NULL);
 	goto fail_nodriver;
     }
 
