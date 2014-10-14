@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
     Copyright (C) 2003 Robert Ham <rah@bash.sh>
     Copyright (C) 2001 Paul Davis
@@ -19,6 +18,9 @@
 
 */
 
+#include <string>
+#include <vector>
+
 #include <math.h>
 #include <stdio.h>
 #include <memory.h>
@@ -29,16 +31,18 @@
 #include <sys/mman.h>
 
 #include <jack/types.h>
-#include "internal.h"
-#include "engine.h"
+#include "internal.hpp"
+#include "engine.hpp"
 #include <sysdeps/time.h>
 
-#include "dummy_driver.h"
+#include "dummy_driver.hpp"
 
 #undef DEBUG_WAKEUP
 
 /* this is used for calculate what counts as an xrun */
 #define PRETEND_BUFFER_SIZE 4096
+
+extern "C" {
 
 void
 FakeVideoSync( dummy_driver_t *driver )
@@ -407,18 +411,17 @@ dummy_driver_new (jack_client_t * client,
 
 /* DRIVER "PLUGIN" INTERFACE */
 
-jack_driver_desc_t *
-driver_get_descriptor ()
+jack_driver_desc_t * driver_get_descriptor ()
 {
 	jack_driver_desc_t * desc;
 	jack_driver_param_desc_t * params;
 	unsigned int i;
 
-	desc = calloc (1, sizeof (jack_driver_desc_t));
+	desc = (jack_driver_desc_t*)calloc (1, sizeof (jack_driver_desc_t));
 	strcpy (desc->name, "dummy");
 	desc->nparams = 5;
 
-	params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
+	params = (jack_driver_param_desc_t*)calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
 	i = 0;
 	strcpy (params[i].name, "capture");
@@ -523,3 +526,4 @@ driver_finish (jack_driver_t *driver)
 	dummy_driver_delete ((dummy_driver_t *) driver);
 }
 
+}

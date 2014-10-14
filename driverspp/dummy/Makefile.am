@@ -8,8 +8,8 @@ plugindir = $(ADDONPP_DIR)
 plugin_LTLIBRARIES = jack_dummy.la
 
 jack_dummy_la_LDFLAGS = -module -avoid-version
-jack_dummy_la_SOURCES = dummy_driver.c dummy_driver.h
+jack_dummy_la_SOURCES = dummy_driver.cpp
 
-noinst_HEADERS = dummy_driver.h
+noinst_HEADERS = dummy_driver.hpp
 
 jack_dummy_la_LIBADD = $(top_builddir)/jackdpp/libjackserverpp.la

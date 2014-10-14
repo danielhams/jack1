@@ -69,13 +69,11 @@ typedef struct _jack_reserved_name {
 struct _jack_engine {
     jack_control_t        *control;
 
-//    JSList                *drivers_jsl;
     std::vector<jack_driver_desc_t*> drivers;
     struct _jack_driver   *driver;
     jack_driver_desc_t    *driver_desc;
     JSList                *driver_params;
 
-//    JSList                *slave_drivers_jsl;
     std::vector<jack_driver_t*> slave_drivers;
 
     /* these are "callbacks" made by the driver backend */

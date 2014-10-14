@@ -25,7 +25,7 @@
 #include <jack/types.h>
 #include <jack/jslist.h>
 #include <jack/jack.h>
-#include "driver.h"
+#include "driver.hpp"
 #include <config.h>
 
 // needed for clock_nanosleep
@@ -33,6 +33,10 @@
     #define _GNU_SOURCE
 #endif
 #include <time.h>
+
+extern "C" {
+
+extern const char driver_client_name[];
 
 typedef struct _dummy_driver dummy_driver_t;
 
@@ -58,5 +62,7 @@ struct _dummy_driver
 
     jack_client_t  *client;
 };
+
+}
 
 #endif /* __JACK_DUMMY_DRIVER_H__ */

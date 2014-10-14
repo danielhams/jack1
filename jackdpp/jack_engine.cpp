@@ -4045,22 +4045,11 @@ unique_ptr<jack_engine_t> jack_engine_create(
 
     jack_init_time ();
 
-    /* allocate the engine, zero the structure to ease debugging */
-//	engine = (jack_engine_t *) calloc (1, sizeof (jack_engine_t));
-
     engine->drivers = loaded_drivers;
-
-//    JSList * drivers_jsl = NULL;
-//    for( jack_driver_desc_t * od : loaded_drivers ) {
-//	drivers_jsl = jack_slist_append( drivers_jsl, (void*)od );
-//    }
-//    engine->drivers_jsl = drivers_jsl;
 
     engine->driver = NULL;
     engine->driver_desc = NULL;
     engine->driver_params = NULL;
-
-//    engine->slave_drivers_jsl = NULL;
 
     engine->set_sample_rate = jack_set_sample_rate;
     engine->set_buffer_size = jack_driver_buffer_size;
@@ -4303,9 +4292,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
 
 void jack_engine_cleanup( jack_engine_t & engine )
 {
-//    if (engine == NULL)
-//	return;
-
     VERBOSE( &engine, "starting server engine shutdown" );
 
     jack_stop_freewheeling( &engine, 1 );
@@ -4483,7 +4469,6 @@ int jack_add_slave_driver( jack_engine_t *engine, jack_driver_t *driver )
 	}
 
 	engine->slave_drivers.push_back( driver );
-//	engine->slave_drivers_jsl = jack_slist_append( engine->slave_drivers_jsl, driver );
     }
 
     return 0;
@@ -4539,7 +4524,6 @@ static void jack_engine_slave_driver_remove( jack_engine_t & engine, jack_driver
     if( sdFinder != engine.slave_drivers.end() ) {
 	engine.slave_drivers.erase( sdFinder );
     }
-//    engine.slave_drivers_jsl = jack_slist_remove( engine.slave_drivers_jsl, sdriver );
 
     jack_driver_unload(sdriver);
 }
@@ -4553,27 +4537,6 @@ int jack_engine_drivers_start( jack_engine_t & engine )
 	    failed_drivers.push_back( sdriver );
 	}
     }
-    /*
-    JSList *node;
-    JSList *failed_drivers = NULL;
-    for (node=engine.slave_drivers; node; node=jack_slist_next(node))
-    {
-	jack_driver_t *sdriver = (jack_driver_t*)node->data;
-	if (sdriver->start (sdriver)) {
-	    failed_drivers = jack_slist_append(failed_drivers, sdriver);
-	}
-    }
-    */
-
-    // Clean up drivers which failed to start.
-    /*
-    for (node=failed_drivers; node; node=jack_slist_next(node))
-    {
-	jack_driver_t *sdriver = (jack_driver_t*)node->data;
-	jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
-	jack_slave_driver_remove( &engine, sdriver);
-    }
-    */
     for( jack_driver_t * sdriver : failed_drivers ) {
 	jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
 	jack_engine_slave_driver_remove( engine, sdriver);
