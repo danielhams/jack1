@@ -43,10 +43,21 @@ typedef struct {
     jack_shmsize_t   offset;
 } jack_port_buffer_info_t;
 
+struct _jack_port_internal;
+
+typedef struct _jack_connection_internal {
+    struct _jack_port_internal *source;
+    struct _jack_port_internal *destination;
+    signed int dir; /* -1 = feedback, 0 = self, 1 = forward */
+    jack_client_internal_t *srcclient;
+    jack_client_internal_t *dstclient;
+} jack_connection_internal_t;
+
 /* The engine keeps an array of these in its local memory. */
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
     JSList                   *connections;
+    std::vector<jack_connection_internal_t*> connections_vector;
     jack_port_buffer_info_t  *buffer_info;
 } jack_port_internal_t;
 
@@ -54,6 +65,7 @@ typedef struct _jack_port_internal {
 typedef struct _jack_port_buffer_list {
     pthread_mutex_t          lock;	/* only lock within server */
     JSList	            *freelist;	/* list of free buffers */
+    std::vector<jack_port_buffer_info_t*> freelist_vector;
     jack_port_buffer_info_t *info;	/* jack_buffer_info_t array */
 } jack_port_buffer_list_t;
 
@@ -147,9 +159,13 @@ struct _jack_engine {
 
     /* these lists are protected by `client_lock' */
     JSList	   *clients;
+    std::vector<jack_client_internal_t*> clients_vector;
     JSList	   *clients_waiting;
+    std::vector<jack_client_internal_t*> clients_waiting_vector;
     JSList	   *reserved_client_names;
+    std::vector<jack_reserved_name_t*> reserved_client_names_vector;
 
+    // Actually fixed size based on options
     std::vector<jack_port_internal_t> internal_ports;
     jack_client_internal_t  *timebase_client;
     jack_port_buffer_info_t *silent_buffer;

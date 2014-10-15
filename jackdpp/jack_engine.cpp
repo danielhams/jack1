@@ -58,15 +58,6 @@ using std::stringstream;
 using std::unique_ptr;
 using std::make_unique;
 
-typedef struct {
-
-    jack_port_internal_t *source;
-    jack_port_internal_t *destination;
-    signed int dir; /* -1 = feedback, 0 = self, 1 = forward */
-    jack_client_internal_t *srcclient;
-    jack_client_internal_t *dstclient;
-} jack_connection_internal_t;
-
 typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, const JSList *);
 typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
 
@@ -93,13 +84,13 @@ static int  jack_port_do_disconnect (jack_engine_t *engine,
 				     const char *destination_port);
 static int  jack_port_do_disconnect_all (jack_engine_t *engine,
 					 jack_port_id_t);
-static int  jack_port_do_unregister (jack_engine_t *engine, jack_request_t *);
+//static int  jack_engine_port_do_unregister( jack_engine_t & engine, jack_request_t *);
 static int  jack_port_do_register (jack_engine_t *engine, jack_request_t *, int);
 static int  jack_do_get_port_connections (jack_engine_t *engine,
 					  jack_request_t *req, int reply_fd);
-static int  jack_port_disconnect_internal (jack_engine_t *engine,
-					   jack_port_internal_t *src, 
-					   jack_port_internal_t *dst);
+//static int  jack_engine_port_disconnect_internal( jack_engine_t & engine,
+//						  jack_port_internal_t *src, 
+//						  jack_port_internal_t *dst);
 static int  jack_send_connection_notification (jack_engine_t *,
 					       jack_uuid_t,
 					       jack_port_id_t,
@@ -125,7 +116,7 @@ static int  jack_client_feeds_transitive (jack_client_internal_t *source,
 					  jack_client_internal_t *dest);
 static int  jack_client_sort (jack_client_internal_t *a,
 			      jack_client_internal_t *b);
-static void jack_check_acyclic (jack_engine_t* engine);
+static void jack_engine_check_acyclic( jack_engine_t & engine );
 static void jack_compute_all_port_total_latencies (jack_engine_t *engine);
 static void jack_compute_port_total_latency (jack_engine_t *engine, jack_port_shared_t*);
 static int  jack_check_client_status (jack_engine_t* engine);
@@ -918,7 +909,7 @@ static JSList * jack_process_external(jack_engine_t *engine, JSList *node)
 		 ctl->finished_at? (ctl->finished_at -
 				    ctl->signalled_at): 0);
 
-	if (jack_check_clients (engine, 1)) {
+	if( jack_engine_check_clients(*engine, 1)) {
 
 	    engine->process_errors++;
 	    return NULL;		/* will stop the loop */
@@ -1075,7 +1066,7 @@ static void jack_engine_post_process (jack_engine_t *engine)
 
     jack_transport_cycle_end (engine);
     jack_calc_cpu_load (engine);
-    jack_check_clients (engine, 0);
+    jack_engine_check_clients( *engine, 0 );
 }
 
 static int jack_run_one_cycle (jack_engine_t *engine, jack_nframes_t nframes,
@@ -1534,10 +1525,10 @@ static inline jack_port_buffer_list_t * jack_port_buffer_list (jack_engine_t *en
     return &engine->port_buffers[port->shared->ptype_id];
 }
 
-void jack_property_change_notify (jack_engine_t *engine,
-				  jack_property_change_t change,
-				  jack_uuid_t uuid,
-				  const char* key)
+void jack_engine_property_change_notify( jack_engine_t & engine,
+					 jack_property_change_t change,
+					 jack_uuid_t uuid,
+					 const char* key )
 {
     jack_event_t event;
     jack_client_internal_t *client;
@@ -1553,7 +1544,7 @@ void jack_property_change_notify (jack_engine_t *engine,
 	event.y.key_size = 0;
     }
 
-    for (node = engine->clients; node; node = jack_slist_next (node)) {
+    for (node = engine.clients; node; node = jack_slist_next (node)) {
 		
 	client = (jack_client_internal_t *) node->data;
 
@@ -1562,7 +1553,7 @@ void jack_property_change_notify (jack_engine_t *engine,
 	}
 
 	if (client->control->property_cbset) {
-	    if (jack_engine_deliver_event( *engine, client, &event, key)) {
+	    if (jack_engine_deliver_event( engine, client, &event, key)) {
 		jack_error ("cannot send property change notification to %s (%s)",
 			    client->control->name,
 			    strerror (errno));
@@ -1641,7 +1632,7 @@ void jack_engine_port_release( jack_engine_t & engine, jack_port_internal_t *por
 	/* have to do the notification ourselves, since the client argument
 	   to jack_remove_properties() was NULL
 	*/
-	jack_property_change_notify( &engine, PropertyDeleted, port->shared->uuid, NULL);
+	jack_engine_property_change_notify( engine, PropertyDeleted, port->shared->uuid, NULL);
     }
 
     pthread_mutex_lock (&engine.port_lock);
@@ -1770,6 +1761,7 @@ int jack_port_do_register (jack_engine_t *engine, jack_request_t *req, int inter
 
     port->shared = shared;
     port->connections = 0;
+    port->connections_vector.clear();
     port->buffer_info = NULL;
 	
     if (jack_port_assign_buffer (engine, port)) {
@@ -2055,6 +2047,88 @@ static int jack_client_sort( jack_client_internal_t *a, jack_client_internal_t *
     }
 }
 
+struct jack_engine_clients_compare
+{
+    int operator()( jack_client_internal_t * a, jack_client_internal_t * b ) {
+	/* drivers are forced to the front, ie considered as sources
+	   rather than sinks for purposes of the sort */
+
+	if (jack_client_feeds_transitive( a, b ) ||
+	    (a->control->type == ClientDriver &&
+	     b->control->type != ClientDriver)) {
+	    return -1;
+	} else if (jack_client_feeds_transitive( b, a ) ||
+		   (b->control->type == ClientDriver &&
+		    a->control->type != ClientDriver)) {
+	    return 1;
+	} else {
+	    return 0;
+	}
+    }
+};
+
+static void CHECK_CLIENTS_LIST_MATCHES(
+    std::vector<jack_client_internal_t*> & clients_vector,
+    JSList * clients_jsl )
+{
+    auto cvIterator = clients_vector.begin();
+
+    JSList * cjIterator = clients_jsl;
+
+    while( cjIterator != NULL && cvIterator != clients_vector.end() )
+    {
+	jack_client_internal_t * cjData = (jack_client_internal_t*)cjIterator->data;
+	if( cjData != *cvIterator ) {
+	    jack_error("Failed during clients list element check - elements don't match");
+	    break;
+	}
+
+	++cvIterator;
+	cjIterator = clients_jsl->next;
+    }
+
+    if( cjIterator != NULL ) {
+	jack_error("Failed during clients list match - missing clients_vector elements");
+    }
+    else if( cvIterator != clients_vector.end() ) {
+	jack_error("Failed during clients list match - clients_vector has additional elements");
+    }
+    else {
+	jack_info("Success! clients list and vector matches!");
+    }
+}
+
+static void CHECK_CONNECTIONS_VECTOR_MATCHES(
+    std::vector<jack_connection_internal_t*> & connections_vector,
+    JSList * connections_jsl )
+{
+    auto cvIterator = connections_vector.begin();
+
+    JSList * cjIterator = connections_jsl;
+
+    while( cjIterator != NULL && cvIterator != connections_vector.end() )
+    {
+	jack_connection_internal_t  * cjData = (jack_connection_internal_t*)cjIterator->data;
+	if( cjData != *cvIterator ) {
+	    jack_error("Failed during connections list element check - elements don't match");
+	    break;
+	}
+
+	++cvIterator;
+	cjIterator = connections_jsl->next;
+    }
+
+    if( cjIterator != NULL ) {
+	jack_error("Failed during connections list match - missing connections_vector elements");
+    }
+    else if( cvIterator != connections_vector.end() ) {
+	jack_error("Failed during connections list match - connections_vector has additional elements");
+    }
+    else {
+	jack_info("Success! connections list and vector matches!");
+    }
+}
+
 /* How the sort works:
  *
  * Each client has a "sortfeeds" list of clients indicating which clients
@@ -2089,6 +2163,10 @@ void jack_engine_sort_graph( jack_engine_t & engine )
     VERBOSE( &engine, "++ jack_engine_sort_graph");
     engine.clients = jack_slist_sort( engine.clients,
 				      (JCompareFunc) jack_client_sort);
+
+    std::sort( engine.clients_vector.begin(), engine.clients_vector.end(), jack_engine_clients_compare() );
+    CHECK_CLIENTS_LIST_MATCHES( engine.clients_vector, engine.clients );
+
     jack_compute_all_port_total_latencies( &engine );
     jack_compute_new_latency( &engine );
     jack_rechain_graph( &engine );
@@ -2096,16 +2174,31 @@ void jack_engine_sort_graph( jack_engine_t & engine )
     VERBOSE( &engine, "-- jack_engine_sort_graph");
 }
 
-int jack_port_disconnect_internal (jack_engine_t *engine, 
-			       jack_port_internal_t *srcport, 
-			       jack_port_internal_t *dstport )
+static void jack_engine_port_connection_remove( jack_engine_t & engine,
+    std::vector<jack_connection_internal_t*> & connections,
+    jack_connection_internal_t * to_remove )
+{
+    auto cFinder = std::find(connections.begin(), connections.end(), to_remove );
+
+    if( cFinder == connections.end() ) {
+	VERBOSE( &engine, "-- failed port connection removal");
+    }
+    else {
+	connections.erase( cFinder );
+    }
+}
+						
+static int jack_engine_port_disconnect_internal(
+    jack_engine_t & engine, 
+    jack_port_internal_t *srcport, 
+    jack_port_internal_t *dstport )
 
 {
     JSList *node;
     jack_connection_internal_t *connect;
     int ret = -1;
     jack_port_id_t src_id, dst_id;
-    int check_acyclic = engine->feedbackcount;
+    int check_acyclic = engine.feedbackcount;
 
     /* call tree **** MUST HOLD **** engine->client_lock. */
     for (node = srcport->connections; node;
@@ -2116,7 +2209,7 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 	if (connect->source == srcport &&
 	    connect->destination == dstport) {
 
-	    VERBOSE (engine, "DIS-connect %s and %s",
+	    VERBOSE( &engine, "DIS-connect %s and %s",
 		     srcport->shared->name,
 		     dstport->shared->name);
 			
@@ -2143,26 +2236,29 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 	    }
 
 	    jack_send_connection_notification (
-		engine, srcport->shared->client_id, src_id,
+		&engine, srcport->shared->client_id, src_id,
 		dst_id, FALSE);
 	    jack_send_connection_notification (
-		engine, dstport->shared->client_id, dst_id,
+		&engine, dstport->shared->client_id, dst_id,
 		src_id, FALSE);
 
 	    /* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
 			
-	    jack_notify_all_port_interested_clients (engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 0);
+	    jack_notify_all_port_interested_clients(
+		&engine,
+		srcport->shared->client_id, dstport->shared->client_id,
+		src_id, dst_id, 0);
 
-	    if (connect->dir) {
+	    if( connect->dir ) {
 			
 		jack_client_internal_t *src;
 		jack_client_internal_t *dst;
 			
 		src = jack_engine_client_internal_by_id 
-		    (*engine, srcport->shared->client_id);
+		    (engine, srcport->shared->client_id);
 
 		dst =  jack_engine_client_internal_by_id
-		    (*engine, dstport->shared->client_id);
+		    (engine, dstport->shared->client_id);
 								    
 		src->truefeeds = jack_slist_remove
 		    (src->truefeeds, dst);
@@ -2179,10 +2275,10 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 		       from dest's sortfeeds list */
 		    dst->sortfeeds = jack_slist_remove
 			(dst->sortfeeds, src);
-		    engine->feedbackcount--;
-		    VERBOSE (engine,
+		    engine.feedbackcount--;
+		    VERBOSE( &engine,
 			     "feedback count down to %d",
-			     engine->feedbackcount);
+			     engine.feedbackcount);
 					
 		}
 	    } /* else self-connection: do nothing */
@@ -2193,11 +2289,91 @@ int jack_port_disconnect_internal (jack_engine_t *engine,
 	}
     }
 
-    if (check_acyclic) {
-	jack_check_acyclic (engine);
+    for( jack_connection_internal_t * connection : srcport->connections_vector ) {
+	if( connection->source == srcport &&
+	    connection->destination == dstport ) {
+	    VERBOSE( &engine, "DIS-connect %s and %s",
+		     srcport->shared->name,
+		     dstport->shared->name);
+
+	    jack_engine_port_connection_remove( engine, srcport->connections_vector, connection );
+
+	    jack_engine_port_connection_remove( engine, dstport->connections_vector, connection );
+			
+//	    src_id = srcport->shared->id;
+//	    dst_id = dstport->shared->id;
+
+	    /* this is a bit harsh, but it basically says
+	       that if we actually do a disconnect, and
+	       its the last one, then make sure that any
+	       input monitoring is turned off on the
+	       srcport. this isn't ideal for all
+	       situations, but it works better for most of
+	       them.
+	    */
+//	    if (srcport->connections_vector.size() == 0) {
+//		srcport->shared->monitor_requests = 0;
+//	    }
+
+//	    jack_send_connection_notification( &engine, srcport->shared->client_id,
+//					       src_id, dst_id, FALSE);
+
+//	    jack_send_connection_notification( &engine, dstport->shared->client_id,
+//					       dst_id, src_id, FALSE);
+
+	    /* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
+			
+//	    jack_notify_all_port_interested_clients( &engine, srcport->shared->client_id, dstport->shared->client_id,
+//						     src_id, dst_id, 0);
+
+	    // Currently handled by the jslist code.
+/*								    
+	    if (connection->dir) {
+		jack_client_internal_t *src;
+		jack_client_internal_t *dst;
+			
+		src = jack_engine_client_internal_by_id 
+		    (engine, srcport->shared->client_id);
+
+		dst =  jack_engine_client_internal_by_id
+		    (engine, dstport->shared->client_id);
+
+		src->truefeeds = jack_slist_remove
+		    (src->truefeeds, dst);
+
+		dst->fedcount--;					
+				
+		if (connection->dir == 1) {
+		    /* normal connection: remove dest from
+		       source's sortfeeds list *
+		    src->sortfeeds = jack_slist_remove
+			(src->sortfeeds, dst);
+		} else {
+		    /* feedback connection: remove source
+		       from dest's sortfeeds list *
+		    dst->sortfeeds = jack_slist_remove
+			(dst->sortfeeds, src);
+		    engine.feedbackcount--;
+		    VERBOSE( &engine,
+			     "feedback count down to %d",
+			     engine->feedbackcount);
+					
+		}
+	    } /* else self-connection: do nothing *
+*/
+
+	    ret = 0;
+	    break;
+	}
+    }
+
+    CHECK_CONNECTIONS_VECTOR_MATCHES( srcport->connections_vector, srcport->connections );
+
+    if( check_acyclic ) {
+	jack_engine_check_acyclic( engine );
     }
 	
-    jack_engine_sort_graph( *engine );
+    jack_engine_sort_graph( engine );
 
     return ret;
 }
@@ -2209,11 +2385,10 @@ void jack_engine_port_clear_connections( jack_engine_t & engine,
 
     for (node = port->connections; node; ) {
 	next = jack_slist_next (node);
-	jack_port_disconnect_internal (
-	    &engine, ((jack_connection_internal_t *)
-		     node->data)->source,
-	    ((jack_connection_internal_t *)
-	     node->data)->destination);
+	jack_engine_port_disconnect_internal (
+	    engine,
+	    ((jack_connection_internal_t *)node->data)->source,
+	    ((jack_connection_internal_t *)node->data)->destination);
 	node = next;
     }
 
@@ -2221,7 +2396,7 @@ void jack_engine_port_clear_connections( jack_engine_t & engine,
     port->connections = 0;
 }
 
-int jack_port_do_unregister( jack_engine_t *engine, jack_request_t *req )
+int jack_engine_port_do_unregister( jack_engine_t & engine, jack_request_t *req )
 {
     jack_client_internal_t *client;
     jack_port_shared_t *shared;
@@ -2229,14 +2404,14 @@ int jack_port_do_unregister( jack_engine_t *engine, jack_request_t *req )
     jack_uuid_t uuid;
 
     if (req->x.port_info.port_id < 0 ||
-	req->x.port_info.port_id > engine->port_max) {
-	jack_error ("invalid port ID %" PRIu32
+	req->x.port_info.port_id > engine.port_max) {
+	jack_error( "invalid port ID %" PRIu32
 		    " in unregister request",
 		    req->x.port_info.port_id);
 	return -1;
     }
 
-    shared = &engine->control->ports[req->x.port_info.port_id];
+    shared = &engine.control->ports[req->x.port_info.port_id];
 
     if (jack_uuid_compare (shared->client_id, req->x.port_info.client_id) != 0) {
 	char buf[JACK_UUID_STRING_SIZE];
@@ -2248,23 +2423,23 @@ int jack_port_do_unregister( jack_engine_t *engine, jack_request_t *req )
 
     jack_uuid_copy (&uuid, shared->uuid);
 
-    jack_lock_graph (engine);
-    if ((client = jack_engine_client_internal_by_id(*engine, shared->client_id))
+    jack_lock_graph( (&engine) );
+    if ((client = jack_engine_client_internal_by_id( engine, shared->client_id))
 	== NULL) {
 	jack_error ("unknown client id in port registration request");
-	jack_unlock_graph (engine);
+	jack_unlock_graph( (&engine) );
 	return -1;
     }
 
-    port = &engine->internal_ports[req->x.port_info.port_id];
+    port = &engine.internal_ports[req->x.port_info.port_id];
 
-    jack_engine_port_clear_connections( *engine, port );
-    jack_engine_port_release( *engine, &engine->internal_ports[req->x.port_info.port_id]);
+    jack_engine_port_clear_connections( engine, port );
+    jack_engine_port_release( engine, &engine.internal_ports[req->x.port_info.port_id]);
 	
-    client->ports = jack_slist_remove (client->ports, port);
-    jack_engine_port_registration_notify( *engine, req->x.port_info.port_id,
+    client->ports = jack_slist_remove( client->ports, port );
+    jack_engine_port_registration_notify( engine, req->x.port_info.port_id,
 					  FALSE);
-    jack_unlock_graph (engine);
+    jack_unlock_graph( (&engine) );
 
     return 0;
 }
@@ -2649,7 +2824,7 @@ static int jack_port_do_disconnect_all (jack_engine_t *engine,
  * sortfeeds lists to turn leftover feedback connections into normal ones.
  * This lowers latency, but at the expense of some data corruption.
  */
-static void jack_check_acyclic (jack_engine_t *engine)
+static void jack_engine_check_acyclic( jack_engine_t & engine )
 {
     JSList *srcnode, *dstnode, *portnode, *connnode;
     jack_client_internal_t *src, *dst;
@@ -2658,9 +2833,9 @@ static void jack_check_acyclic (jack_engine_t *engine)
     int stuck;
     int unsortedclients = 0;
 
-    VERBOSE (engine, "checking for graph become acyclic");
+    VERBOSE( &engine, "checking for graph become acyclic");
 
-    for (srcnode = engine->clients; srcnode;
+    for (srcnode = engine.clients; srcnode;
 	 srcnode = jack_slist_next (srcnode)) {
 
 	src = (jack_client_internal_t *) srcnode->data;
@@ -2675,7 +2850,7 @@ static void jack_check_acyclic (jack_engine_t *engine)
 	
 	stuck = TRUE;
 
-	for (srcnode = engine->clients; srcnode;
+	for (srcnode = engine.clients; srcnode;
 	     srcnode = jack_slist_next (srcnode)) {
 
 	    src = (jack_client_internal_t *) srcnode->data;
@@ -2699,13 +2874,13 @@ static void jack_check_acyclic (jack_engine_t *engine)
 	
     if (stuck) {
 
-	VERBOSE (engine, "graph is still cyclic" );
+	VERBOSE( &engine, "graph is still cyclic" );
     } else {
 
-	VERBOSE (engine, "graph has become acyclic");
+	VERBOSE( &engine, "graph has become acyclic");
 
 	/* turn feedback connections around in sortfeeds */
-	for (srcnode = engine->clients; srcnode;
+	for (srcnode = engine.clients; srcnode;
 	     srcnode = jack_slist_next (srcnode)) {
 
 	    src = (jack_client_internal_t *) srcnode->data;
@@ -2726,7 +2901,7 @@ static void jack_check_acyclic (jack_engine_t *engine)
 			/*&& 
 			  conn->srcclient == src) */{
 				
-			VERBOSE (engine,
+			VERBOSE( &engine,
 				 "reversing connection from "
 				 "%s to %s",
 				 conn->srcclient->control->name,
@@ -2745,7 +2920,7 @@ static void jack_check_acyclic (jack_engine_t *engine)
 		}
 	    }
 	}
-	engine->feedbackcount = 0;
+	engine.feedbackcount = 0;
     }
 }
 
@@ -2771,7 +2946,7 @@ static int jack_port_do_disconnect (jack_engine_t *engine,
 
     jack_lock_graph (engine);
 
-    ret = jack_port_disconnect_internal (engine, srcport, dstport);
+    ret = jack_engine_port_disconnect_internal( *engine, srcport, dstport );
 
     jack_unlock_graph (engine);
 
@@ -3489,7 +3664,7 @@ static void do_request (jack_engine_t *engine, jack_request_t *req, int *reply_f
 	    break;
 
 	case UnRegisterPort:
-	    req->status = jack_port_do_unregister (engine, req);
+	    req->status = jack_engine_port_do_unregister( *engine, req);
 	    break;
 
 	case ConnectPorts:
@@ -3510,11 +3685,11 @@ static void do_request (jack_engine_t *engine, jack_request_t *req, int *reply_f
 	    break;
 
 	case ActivateClient:
-	    req->status = jack_client_activate (engine, req->x.client_id);
+	    req->status = jack_engine_client_activate( *engine, req->x.client_id);
 	    break;
 
 	case DeactivateClient:
-	    req->status = jack_client_deactivate (engine, req->x.client_id);
+	    req->status = jack_engine_client_deactivate( *engine, req->x.client_id);
 	    break;
 
 	case SetTimeBaseClient:
@@ -3579,19 +3754,19 @@ static void do_request (jack_engine_t *engine, jack_request_t *req, int *reply_f
 	    break;
 
 	case IntClientHandle:
-	    jack_intclient_handle_request (engine, req);
+	    jack_engine_intclient_handle_request( *engine, req);
 	    break;
 
 	case IntClientLoad:
-	    jack_intclient_load_request (engine, req);
+	    jack_engine_intclient_load_request( *engine, req);
 	    break;
 
 	case IntClientName:
-	    jack_intclient_name_request (engine, req);
+	    jack_engine_intclient_name_request( *engine, req);
 	    break;
 
 	case IntClientUnload:
-	    jack_intclient_unload_request (engine, req);
+	    jack_engine_intclient_unload_request( *engine, req);
 	    break;
 
 	case RecomputeTotalLatencies:
@@ -3645,7 +3820,7 @@ static void do_request (jack_engine_t *engine, jack_request_t *req, int *reply_f
 	    jack_unlock_graph (engine);
 	    break;
         case PropertyChangeNotify:
-	    jack_property_change_notify (engine, req->x.property.change, req->x.property.uuid, req->x.property.key);
+	    jack_engine_property_change_notify( *engine, req->x.property.change, req->x.property.uuid, req->x.property.key);
 	    break;
 
 	default:
@@ -3901,7 +4076,7 @@ static void * jack_server_thread (void *arg)
 
 	    if (engine->pfd[i].revents & ~POLLIN) {
                                 
-		jack_mark_client_socket_error (engine, engine->pfd[i].fd);
+		jack_engine_mark_client_socket_error( *engine, engine->pfd[i].fd );
 		jack_engine_signal_problems( *engine );
 		VERBOSE (engine, "non-POLLIN events on fd %d", engine->pfd[i].fd);
 	    } else if (engine->pfd[i].revents & POLLIN) {
@@ -3929,7 +4104,7 @@ static void * jack_server_thread (void *arg)
 	    VERBOSE (engine, "trying to lock graph to remove %d problems", problemsProblemsPROBLEMS);
 	    jack_lock_graph (engine);
 	    VERBOSE (engine, "we have problem clients (problems = %d", problemsProblemsPROBLEMS);
-	    jack_remove_clients (engine, &stop_freewheeling);
+	    jack_engine_remove_clients( *engine, &stop_freewheeling);
 	    if (stop_freewheeling) {
 		VERBOSE (engine, "need to stop freewheeling once problems are cleared");
 	    }
@@ -3966,7 +4141,7 @@ static void * jack_server_thread (void *arg)
 			 &client_addrlen)) < 0) {
 		jack_error ("cannot accept new connection (%s)",
 			    strerror (errno));
-	    } else if (!engine->new_clients_allowed || jack_client_create (engine, client_socket) < 0) {
+	    } else if (!engine->new_clients_allowed || jack_engine_client_create( *engine, client_socket) < 0) {
 		jack_error ("cannot complete client "
 			    "connection process");
 		close (client_socket);
@@ -4434,7 +4609,7 @@ int jack_engine_load_driver( jack_engine_t & engine,
 	return -1;
     }
 
-    if ((client = jack_create_driver_client( &engine, info->client_name )
+    if ((client = jack_engine_create_driver_client( engine, info->client_name )
 	    ) == NULL) {
 	return -1;
     }
@@ -4451,7 +4626,7 @@ int jack_engine_load_driver( jack_engine_t & engine,
     free (info);
 
     if (jack_engine_use_driver( engine, driver ) < 0) {
-	jack_remove_client( &engine, client );
+	jack_engine_remove_client( engine, client );
 	return -1;
     }
 
@@ -4488,7 +4663,7 @@ int jack_engine_load_slave_driver (jack_engine_t & engine,
 	return -1;
     }
 
-    if ((client = jack_create_driver_client( &engine, info->client_name)
+    if ((client = jack_engine_create_driver_client( engine, info->client_name)
 	    ) == NULL) {
 	jack_info ("Creating slave failed\n");
 	return -1;
@@ -4508,7 +4683,7 @@ int jack_engine_load_slave_driver (jack_engine_t & engine,
 
     if( jack_engine_add_slave_driver( engine, driver ) < 0 ) {
 	jack_info ("Adding slave failed\n");
-	jack_client_delete( &engine, client);
+	jack_engine_client_delete( engine, client);
 	return -1;
     }
 
@@ -4582,40 +4757,6 @@ void jack_engine_signal_problems( jack_engine_t & engine )
     engine.problems++;
     jack_unlock_problems( (&engine) );
     jack_wake_server_thread( &engine );
-}
-
-void jack_client_registration_notify( jack_engine_t *engine,
-				      const char* name, int yn)
-{
-    jack_event_t event;
-    jack_client_internal_t *client;
-    JSList *node;
-
-    event.type = (yn ? ClientRegistered : ClientUnregistered);
-    snprintf (event.x.name, sizeof (event.x.name), "%s", name);
-	
-    for (node = engine->clients; node; node = jack_slist_next (node)) {
-		
-	client = (jack_client_internal_t *) node->data;
-
-	if (!client->control->active) {
-	    continue;
-	}
-
-	if (strcmp ((char*) client->control->name, (char*) name) == 0) {
-	    /* do not notify client of its own registration */
-	    continue;
-	}
-
-	if (client->control->client_register_cbset) {
-	    if (jack_engine_deliver_event( *engine, client, &event)) {
-		jack_error ("cannot send client registration"
-			    " notification to %s (%s)",
-			    client->control->name,
-			    strerror (errno));
-	    }
-	}
-    }
 }
 
 jack_client_internal_t * jack_engine_client_by_name( jack_engine_t & engine, const char *name )

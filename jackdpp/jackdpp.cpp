@@ -189,7 +189,7 @@ static void jack_load_internal_clients_pp( jack_engine_t * engine, const vector<
 	}
 
 	pthread_mutex_lock (&engine->request_lock);
-	jack_intclient_load_request( engine, &req );
+	jack_engine_intclient_load_request( *engine, &req );
 	pthread_mutex_unlock (&engine->request_lock);
     }
 }
