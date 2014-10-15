@@ -240,6 +240,18 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, client->control->uuid) == 0) {
 	    engine.clients = jack_slist_remove_link( engine.clients, node );
 	    jack_slist_free_1(node);
+
+	    auto cFinder = std::find_if( engine.clients_vector.begin(), engine.clients_vector.end(), 
+					 [&client] ( jack_client_internal_t * ic ) {
+					     return jack_uuid_compare( ic->control->uuid, client->control->uuid ) == 0;
+					 } );
+
+	    if( cFinder != engine.clients_vector.end() ) {
+		engine.clients_vector.erase( cFinder );
+	    }
+
+	    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
+
 	    VERBOSE( &engine, "removed from client list, via matching UUID");
 	    break;
 	}
@@ -755,13 +767,14 @@ static jack_client_internal_t * jack_engine_setup_client(
 
     /* add new client to the clients list */
     jack_lock_graph( (&engine) );
-    engine.clients = jack_slist_prepend( engine.clients, client);
+    jack_info( "Adding (%s)(%p) to the clients", client->control->name, client );
+//    engine.clients = jack_slist_prepend( engine.clients, client);
+    engine.clients = jack_slist_append( engine.clients, client);
     engine.clients_vector.push_back( client );
     CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
     jack_engine_reset_rolling_usecs( engine );
 	
     if (jack_client_is_internal(client)) {
-
 
 	jack_unlock_graph( (&engine) );
 
@@ -817,268 +830,268 @@ jack_client_internal_t * jack_engine_create_driver_client( jack_engine_t & engin
 
 static jack_status_t jack_engine_handle_unload_client( jack_engine_t & engine, jack_uuid_t id)
 {
-	/* called *without* the request_lock */
-	jack_client_internal_t *client;
-	jack_status_t status = (jack_status_t)(JackNoSuchClient|JackFailure);
+    /* called *without* the request_lock */
+    jack_client_internal_t *client;
+    jack_status_t status = (jack_status_t)(JackNoSuchClient|JackFailure);
 
-	jack_lock_graph( (&engine) );
+    jack_lock_graph( (&engine) );
 
-	if ((client = jack_engine_client_internal_by_id( engine, id))) {
-		VERBOSE( &engine, "unloading client \"%s\"",
-			 client->control->name);
-                if (client->control->type != ClientInternal) {
-                        status = (jack_status_t)(JackFailure|JackInvalidOption);
-                } else {
-                        jack_engine_remove_client( engine, client );
-                        status = (jack_status_t)0;
-                }
+    if ((client = jack_engine_client_internal_by_id( engine, id))) {
+	VERBOSE( &engine, "unloading client \"%s\"",
+		 client->control->name);
+	if (client->control->type != ClientInternal) {
+	    status = (jack_status_t)(JackFailure|JackInvalidOption);
+	} else {
+	    jack_engine_remove_client( engine, client );
+	    status = (jack_status_t)0;
 	}
+    }
 
-	jack_unlock_graph( (&engine) );
+    jack_unlock_graph( (&engine) );
 
-	return status;
+    return status;
 }
 
 static char * jack_engine_get_reserved_name (jack_engine_t & engine, jack_uuid_t uuid)
 {
-	JSList *node;
-        for( node = engine.reserved_client_names; node; node = jack_slist_next (node) ) {
-		jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-		if( jack_uuid_compare(reservation->uuid, uuid) != 0 ) {
-			char *retval = strdup (reservation->name);
-			free (reservation);
-			engine.reserved_client_names = 
-				jack_slist_remove (engine.reserved_client_names, reservation);
-			return retval;
-		}
+    JSList *node;
+    for( node = engine.reserved_client_names; node; node = jack_slist_next (node) ) {
+	jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
+	if( jack_uuid_compare(reservation->uuid, uuid) != 0 ) {
+	    char *retval = strdup (reservation->name);
+	    free (reservation);
+	    engine.reserved_client_names =
+		jack_slist_remove (engine.reserved_client_names, reservation);
+	    return retval;
 	}
-	return 0;
+    }
+    return 0;
 }
 
 int jack_engine_client_create( jack_engine_t & engine, int client_fd )
 {
-	/* called *without* the request_lock */
-	jack_client_internal_t *client;
-	jack_client_connect_request_t req;
-	jack_client_connect_result_t res;
-	ssize_t nbytes;
+    /* called *without* the request_lock */
+    jack_client_internal_t *client;
+    jack_client_connect_request_t req;
+    jack_client_connect_result_t res;
+    ssize_t nbytes;
 
-	res.status = (jack_status_t)0;
+    res.status = (jack_status_t)0;
 
-        VALGRIND_MEMSET(&res, 0, sizeof (res));
+    VALGRIND_MEMSET(&res, 0, sizeof (res));
 
-        nbytes = read (client_fd, &req, sizeof (req));
+    nbytes = read (client_fd, &req, sizeof (req));
         
-        if (nbytes == 0) {		/* EOF? */
-                jack_error ("cannot read connection request from client (%s)", strerror(errno));
-                return -1;
-        }
+    if (nbytes == 0) {		/* EOF? */
+	jack_error ("cannot read connection request from client (%s)", strerror(errno));
+	return -1;
+    }
 
-	/* First verify protocol version (first field of request), if
-	 * present, then make sure request has the expected length. */
-	if (((size_t)nbytes < sizeof (req.protocol_v))
-	    || (req.protocol_v != jack_protocol_version)
-	    || (nbytes != sizeof (req))) {
+    /* First verify protocol version (first field of request), if
+     * present, then make sure request has the expected length. */
+    if (((size_t)nbytes < sizeof (req.protocol_v))
+	|| (req.protocol_v != jack_protocol_version)
+	|| (nbytes != sizeof (req))) {
 
-		/* JACK protocol incompatibility */
-		res.status = (jack_status_t)(res.status | (JackFailure|JackVersionError));
-		jack_error ("JACK protocol mismatch (%d vs %d)", req.protocol_v, jack_protocol_version);
-		if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
-			jack_error ("cannot write client connection response");
-		}
-		return -1;
+	/* JACK protocol incompatibility */
+	res.status = (jack_status_t)(res.status | (JackFailure|JackVersionError));
+	jack_error ("JACK protocol mismatch (%d vs %d)", req.protocol_v, jack_protocol_version);
+	if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
+	    jack_error ("cannot write client connection response");
+	}
+	return -1;
+    }
+
+    if (!req.load) {		/* internal client close? */
+
+	int rc = -1;
+	jack_uuid_t id = JACK_UUID_EMPTY_INITIALIZER;
+
+	if (jack_engine_client_id_by_name( engine, req.name, id) == 0) {
+	    rc = jack_engine_handle_unload_client( engine, id );
 	}
 
-	if (!req.load) {		/* internal client close? */
-
-		int rc = -1;
-		jack_uuid_t id = JACK_UUID_EMPTY_INITIALIZER;
-
-		if (jack_engine_client_id_by_name( engine, req.name, id) == 0) {
-			rc = jack_engine_handle_unload_client( engine, id );
-		}
-		
-		/* close does not send a reply */
-		return rc;
-	}
+	/* close does not send a reply */
+	return rc;
+    }
 	
-	pthread_mutex_lock( &engine.request_lock );
-	if (!jack_uuid_empty (req.uuid)) {
-		char *res_name = jack_engine_get_reserved_name( engine, req.uuid );
-		if (res_name) {
-			snprintf (req.name, sizeof(req.name), "%s", res_name);
-			free (res_name);
-		}
+    pthread_mutex_lock( &engine.request_lock );
+    if (!jack_uuid_empty (req.uuid)) {
+	char *res_name = jack_engine_get_reserved_name( engine, req.uuid );
+	if (res_name) {
+	    snprintf (req.name, sizeof(req.name), "%s", res_name);
+	    free (res_name);
 	}
+    }
 
-	client = jack_engine_setup_client( engine, req.type, req.name, req.uuid,
-					   req.options, &res.status, client_fd,
-					   req.object_path, req.object_data);
-	pthread_mutex_unlock(&engine.request_lock);
-	if (client == NULL) {
-		res.status = (jack_status_t)(res.status | JackFailure); /* just making sure */
-		return -1;
-	}
-	res.client_shm_index = client->control_shm.index;
-	res.engine_shm_index = engine.control_shm.index;
-	res.realtime = engine.control->real_time;
-	res.realtime_priority = engine.rtpriority - 1;
-	strncpy (res.name, req.name, sizeof(res.name));
+    client = jack_engine_setup_client( engine, req.type, req.name, req.uuid,
+				       req.options, &res.status, client_fd,
+				       req.object_path, req.object_data);
+    pthread_mutex_unlock(&engine.request_lock);
+    if (client == NULL) {
+	res.status = (jack_status_t)(res.status | JackFailure); /* just making sure */
+	return -1;
+    }
+    res.client_shm_index = client->control_shm.index;
+    res.engine_shm_index = engine.control_shm.index;
+    res.realtime = engine.control->real_time;
+    res.realtime_priority = engine.rtpriority - 1;
+    strncpy (res.name, req.name, sizeof(res.name));
 
 #ifdef JACK_USE_MACH_THREADS
-	/* Mach port number for server/client communication */
-	res.portnum = client->portnum;
+    /* Mach port number for server/client communication */
+    res.portnum = client->portnum;
 #endif
 	
-	if (jack_client_is_internal(client)) {
-		/* the ->control pointers are for an internal client
-		   so we know they are the right sized pointers
-		   for this server. however, to keep the result
-		   structure the same size for both 32 and 64 bit
-		   clients/servers, the result structure stores
-		   them as 64 bit integer, so we have to do a slightly
-		   forced cast here.
-		*/
-		res.client_control = (uint64_t) ((intptr_t) client->control);
-		res.engine_control = (uint64_t) ((intptr_t) engine.control);
-	} else {
-		strcpy (res.fifo_prefix, engine.fifo_prefix);
-	}
+    if (jack_client_is_internal(client)) {
+	/* the ->control pointers are for an internal client
+	   so we know they are the right sized pointers
+	   for this server. however, to keep the result
+	   structure the same size for both 32 and 64 bit
+	   clients/servers, the result structure stores
+	   them as 64 bit integer, so we have to do a slightly
+	   forced cast here.
+	*/
+	res.client_control = (uint64_t) ((intptr_t) client->control);
+	res.engine_control = (uint64_t) ((intptr_t) engine.control);
+    } else {
+	strcpy (res.fifo_prefix, engine.fifo_prefix);
+    }
 
-	if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
-		jack_error ("cannot write connection response to client");
-		jack_lock_graph( (&engine) );
-		client->control->dead = 1;
-		jack_engine_remove_client( engine, client );
-		jack_unlock_graph( (&engine) );
-		return -1;
-	}
+    if (write (client_fd, &res, sizeof (res)) != sizeof (res)) {
+	jack_error ("cannot write connection response to client");
+	jack_lock_graph( (&engine) );
+	client->control->dead = 1;
+	jack_engine_remove_client( engine, client );
+	jack_unlock_graph( (&engine) );
+	return -1;
+    }
 
-	if (jack_client_is_internal(client)) {
-		close (client_fd);
-	}
+    if (jack_client_is_internal(client)) {
+	close (client_fd);
+    }
 
-	jack_engine_client_registration_notify( engine, (const char*) client->control->name, 1 );
+    jack_engine_client_registration_notify( engine, (const char*) client->control->name, 1 );
 
-	return 0;
+    return 0;
 }
 
 int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
 {
-	jack_client_internal_t *client;
-	JSList *node;
-	int ret = -1;
-	int i;
-	jack_event_t event;
+    jack_client_internal_t *client;
+    JSList *node;
+    int ret = -1;
+    int i;
+    jack_event_t event;
 
-        VALGRIND_MEMSET(&event, 0, sizeof(event));
+    VALGRIND_MEMSET(&event, 0, sizeof(event));
 
-	jack_lock_graph( (&engine) );
+    jack_lock_graph( (&engine) );
 
-	if ((client = jack_engine_client_internal_by_id( engine, id)))
-	{
-		client->control->active = TRUE;
+    if ((client = jack_engine_client_internal_by_id( engine, id)))
+    {
+	client->control->active = TRUE;
 
-		jack_transport_activate( &engine, client );
+	jack_transport_activate( &engine, client );
 
-		/* we call this to make sure the FIFO is
-		 * built+ready by the time the client needs
-		 * it. we don't care about the return value at
-		 * this point.
-		 */
+	/* we call this to make sure the FIFO is
+	 * built+ready by the time the client needs
+	 * it. we don't care about the return value at
+	 * this point.
+	 */
 
-		jack_engine_get_fifo_fd( engine,
-					 ++engine.external_client_cnt);
-		jack_engine_sort_graph( engine );
+	jack_engine_get_fifo_fd( engine,
+				 ++engine.external_client_cnt);
+	jack_engine_sort_graph( engine );
 
 
-		for (i = 0; i < engine.control->n_port_types; ++i) {
-			event.type = AttachPortSegment;
-			event.y.ptid = i;
-			jack_engine_deliver_event( engine, client, &event);
-		}
-
-		event.type = BufferSizeChange;
-                event.x.n = engine.control->buffer_size;
-		jack_engine_deliver_event( engine, client, &event);
-
-		// send delayed notifications for ports.
-		for (node = client->ports; node; node = jack_slist_next (node)) {
-			jack_port_internal_t *port = (jack_port_internal_t *) node->data;
-			jack_engine_port_registration_notify( engine, port->shared->id, TRUE);
-		}
-
-		ret = 0;
+	for (i = 0; i < engine.control->n_port_types; ++i) {
+	    event.type = AttachPortSegment;
+	    event.y.ptid = i;
+	    jack_engine_deliver_event( engine, client, &event);
 	}
 
+	event.type = BufferSizeChange;
+	event.x.n = engine.control->buffer_size;
+	jack_engine_deliver_event( engine, client, &event);
 
-	jack_unlock_graph( (&engine) );
-	return ret;
+	// send delayed notifications for ports.
+	for (node = client->ports; node; node = jack_slist_next (node)) {
+	    jack_port_internal_t *port = (jack_port_internal_t *) node->data;
+	    jack_engine_port_registration_notify( engine, port->shared->id, TRUE);
+	}
+
+	ret = 0;
+    }
+
+
+    jack_unlock_graph( (&engine) );
+    return ret;
 }	
 
 int jack_engine_client_deactivate( jack_engine_t & engine, jack_uuid_t id )
 {
-	JSList *node;
-	int ret = -1;
+    JSList *node;
+    int ret = -1;
 
-	jack_lock_graph( (&engine) );
+    jack_lock_graph( (&engine) );
 
-	for (node = engine.clients; node; node = jack_slist_next (node)) {
+    for (node = engine.clients; node; node = jack_slist_next (node)) {
 
-		jack_client_internal_t *client =
-			(jack_client_internal_t *) node->data;
+	jack_client_internal_t *client =
+	    (jack_client_internal_t *) node->data;
                 
-		if (jack_uuid_compare (client->control->uuid, id) == 0) {
+	if (jack_uuid_compare (client->control->uuid, id) == 0) {
 		        
-	        	JSList *portnode;
-			jack_port_internal_t *port;
+	    JSList *portnode;
+	    jack_port_internal_t *port;
 
-			for (portnode = client->ports; portnode;
-			     portnode = jack_slist_next (portnode)) {
-				port = (jack_port_internal_t *) portnode->data;
-				jack_engine_port_clear_connections( engine, port );
- 			}
+	    for (portnode = client->ports; portnode;
+		 portnode = jack_slist_next (portnode)) {
+		port = (jack_port_internal_t *) portnode->data;
+		jack_engine_port_clear_connections( engine, port );
+	    }
 
-			ret = jack_engine_client_do_deactivate( engine, client, TRUE);
-			break;
-		}
+	    ret = jack_engine_client_do_deactivate( engine, client, TRUE);
+	    break;
 	}
+    }
 
-	jack_unlock_graph( (&engine) );
+    jack_unlock_graph( (&engine) );
 
-	return ret;
+    return ret;
 }	
 
 
 int jack_engine_mark_client_socket_error( jack_engine_t & engine, int fd )
 {
-	/* CALLER MUST HOLD GRAPH LOCK */
+    /* CALLER MUST HOLD GRAPH LOCK */
 
-	jack_client_internal_t *client = 0;
-	JSList *node;
+    jack_client_internal_t *client = 0;
+    JSList *node;
 
-        for (node = engine.clients; node; node = jack_slist_next (node)) {
+    for (node = engine.clients; node; node = jack_slist_next (node)) {
 
-                if (jack_client_is_internal((jack_client_internal_t *)
-					    node->data)) {
-                        continue;
-                }
-
-                if (((jack_client_internal_t *) node->data)->request_fd == fd) {
-                        client = (jack_client_internal_t *) node->data;
-                        break;
-                }
-        }
-
-        if (client) {
-		VERBOSE( &engine, "marking client %s with SOCKET error state = "
-			 "%s errors = %d", client->control->name,
-			 jack_client_state_name (client),
-			 client->error);
-		client->error += JACK_ERROR_WITH_SOCKETS;
+	if (jack_client_is_internal((jack_client_internal_t *)
+				    node->data)) {
+	    continue;
 	}
 
-	return 0;
+	if (((jack_client_internal_t *) node->data)->request_fd == fd) {
+	    client = (jack_client_internal_t *) node->data;
+	    break;
+	}
+    }
+
+    if (client) {
+	VERBOSE( &engine, "marking client %s with SOCKET error state = "
+		 "%s errors = %d", client->control->name,
+		 jack_client_state_name (client),
+		 client->error);
+	client->error += JACK_ERROR_WITH_SOCKETS;
+    }
+
+    return 0;
 }
 
 void jack_engine_client_delete( jack_engine_t & engine, jack_client_internal_t *client )
@@ -1115,14 +1128,14 @@ void jack_engine_client_delete( jack_engine_t & engine, jack_client_internal_t *
 
 void jack_engine_intclient_handle_request( jack_engine_t & engine, jack_request_t *req )
 {
-	jack_client_internal_t *client;
+    jack_client_internal_t *client;
 
-	req->status = 0;
-	if ((client = jack_engine_client_by_name( engine, req->x.intclient.name))) {
-		jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
-	} else {
-		req->status = (jack_status_t)(req->status | (JackNoSuchClient|JackFailure));
-	}
+    req->status = 0;
+    if ((client = jack_engine_client_by_name( engine, req->x.intclient.name))) {
+	jack_uuid_copy (&req->x.intclient.uuid, client->control->uuid);
+    } else {
+	req->status = (jack_status_t)(req->status | (JackNoSuchClient|JackFailure));
+    }
 }
 
 void jack_engine_intclient_load_request( jack_engine_t & engine, jack_request_t *req )
@@ -1188,4 +1201,3 @@ void jack_engine_intclient_unload_request( jack_engine_t & engine, jack_request_
 	req->status = JackFailure;
     }
 }
-

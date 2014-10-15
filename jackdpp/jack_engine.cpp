@@ -715,7 +715,7 @@ static JSList * jack_engine_process_internal(
 	return jack_slist_next (node);
 }
 
-static int jack_engine_check_client_status( jack_engine_t & engine)
+static int jack_engine_check_client_status( jack_engine_t & engine )
 {
     JSList *node;
     int err = 0;
@@ -2032,26 +2032,22 @@ static int jack_client_sort( jack_client_internal_t *a, jack_client_internal_t *
 		a->control->type != ClientDriver)) {
 	return 1;
     } else {
-	return 0;
+	return ( a < b ? -1 : ( a == b ? 0 : 1 ) );
     }
 }
 
 struct jack_engine_clients_compare
 {
-    int operator()( jack_client_internal_t * a, jack_client_internal_t * b ) {
+    bool operator()( jack_client_internal_t * a, jack_client_internal_t * b ) {
 	/* drivers are forced to the front, ie considered as sources
 	   rather than sinks for purposes of the sort */
 
 	if (jack_client_feeds_transitive( a, b ) ||
 	    (a->control->type == ClientDriver &&
 	     b->control->type != ClientDriver)) {
-	    return -1;
-	} else if (jack_client_feeds_transitive( b, a ) ||
-		   (b->control->type == ClientDriver &&
-		    a->control->type != ClientDriver)) {
-	    return 1;
+	    return true;
 	} else {
-	    return 0;
+	    return a < b;
 	}
     }
 };
@@ -2088,16 +2084,18 @@ void jack_engine_sort_graph( jack_engine_t & engine )
     /* called, obviously, must hold engine->client_lock */
 
     VERBOSE( &engine, "++ jack_engine_sort_graph");
+    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph presort", engine.clients_vector, engine.clients );
     engine.clients = jack_slist_sort( engine.clients,
 				      (JCompareFunc) jack_client_sort);
 
     std::sort( engine.clients_vector.begin(), engine.clients_vector.end(), jack_engine_clients_compare() );
-    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
+    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph postsort", engine.clients_vector, engine.clients );
 
     jack_engine_compute_all_port_total_latencies( engine );
     jack_engine_compute_new_latency( engine );
     jack_engine_rechain_graph( engine );
     engine.timeout_count = 0;
+    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph postrechain", engine.clients_vector, engine.clients );
     VERBOSE( &engine, "-- jack_engine_sort_graph");
 }
 
@@ -4582,7 +4580,7 @@ int jack_engine_load_slave_driver (jack_engine_t & engine,
 	return -1;
     }
 
-    if ((client = jack_engine_create_driver_client( engine, info->client_name)
+    if ((client = jack_engine_create_driver_client( engine, info->client_name )
 	    ) == NULL) {
 	jack_info ("Creating slave failed\n");
 	return -1;

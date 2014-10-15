@@ -62,50 +62,64 @@ void CHECK_CLIENTS_LIST_MATCHES(
     std::vector<jack_client_internal_t*> & clients_vector,
     JSList * clients_jsl )
 {
-    auto cvIterator = clients_vector.rbegin();
-    uint32_t cvCount { 0 };
+    auto cv_iterator = clients_vector.begin();
+    uint32_t cv_count { 0 };
 
-    JSList * cjIterator = clients_jsl;
-    uint32_t cjCount { 0 };
+    JSList * cj_iterator = clients_jsl;
+    uint32_t cj_count { 0 };
 
-    while( cjIterator != NULL && cvIterator != clients_vector.rend() )
-    {
-	cvCount++;
-	cjCount++;
+    bool done { false };
+    bool was_error { false };
+    uint32_t cur_el_num { 0 };
 
-	jack_client_internal_t * cjData = (jack_client_internal_t*)cjIterator->data;
-	jack_info("(%s) comparing clients (%p)(%p)", source,
-		  cjData, *cvIterator );
-	if( cjData != *cvIterator ) {
-	    jack_error("(%s) Failed during clients list element check - elements don't match", source );
-	    break;
+    while( !done ) {
+	cur_el_num++;
+
+	if( cj_iterator != NULL ) {
+	    cj_count++;
+	}
+	if( cv_iterator != clients_vector.end() ) {
+	    cv_count++;
 	}
 
-	cvIterator++;
-	cjIterator = cjIterator->next;
+	if( cj_iterator != NULL && cv_iterator != clients_vector.end() ) {
+	    jack_client_internal_t * cj_data = (jack_client_internal_t*)cj_iterator->data;
+	    jack_client_internal_t * cv_data = *cv_iterator;
+
+	    char * cj_name = (char*)cj_data->control->name;
+	    char * cv_name = (char*)cv_data->control->name;
+	    jack_info("(%s) (%d) comparing clients (%s-%p)(%s-%p)", source,
+		      cur_el_num,
+		      cj_name, cj_data,
+		      cv_name, cv_data );
+	    if( cj_data != cv_data ) {
+		was_error = true;
+	    }
+	}
+
+	if( was_error ) {
+	    jack_error("(%s) (%d) failed client element check", source, cur_el_num );
+	}
+
+	if( cj_iterator != NULL ) {
+	    cj_iterator = cj_iterator->next;
+	}
+	if( cv_iterator != clients_vector.end() ) {
+	    cv_iterator++;
+	}
+
+	if( cj_iterator == NULL && cv_iterator == clients_vector.end() ) {
+	    done = true;
+	}
     }
 
-    if( cjIterator != NULL ) {
-	while( cjIterator != NULL ) {
-	    cjIterator = cjIterator->next;
-	    cjCount++;
-	}
-	jack_error("(%s) Failed during clients list match - missing clients_vector elements", source );
+    if( !was_error && cv_count == cj_count ) {
+	jack_info("(%s) Success! clients list and vector matches cjCount(%d) cvCount(%d)", source,
+		  cj_count, cv_count);
     }
-    else if( cvIterator != clients_vector.rend() ) {
-	while( cvIterator != clients_vector.rend() ) {
-	    cvIterator++;
-	    cvCount++;
-	}
-	jack_error("(%s) Failed during clients list match - clients_vector has additional elements", source );
-    }
-    else if( cvCount == cjCount ) {
-	jack_info("(%s) Success! clients list and vector matches!", source );
-    }
-
-    if( cvCount != cjCount ) {
+    else {
 	jack_error("(%s) Failed during clients list match cjCount(%d) cvCount(%d)", source,
-		   cjCount, cvCount );
+		   cj_count, cv_count );
     }
 }
 
@@ -136,14 +150,14 @@ void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
 	cjIterator = cjIterator->next;
     }
 
-    if( cjIterator != NULL ) {
+    if( cjIterator != NULL && cvIterator == connections_vector.end() ) {
 	while( cjIterator != NULL ) {
 	    cjIterator = cjIterator->next;
 	    cjCount++;
 	}
 	jack_error("(%s) Failed during connections list match - missing connections_vector elements", source );
     }
-    else if( cvIterator != connections_vector.end() ) {
+    else if( cjIterator == NULL && cvIterator != connections_vector.end() ) {
 	while( cvIterator != connections_vector.end() ) {
 	    cvIterator++;
 	    cvCount++;
