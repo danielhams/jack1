@@ -108,8 +108,8 @@ int jack_client_do_deactivate (jack_engine_t *engine,
     return 0;
 }
 
-static int jack_load_client (jack_engine_t *engine, jack_client_internal_t *client,
-			     const char *so_name)
+static int jack_engine_load_client( jack_engine_t & engine, jack_client_internal_t *client,
+				    const char *so_name)
 {
     const char *errstr;
 
@@ -698,108 +698,102 @@ static void jack_ensure_uuid_unique (jack_engine_t *engine, jack_uuid_t uuid)
 }
 
 /* set up all types of clients */
-static jack_client_internal_t * setup_client(
-	jack_engine_t *engine, ClientType type, char *name,
-	jack_uuid_t uuid,
-	jack_options_t options, jack_status_t *status, int client_fd,
-	const char *object_path, const char *object_data)
+static jack_client_internal_t * jack_engine_setup_client(
+    jack_engine_t & engine, ClientType type, char *name, jack_uuid_t uuid, jack_options_t options,
+    jack_status_t *status, int client_fd, const char *object_path, const char *object_data)
 {
-	/* called with the request_lock */
-	jack_client_internal_t *client;
-        char bufx[64];
+    /* called with the request_lock */
+    jack_client_internal_t *client;
+    char bufx[64];
 
-	/* validate client name, generate a unique one if appropriate */
-	if (jack_client_name_invalid (engine, name, options, status))
-		return NULL;
+    /* validate client name, generate a unique one if appropriate */
+    if (jack_client_name_invalid( &engine, name, options, status))
+	return NULL;
 
-        jack_ensure_uuid_unique (engine, uuid);
+    jack_ensure_uuid_unique( &engine, uuid);
 
-	/* create a client struct for this name */
-	if ((client = jack_setup_client_control (engine, client_fd,
-						 type, name, uuid)) == NULL) {
-		*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
-		jack_error ("cannot create new client object");
-		return NULL;
+    /* create a client struct for this name */
+    if ((client = jack_setup_client_control( &engine, client_fd,
+					     type, name, uuid)) == NULL) {
+	*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
+	jack_error ("cannot create new client object");
+	return NULL;
+    }
+
+    /* only for internal clients, driver is already loaded */
+    if (type == ClientInternal) {
+	if (jack_engine_load_client( engine, client, object_path) ) {
+	    jack_error ("cannot dynamically load client from"
+			" \"%s\"", object_path);
+	    jack_engine_client_delete( engine, client );
+	    *status = (jack_status_t)(*status | (JackFailure|JackLoadFailure));
+	    return NULL;
 	}
+    }
 
-	/* only for internal clients, driver is already loaded */
-	if (type == ClientInternal) {
-		if (jack_load_client (engine, client, object_path)) {
-			jack_error ("cannot dynamically load client from"
-				    " \"%s\"", object_path);
-			jack_engine_client_delete( *engine, client );
-			*status = (jack_status_t)(*status | (JackFailure|JackLoadFailure));
-			return NULL;
-		}
-	}
-
-        jack_uuid_unparse (client->control->uuid, bufx);
+    jack_uuid_unparse(client->control->uuid, bufx);
                 
-	VERBOSE (engine, "new client: %s, uuid = %s" 
-		 " type %d @ %p fd = %d", 
-		 client->control->name, bufx,
-		 type, client->control, client_fd);
+    VERBOSE( &engine, "new client: %s, uuid = %s" 
+	     " type %d @ %p fd = %d", 
+	     client->control->name, bufx,
+	     type, client->control, client_fd);
 
-	if (jack_client_is_internal(client)) {
+    if (jack_client_is_internal(client)) {
 
-	    // XXX: do i need to lock the graph here ?
-	    // i moved this one up in the init process, lets see what happens.
+	// XXX: do i need to lock the graph here ?
+	// i moved this one up in the init process, lets see what happens.
 
-		/* Internal clients need to make regular JACK API
-		 * calls, which need a jack_client_t structure.
-		 * Create one here.
-		 */
-		client->private_client =
-			jack_client_alloc_internal (client->control, engine);
+	/* Internal clients need to make regular JACK API
+	 * calls, which need a jack_client_t structure.
+	 * Create one here.
+	 */
+	client->private_client = jack_client_alloc_internal( client->control, &engine);
 
-		/* Set up the pointers necessary for the request
-		 * system to work.  The client is in the same address
-		 * space */
+	/* Set up the pointers necessary for the request
+	 * system to work.  The client is in the same address
+	 * space */
 
-		client->private_client->deliver_request = internal_client_request;
-		client->private_client->deliver_arg = engine;
+	client->private_client->deliver_request = internal_client_request;
+	client->private_client->deliver_arg = &engine;
+    }
+
+    /* add new client to the clients list */
+    jack_lock_graph( (&engine) );
+    engine.clients = jack_slist_prepend( engine.clients, client);
+    jack_engine_reset_rolling_usecs( engine );
+	
+    if (jack_client_is_internal(client)) {
+
+
+	jack_unlock_graph( (&engine) );
+
+	/* Call its initialization function.  This function
+	 * may make requests of its own, so we temporarily
+	 * release and then reacquire the request_lock.  */
+	if (client->control->type == ClientInternal) {
+
+	    pthread_mutex_unlock(&engine.request_lock);
+	    if (client->initialize(client->private_client,
+				    object_data)) {
+
+		/* failed: clean up client data */
+		VERBOSE( &engine, "%s jack_initialize() failed!", client->control->name);
+		jack_lock_graph( (&engine) );
+		jack_engine_remove_client( engine, client );
+		jack_unlock_graph( (&engine) );
+		*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
+		client = NULL;
+		//JOQ: not clear that all allocated
+		//storage has been cleaned up properly.
+	    }
+	    pthread_mutex_lock(&engine.request_lock);
 	}
 
-	/* add new client to the clients list */
-	jack_lock_graph (engine);
- 	engine->clients = jack_slist_prepend (engine->clients, client);
-	jack_engine_reset_rolling_usecs( *engine );
-	
-	if (jack_client_is_internal(client)) {
+    } else {			/* external client */
+	jack_unlock_graph( (&engine) );
+    }
 
-
-		jack_unlock_graph (engine);
-
-		/* Call its initialization function.  This function
-		 * may make requests of its own, so we temporarily
-		 * release and then reacquire the request_lock.  */
-		if (client->control->type == ClientInternal) {
-
-			pthread_mutex_unlock (&engine->request_lock);
-			if (client->initialize (client->private_client,
-						object_data)) {
-
-				/* failed: clean up client data */
-				VERBOSE (engine,
-					 "%s jack_initialize() failed!",
-					 client->control->name);
-				jack_lock_graph (engine);
-				jack_engine_remove_client( *engine, client );
-				jack_unlock_graph (engine);
-				*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
-				client = NULL;
-				//JOQ: not clear that all allocated
-				//storage has been cleaned up properly.
-			}
-			pthread_mutex_lock (&engine->request_lock);
-		}
-
-	} else {			/* external client */
-
-		jack_unlock_graph (engine);
-	}
-	
-	return client;
+    return client;
 }
 
 jack_client_internal_t * jack_engine_create_driver_client( jack_engine_t & engine, char *name )
@@ -816,8 +810,8 @@ jack_client_internal_t * jack_engine_create_driver_client( jack_engine_t & engin
     jack_uuid_clear (&empty_uuid);
 
     pthread_mutex_lock( &engine.request_lock );
-    client = setup_client( &engine, ClientDriver, name, empty_uuid, JackUseExactName,
-			   &status, -1, NULL, NULL);
+    client = jack_engine_setup_client( engine, ClientDriver, name, empty_uuid, JackUseExactName,
+				       &status, -1, NULL, NULL);
     pthread_mutex_unlock( &engine.request_lock );
 
     return client;
@@ -919,9 +913,9 @@ int jack_engine_client_create( jack_engine_t & engine, int client_fd )
 		}
 	}
 
-	client = setup_client( &engine, req.type, req.name, req.uuid,
-			       req.options, &res.status, client_fd,
-			       req.object_path, req.object_data);
+	client = jack_engine_setup_client( engine, req.type, req.name, req.uuid,
+					   req.options, &res.status, client_fd,
+					   req.object_path, req.object_data);
 	pthread_mutex_unlock(&engine.request_lock);
 	if (client == NULL) {
 		res.status = (jack_status_t)(res.status | JackFailure); /* just making sure */
@@ -1149,9 +1143,9 @@ void jack_engine_intclient_load_request( jack_engine_t & engine, jack_request_t 
 
     jack_options_t client_options = (jack_options_t)(req->x.intclient.options | JackUseExactName);
 
-    client = setup_client( &engine, ClientInternal, req->x.intclient.name, empty_uuid,
-			   client_options, &status, -1,
-			   req->x.intclient.path, req->x.intclient.init);
+    client = jack_engine_setup_client( engine, ClientInternal, req->x.intclient.name, empty_uuid,
+				       client_options, &status, -1,
+				       req->x.intclient.path, req->x.intclient.init);
 
     if (client == NULL) {
 	status = (jack_status_t)(status | JackFailure);	/* just making sure */
