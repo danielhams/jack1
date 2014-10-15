@@ -91,8 +91,7 @@ struct _jack_engine {
     /* these are "callbacks" made by the driver backend */
     int  (*set_buffer_size) (struct _jack_engine *, jack_nframes_t frames);
     int  (*set_sample_rate) (struct _jack_engine *, jack_nframes_t frames);
-    int  (*run_cycle)	    (struct _jack_engine *, jack_nframes_t nframes,
-			     float delayed_usecs);
+    int  (*run_cycle)	    (struct _jack_engine *, jack_nframes_t nframes, float delayed_usecs);
     void (*delay)	    (struct _jack_engine *, float delayed_usecs);
     void (*transport_cycle_start) (struct _jack_engine *, jack_time_t time);
     void (*driver_exit)     (struct _jack_engine *);

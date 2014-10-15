@@ -56,6 +56,8 @@ void jack_engine_sort_graph( jack_engine_t & engine );
 void jack_engine_property_change_notify( jack_engine_t & engine, jack_property_change_t change,
 					 jack_uuid_t uuid, const char* key);
 
+//int jack_engine_set_sample_rate( jack_engine_t * engine, jack_nframes_t nframes );
+
 // private engine functions (are used by clients)
 void jack_engine_reset_rolling_usecs( jack_engine_t & engine );
 

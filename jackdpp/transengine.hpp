@@ -27,7 +27,6 @@
 extern "C" {
 #endif
 
-int	jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes);
 int	jack_timebase_reset (jack_engine_t *engine,
 			     jack_uuid_t client_id);
 int	jack_timebase_set (jack_engine_t *engine,

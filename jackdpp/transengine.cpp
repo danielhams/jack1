@@ -154,16 +154,6 @@ static inline int jack_sync_timeout (jack_engine_t *engine)
 
 /**************** subroutines used by engine.c ****************/
 
-/* driver callback */
-int jack_set_sample_rate (jack_engine_t *engine, jack_nframes_t nframes)
-{
-	jack_control_t *ectl = engine->control;
-
-	ectl->current_time.frame_rate = nframes;
-	ectl->pending_time.frame_rate = nframes;
-	return 0;
-}
-
 /* on ResetTimeBaseClient request */
 int jack_timebase_reset (jack_engine_t *engine, jack_uuid_t client_id)
 {
