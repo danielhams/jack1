@@ -1,0 +1,161 @@
+/*
+  Copyright (C) 2014- Daniel Hams
+    
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+
+*/
+
+#include <config.h>
+
+#include "jack_pp_debug.hpp"
+
+#include <string>
+#include <iostream>
+#include <sstream>
+#include <vector>
+
+#include "internal.hpp"
+#include "driver.hpp"
+#include "jack/uuid.h"
+#include "shm.hpp"
+#include "engine.hpp"
+#include "transengine.hpp"
+#include "clientengine.hpp"
+#include "jack/types.h"
+#include "messagebuffer.hpp"
+#include "engine.hpp"
+
+#include "libjackpp/local.hpp"
+
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <dirent.h>
+#include <signal.h>
+#include <poll.h>
+#include <stdarg.h>
+
+using std::cout;
+using std::endl;
+using std::string;
+using std::vector;
+using std::stringstream;
+using std::unique_ptr;
+using std::make_unique;
+
+void CHECK_CLIENTS_LIST_MATCHES(
+    const char * source,
+    std::vector<jack_client_internal_t*> & clients_vector,
+    JSList * clients_jsl )
+{
+    auto cvIterator = clients_vector.rbegin();
+    uint32_t cvCount { 0 };
+
+    JSList * cjIterator = clients_jsl;
+    uint32_t cjCount { 0 };
+
+    while( cjIterator != NULL && cvIterator != clients_vector.rend() )
+    {
+	cvCount++;
+	cjCount++;
+
+	jack_client_internal_t * cjData = (jack_client_internal_t*)cjIterator->data;
+	jack_info("(%s) comparing clients (%p)(%p)", source,
+		  cjData, *cvIterator );
+	if( cjData != *cvIterator ) {
+	    jack_error("(%s) Failed during clients list element check - elements don't match", source );
+	    break;
+	}
+
+	cvIterator++;
+	cjIterator = cjIterator->next;
+    }
+
+    if( cjIterator != NULL ) {
+	while( cjIterator != NULL ) {
+	    cjIterator = cjIterator->next;
+	    cjCount++;
+	}
+	jack_error("(%s) Failed during clients list match - missing clients_vector elements", source );
+    }
+    else if( cvIterator != clients_vector.rend() ) {
+	while( cvIterator != clients_vector.rend() ) {
+	    cvIterator++;
+	    cvCount++;
+	}
+	jack_error("(%s) Failed during clients list match - clients_vector has additional elements", source );
+    }
+    else if( cvCount == cjCount ) {
+	jack_info("(%s) Success! clients list and vector matches!", source );
+    }
+
+    if( cvCount != cjCount ) {
+	jack_error("(%s) Failed during clients list match cjCount(%d) cvCount(%d)", source,
+		   cjCount, cvCount );
+    }
+}
+
+void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
+				       std::vector<jack_connection_internal_t*> & connections_vector,
+				       JSList * connections_jsl )
+{
+    auto cvIterator = connections_vector.begin();
+    uint32_t cvCount { 0 };
+
+    JSList * cjIterator = connections_jsl;
+    uint32_t cjCount { 0 };
+
+    while( cjIterator != NULL && cvIterator != connections_vector.end() )
+    {
+	cvCount++;
+	cjCount++;
+
+	jack_connection_internal_t  * cjData = (jack_connection_internal_t*)cjIterator->data;
+	jack_info("(%s) comparing connections (%p)(%p)", source,
+		  cjData, *cvIterator );
+	if( cjData != *cvIterator ) {
+	    jack_error("(%s) Failed during connections list element check - elements don't match", source );
+	    break;
+	}
+
+	cvIterator++;
+	cjIterator = cjIterator->next;
+    }
+
+    if( cjIterator != NULL ) {
+	while( cjIterator != NULL ) {
+	    cjIterator = cjIterator->next;
+	    cjCount++;
+	}
+	jack_error("(%s) Failed during connections list match - missing connections_vector elements", source );
+    }
+    else if( cvIterator != connections_vector.end() ) {
+	while( cvIterator != connections_vector.end() ) {
+	    cvIterator++;
+	    cvCount++;
+	}
+	jack_error("(%s) Failed during connections list match - connections_vector has additional elements", source );
+    }
+    else if( cvCount == cjCount ) {
+	jack_info("(%s) Success! connections list and vector matches!", source );
+    }
+    
+    if( cvCount != cjCount ) {
+	jack_error("(%s) Failed during connections list match cjCount(%d) cvCount(%d)", source,
+		   cjCount, cvCount );
+    }
+}

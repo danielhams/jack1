@@ -21,6 +21,7 @@
 
 #include "jack_engine.hpp"
 #include "jack_signals.hpp"
+#include "jack_pp_debug.hpp"
 
 #include <string>
 #include <iostream>
@@ -2055,68 +2056,6 @@ struct jack_engine_clients_compare
     }
 };
 
-static void CHECK_CLIENTS_LIST_MATCHES(
-    std::vector<jack_client_internal_t*> & clients_vector,
-    JSList * clients_jsl )
-{
-    auto cvIterator = clients_vector.begin();
-
-    JSList * cjIterator = clients_jsl;
-
-    while( cjIterator != NULL && cvIterator != clients_vector.end() )
-    {
-	jack_client_internal_t * cjData = (jack_client_internal_t*)cjIterator->data;
-	if( cjData != *cvIterator ) {
-	    jack_error("Failed during clients list element check - elements don't match");
-	    break;
-	}
-
-	++cvIterator;
-	cjIterator = clients_jsl->next;
-    }
-
-    if( cjIterator != NULL ) {
-	jack_error("Failed during clients list match - missing clients_vector elements");
-    }
-    else if( cvIterator != clients_vector.end() ) {
-	jack_error("Failed during clients list match - clients_vector has additional elements");
-    }
-    else {
-	jack_info("Success! clients list and vector matches!");
-    }
-}
-
-static void CHECK_CONNECTIONS_VECTOR_MATCHES(
-    std::vector<jack_connection_internal_t*> & connections_vector,
-    JSList * connections_jsl )
-{
-    auto cvIterator = connections_vector.begin();
-
-    JSList * cjIterator = connections_jsl;
-
-    while( cjIterator != NULL && cvIterator != connections_vector.end() )
-    {
-	jack_connection_internal_t  * cjData = (jack_connection_internal_t*)cjIterator->data;
-	if( cjData != *cvIterator ) {
-	    jack_error("Failed during connections list element check - elements don't match");
-	    break;
-	}
-
-	++cvIterator;
-	cjIterator = connections_jsl->next;
-    }
-
-    if( cjIterator != NULL ) {
-	jack_error("Failed during connections list match - missing connections_vector elements");
-    }
-    else if( cvIterator != connections_vector.end() ) {
-	jack_error("Failed during connections list match - connections_vector has additional elements");
-    }
-    else {
-	jack_info("Success! connections list and vector matches!");
-    }
-}
-
 /* How the sort works:
  *
  * Each client has a "sortfeeds" list of clients indicating which clients
@@ -2153,7 +2092,7 @@ void jack_engine_sort_graph( jack_engine_t & engine )
 				      (JCompareFunc) jack_client_sort);
 
     std::sort( engine.clients_vector.begin(), engine.clients_vector.end(), jack_engine_clients_compare() );
-    CHECK_CLIENTS_LIST_MATCHES( engine.clients_vector, engine.clients );
+    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
 
     jack_engine_compute_all_port_total_latencies( engine );
     jack_engine_compute_new_latency( engine );
@@ -2353,7 +2292,7 @@ static int jack_engine_port_disconnect_internal(
 	}
     }
 
-    CHECK_CONNECTIONS_VECTOR_MATCHES( srcport->connections_vector, srcport->connections );
+    CHECK_CONNECTIONS_VECTOR_MATCHES( __FUNCTION__, srcport->connections_vector, srcport->connections );
 
     if( check_acyclic ) {
 	jack_engine_check_acyclic( engine );
