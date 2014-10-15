@@ -89,7 +89,7 @@ void CHECK_CLIENTS_LIST_MATCHES(
 
 	    char * cj_name = (char*)cj_data->control->name;
 	    char * cv_name = (char*)cv_data->control->name;
-	    jack_info("(%s) (%d) comparing clients (%s-%p)(%s-%p)", source,
+	    MESSAGE("(%s) (%d) comparing clients (%s-%p)(%s-%p)", source,
 		      cur_el_num,
 		      cj_name, cj_data,
 		      cv_name, cv_data );
@@ -99,7 +99,7 @@ void CHECK_CLIENTS_LIST_MATCHES(
 	}
 
 	if( was_error ) {
-	    jack_error("(%s) (%d) failed client element check", source, cur_el_num );
+	    MESSAGE("(%s) (%d) failed client element check", source, cur_el_num );
 	}
 
 	if( cj_iterator != NULL ) {
@@ -115,11 +115,11 @@ void CHECK_CLIENTS_LIST_MATCHES(
     }
 
     if( !was_error && cv_count == cj_count ) {
-	jack_info("(%s) Success! clients list and vector matches cjCount(%d) cvCount(%d)", source,
+	MESSAGE("(%s) Success! clients list and vector matches cjCount(%d) cvCount(%d)", source,
 		  cj_count, cv_count);
     }
     else {
-	jack_error("(%s) Failed during clients list match cjCount(%d) cvCount(%d)", source,
+	MESSAGE("(%s) Failed during clients list match cjCount(%d) cvCount(%d)", source,
 		   cj_count, cv_count );
     }
 }
@@ -140,10 +140,10 @@ void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
 	cjCount++;
 
 	jack_connection_internal_t  * cjData = (jack_connection_internal_t*)cjIterator->data;
-	jack_info("(%s) comparing connections (%p)(%p)", source,
+	MESSAGE("(%s) comparing connections (%p)(%p)", source,
 		  cjData, *cvIterator );
 	if( cjData != *cvIterator ) {
-	    jack_error("(%s) Failed during connections list element check - elements don't match", source );
+	    MESSAGE("(%s) Failed during connections list element check - elements don't match", source );
 	    break;
 	}
 
@@ -156,21 +156,21 @@ void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
 	    cjIterator = cjIterator->next;
 	    cjCount++;
 	}
-	jack_error("(%s) Failed during connections list match - missing connections_vector elements", source );
+	MESSAGE("(%s) Failed during connections list match - missing connections_vector elements", source );
     }
     else if( cjIterator == NULL && cvIterator != connections_vector.end() ) {
 	while( cvIterator != connections_vector.end() ) {
 	    cvIterator++;
 	    cvCount++;
 	}
-	jack_error("(%s) Failed during connections list match - connections_vector has additional elements", source );
+	MESSAGE("(%s) Failed during connections list match - connections_vector has additional elements", source );
     }
     else if( cvCount == cjCount ) {
-	jack_info("(%s) Success! connections list and vector matches!", source );
+	MESSAGE("(%s) Success! connections list and vector matches!", source );
     }
     
     if( cvCount != cjCount ) {
-	jack_error("(%s) Failed during connections list match cjCount(%d) cvCount(%d)", source,
+	MESSAGE("(%s) Failed during connections list match cjCount(%d) cvCount(%d)", source,
 		   cjCount, cvCount );
     }
 }

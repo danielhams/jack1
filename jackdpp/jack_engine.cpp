@@ -2043,11 +2043,17 @@ struct jack_engine_clients_compare
 	/* drivers are forced to the front, ie considered as sources
 	   rather than sinks for purposes of the sort */
 
-	if (jack_client_feeds_transitive( a, b ) ||
+	if( jack_client_feeds_transitive( a, b ) ||
 	    (a->control->type == ClientDriver &&
 	     b->control->type != ClientDriver)) {
 	    return true;
-	} else {
+	}
+	else if( jack_client_feeds_transitive( b, a ) ||
+		 (b->control->type == ClientDriver &&
+		  a->control->type != ClientDriver)) {
+	    return false;
+	}
+	else {
 	    return a < b;
 	}
     }
