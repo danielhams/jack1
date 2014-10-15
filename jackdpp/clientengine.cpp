@@ -768,8 +768,8 @@ static jack_client_internal_t * jack_engine_setup_client(
     /* add new client to the clients list */
     jack_lock_graph( (&engine) );
     jack_info( "Adding (%s)(%p) to the clients", client->control->name, client );
-//    engine.clients = jack_slist_prepend( engine.clients, client);
-    engine.clients = jack_slist_append( engine.clients, client);
+    engine.clients = jack_slist_prepend( engine.clients, client);
+//    engine.clients = jack_slist_append( engine.clients, client);
     engine.clients_vector.push_back( client );
     CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
     jack_engine_reset_rolling_usecs( engine );
