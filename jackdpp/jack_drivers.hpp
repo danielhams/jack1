@@ -30,14 +30,14 @@
 namespace jack
 {
 
-std::vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose );
+std::vector<jack_driver_desc_t*> jack_drivers_load( bool verbose );
 
-jack_driver_desc_t * jack_drivers_find_descriptor_pp(
+jack_driver_desc_t * jack_drivers_find_descriptor(
     const std::vector<jack_driver_desc_t*> & loaded_drivers,
     const std::string & name );
 
 /* Should just be internal? */
-jack_driver_desc_t * jack_drivers_find_so_descriptor_pp(
+jack_driver_desc_t * jack_drivers_find_so_descriptor(
     const std::vector<jack_driver_desc_t*> & loaded_drivers,
     const std::string & so_name,
     bool verbose );

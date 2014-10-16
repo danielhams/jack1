@@ -101,11 +101,11 @@ using jack::jack_signals_create;
 using jack::jack_signals_unblock;
 using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
-using jack::jack_drivers_load_pp;
-using jack::jack_drivers_find_descriptor_pp;
-using jack::jack_drivers_find_so_descriptor_pp;
+using jack::jack_drivers_load;
+using jack::jack_drivers_find_descriptor;
+using jack::jack_drivers_find_so_descriptor;
 
-static void jack_load_internal_clients_pp( jack_engine_t * engine, const vector<string> & internal_clients )
+static void jack_load_internal_clients( jack_engine_t * engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
 	jack_request_t req;
@@ -221,7 +221,7 @@ static int jack_main( const jack_options & parsed_options,
     }
 
     for( const string & slave_driver_name : parsed_options.slave_drivers ) {
-	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor_pp( loaded_drivers, slave_driver_name );
+	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor( loaded_drivers, slave_driver_name );
 	if (sl_desc) {
 	    jack_engine_load_slave_driver( *engine, sl_desc, NULL );
 	}
@@ -233,7 +233,7 @@ static int jack_main( const jack_options & parsed_options,
 	goto error;
     }
 
-    jack_load_internal_clients_pp( engine.get(), parsed_options.internal_clients );
+    jack_load_internal_clients( engine.get(), parsed_options.internal_clients );
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -430,7 +430,7 @@ int main (int argc, char *argv[])
 	exit(1);
     }
 
-    vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load_pp( parsed_options.verbose );
+    vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load( parsed_options.verbose );
 
     if (loaded_drivers.size() == 0) {
 	cerr << "jackd: no drivers found; exiting" << endl;
@@ -446,7 +446,7 @@ int main (int argc, char *argv[])
 	}
     }
 
-    desc = jack_drivers_find_descriptor_pp( loaded_drivers, parsed_options.driver );
+    desc = jack_drivers_find_descriptor( loaded_drivers, parsed_options.driver );
     if (!desc) {
 	cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 	exit (1);

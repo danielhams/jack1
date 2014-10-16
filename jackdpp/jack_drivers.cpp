@@ -47,7 +47,7 @@ using std::stringstream;
 
 using jack::addon_dir;
 
-vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose )
+vector<jack_driver_desc_t*> jack_drivers_load( bool verbose )
 {
     vector<jack_driver_desc_t*> loaded_drivers;
 
@@ -86,7 +86,7 @@ vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose )
 	    continue;
 	}
 
-	desc = jack_drivers_find_so_descriptor_pp( loaded_drivers, dir_entry->d_name, verbose );
+	desc = jack_drivers_find_so_descriptor( loaded_drivers, dir_entry->d_name, verbose );
 
 	if (desc) {
 	    loaded_drivers.push_back( desc );
@@ -106,7 +106,7 @@ vector<jack_driver_desc_t*> jack_drivers_load_pp( bool verbose )
     return loaded_drivers;
 }
 
-jack_driver_desc_t * jack_drivers_find_descriptor_pp(
+jack_driver_desc_t * jack_drivers_find_descriptor(
     const vector<jack_driver_desc_t*> & loaded_drivers,
     const string & name )
 {
@@ -119,7 +119,7 @@ jack_driver_desc_t * jack_drivers_find_descriptor_pp(
     return NULL;
 }
 
-jack_driver_desc_t * jack_drivers_find_so_descriptor_pp(
+jack_driver_desc_t * jack_drivers_find_so_descriptor(
     const std::vector<jack_driver_desc_t*> & loaded_drivers,
     const std::string & so_name,
     bool verbose )

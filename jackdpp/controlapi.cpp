@@ -74,13 +74,7 @@ using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
 using jack::jack_options;
 
-using jack::jack_drivers_load_pp;
-
-//using jack::jack_engine_create;
-//using jack::jack_engine_cleanup;
-//using jack::jack_engine_load_driver;
-//using jack::jack_engine_load_slave_driver;
-//using jack::jack_use_driver;
+using jack::jack_drivers_load;
 
 /*
  * XXX: dont like statics here.
@@ -395,7 +389,7 @@ static void jack_cleanup_files( const char *server_name )
 static int jackctl_drivers_load( struct jackctl_server * server_ptr )
 {
     struct jackctl_driver * driver_ptr;
-    static_drivers = jack_drivers_load_pp( server_ptr->verbose.b );
+    static_drivers = jack_drivers_load( server_ptr->verbose.b );
     if( static_drivers.size() == 0 ) {
 	// Should already have warned from the drivers_load call
 	return false;
