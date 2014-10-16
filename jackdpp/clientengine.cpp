@@ -728,7 +728,6 @@ static jack_client_internal_t * jack_engine_setup_client(
 
     /* add new client to the clients list */
     jack_lock_graph( (&engine) );
-    jack_info( "Adding (%s)(%p) to the clients", client->control->name, client );
 
     engine.clients_vector.push_back( client );
 
