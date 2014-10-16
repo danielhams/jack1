@@ -156,11 +156,8 @@ struct _jack_engine {
     volatile int    timeout_count;
     volatile int    new_clients_allowed;
 
-    /* these lists are protected by `client_lock' */
-    JSList	   *clients;
+    /* these are protected by `client_lock' */
     std::vector<jack_client_internal_t*> clients_vector;
-    JSList	   *clients_waiting;
-    std::vector<jack_client_internal_t*> clients_waiting_vector;
     JSList	   *reserved_client_names;
     std::vector<jack_reserved_name_t*> reserved_client_names_vector;
 

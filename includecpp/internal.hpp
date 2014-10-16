@@ -34,6 +34,10 @@
 #include <sys/time.h>
 #include <stdarg.h>
 
+#include <string>
+#include <vector>
+#include <atomic>
+
 /* Needed by <sysdeps/time.h> */
 extern "C" {
 
@@ -72,7 +76,7 @@ const char* jack_clock_source_name (jack_timer_type_t);
 #include <sysdeps/mach_port.h>
 #endif
 
-#include "messagebuffer.h"
+#include "messagebuffer.hpp"
 
 #ifndef PATH_MAX
     #ifdef MAXPATHLEN
@@ -157,6 +161,8 @@ typedef struct {
 
 } POST_PACKED_STRUCTURE jack_frame_timer_t;
 
+extern std::atomic<uint32_t> seq_number;
+
 /* JACK engine shared memory data structure. */
 typedef struct {
 
@@ -167,7 +173,8 @@ typedef struct {
     jack_position_t	  pending_time;	/* position for next cycle */
     jack_position_t	  request_time;	/* latest requested position */
     jack_unique_t	  prev_request; /* previous request unique ID */
-    volatile _Atomic_word seq_number;	/* unique ID sequence number */
+    // THIS IS NOT USED BUT IS LEFT FOR COMPATIBILITY WITH THE EXISTING C JACK1
+    volatile _Atomic_word seq_number;   /* unique ID sequence number */
     int8_t		  new_pos;	/* new position this cycle */
     int8_t		  pending_pos;	/* new position request pending */
     jack_nframes_t	  pending_frame; /* pending frame number */

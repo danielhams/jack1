@@ -26,6 +26,7 @@ namespace jack
 
 constexpr const char * addon_dir = ADDONPP_DIR;
 constexpr const char * default_tmp_dir = DEFAULT_TMP_DIR;
+constexpr const char * jack_location = JACK_LOCATION;
 
 }
 

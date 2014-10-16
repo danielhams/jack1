@@ -28,10 +28,6 @@
 #include "internal.hpp"
 #include "engine.hpp"
 
-void CHECK_CLIENTS_LIST_MATCHES( const char * source,
-    std::vector<jack_client_internal_t*> & clients_vector,
-    JSList * clients_jsl );
-
 void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
     std::vector<jack_connection_internal_t*> & connections_vector,
     JSList * connections_jsl );

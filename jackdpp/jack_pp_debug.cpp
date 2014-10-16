@@ -58,15 +58,15 @@ using std::stringstream;
 using std::unique_ptr;
 using std::make_unique;
 
-void CHECK_CLIENTS_LIST_MATCHES(
+void CHECK_CONNECTIONS_VECTOR_MATCHES(
     const char * source,
-    std::vector<jack_client_internal_t*> & clients_vector,
-    JSList * clients_jsl )
+    std::vector<jack_connection_internal_t*> & connections_vector,
+    JSList * connections_jsl )
 {
-    auto cv_iterator = clients_vector.begin();
+    auto cv_iterator = connections_vector.begin();
     uint32_t cv_count { 0 };
 
-    JSList * cj_iterator = clients_jsl;
+    JSList * cj_iterator = connections_jsl;
     uint32_t cj_count { 0 };
 
     bool done { false };
@@ -79,98 +79,47 @@ void CHECK_CLIENTS_LIST_MATCHES(
 	if( cj_iterator != NULL ) {
 	    cj_count++;
 	}
-	if( cv_iterator != clients_vector.end() ) {
+	if( cv_iterator != connections_vector.end() ) {
 	    cv_count++;
 	}
 
-	if( cj_iterator != NULL && cv_iterator != clients_vector.end() ) {
-	    jack_client_internal_t * cj_data = (jack_client_internal_t*)cj_iterator->data;
-	    jack_client_internal_t * cv_data = *cv_iterator;
+	if( cj_iterator != NULL && cv_iterator != connections_vector.end() ) {
+	    jack_connection_internal_t * cj_data = (jack_connection_internal_t*)cj_iterator->data;
+	    jack_connection_internal_t * cv_data = *cv_iterator;
 
-	    char * cj_name = (char*)cj_data->control->name;
-	    char * cv_name = (char*)cv_data->control->name;
-	    MESSAGE("(%s) (%d) comparing clients (%s-%p)(%s-%p)", source,
-		      cur_el_num,
-		      cj_name, cj_data,
-		      cv_name, cv_data );
+//	    char * cj_name = (char*)cj_data->control->name;
+//	    char * cv_name = (char*)cv_data->control->name;
+//	    MESSAGE("(%s) (%d) comparing clients (%s-%p)(%s-%p)", source,
+//		      cur_el_num,
+//		      cj_name, cj_data,
+//		      cv_name, cv_data );
 	    if( cj_data != cv_data ) {
 		was_error = true;
 	    }
 	}
 
 	if( was_error ) {
-	    MESSAGE("(%s) (%d) failed client element check", source, cur_el_num );
+	    MESSAGE("(%s) (%d) failed connection element check", source, cur_el_num );
 	}
 
 	if( cj_iterator != NULL ) {
 	    cj_iterator = cj_iterator->next;
 	}
-	if( cv_iterator != clients_vector.end() ) {
+	if( cv_iterator != connections_vector.end() ) {
 	    cv_iterator++;
 	}
 
-	if( cj_iterator == NULL && cv_iterator == clients_vector.end() ) {
+	if( cj_iterator == NULL && cv_iterator == connections_vector.end() ) {
 	    done = true;
 	}
     }
 
     if( !was_error && cv_count == cj_count ) {
-	MESSAGE("(%s) Success! clients list and vector matches cjCount(%d) cvCount(%d)", source,
+	MESSAGE("(%s) Success! connections list and vector matches cjCount(%d) cvCount(%d)", source,
 		  cj_count, cv_count);
     }
     else {
-	MESSAGE("(%s) Failed during clients list match cjCount(%d) cvCount(%d)", source,
-		   cj_count, cv_count );
-    }
-}
-
-void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
-				       std::vector<jack_connection_internal_t*> & connections_vector,
-				       JSList * connections_jsl )
-{
-    auto cvIterator = connections_vector.begin();
-    uint32_t cvCount { 0 };
-
-    JSList * cjIterator = connections_jsl;
-    uint32_t cjCount { 0 };
-
-    while( cjIterator != NULL && cvIterator != connections_vector.end() )
-    {
-	cvCount++;
-	cjCount++;
-
-	jack_connection_internal_t  * cjData = (jack_connection_internal_t*)cjIterator->data;
-	MESSAGE("(%s) comparing connections (%p)(%p)", source,
-		  cjData, *cvIterator );
-	if( cjData != *cvIterator ) {
-	    MESSAGE("(%s) Failed during connections list element check - elements don't match", source );
-	    break;
-	}
-
-	cvIterator++;
-	cjIterator = cjIterator->next;
-    }
-
-    if( cjIterator != NULL && cvIterator == connections_vector.end() ) {
-	while( cjIterator != NULL ) {
-	    cjIterator = cjIterator->next;
-	    cjCount++;
-	}
-	MESSAGE("(%s) Failed during connections list match - missing connections_vector elements", source );
-    }
-    else if( cjIterator == NULL && cvIterator != connections_vector.end() ) {
-	while( cvIterator != connections_vector.end() ) {
-	    cvIterator++;
-	    cvCount++;
-	}
-	MESSAGE("(%s) Failed during connections list match - connections_vector has additional elements", source );
-    }
-    else if( cvCount == cjCount ) {
-	MESSAGE("(%s) Success! connections list and vector matches!", source );
-    }
-    
-    if( cvCount != cjCount ) {
 	MESSAGE("(%s) Failed during connections list match cjCount(%d) cvCount(%d)", source,
-		   cjCount, cvCount );
+		   cj_count, cv_count );
     }
 }

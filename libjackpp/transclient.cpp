@@ -27,10 +27,10 @@
 
 #include <jack/uuid.h>
 
-#include "atomicity.hpp"
 #include "internal.hpp"
 #include "local.hpp"
 
+std::atomic<uint32_t> seq_number;
 
 /********************* Internal functions *********************/
 
@@ -38,8 +38,8 @@
 jack_unique_t
 jack_generate_unique_id (jack_control_t *ectl)
 {
-	/* The jack_unique_t is an opaque type. */
-	return exchange_and_add(&ectl->seq_number, 1);
+    /* The jack_unique_t is an opaque type. */
+    return seq_number++;
 }
 
 static inline void

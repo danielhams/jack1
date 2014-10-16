@@ -191,7 +191,6 @@ static void jack_engine_zombify_client( jack_engine_t & engine, jack_client_inte
 
 void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *client )
 {
-    JSList *node;
     jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
 
     jack_uuid_clear (&finalizer);
@@ -234,7 +233,6 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 	close (client->request_fd);
     }
 
-    VERBOSE( &engine, "before: client list contains %d", jack_slist_length(engine.clients) );
     VERBOSE( &engine, "before: client vector contains %d", engine.clients_vector.size() );
 
     auto cFinder = std::find_if( engine.clients_vector.begin(), engine.clients_vector.end(),
@@ -247,19 +245,6 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 	VERBOSE( &engine, "Found and removed from client vector via matching UUID" );
     }
 
-    for( node = engine.clients; node; node = jack_slist_next(node) ) {
-	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, client->control->uuid) == 0) {
-	    engine.clients = jack_slist_remove_link( engine.clients, node );
-	    jack_slist_free_1(node);
-
-	    VERBOSE( &engine, "removed from client list, via matching UUID");
-	    break;
-	}
-    }
-
-    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
-
-    VERBOSE( &engine, "after: client list contains %d", jack_slist_length (engine.clients));
     VERBOSE( &engine, "after: client vector contains %d", engine.clients_vector.size() );
 
     jack_engine_client_delete( engine, client );
@@ -744,12 +729,9 @@ static jack_client_internal_t * jack_engine_setup_client(
     /* add new client to the clients list */
     jack_lock_graph( (&engine) );
     jack_info( "Adding (%s)(%p) to the clients", client->control->name, client );
-    // TO BE REMOVED WHEN CLIENTS REFACTORED AS A VECTOR
-    // Use prepend for correctness, append when testing 
-    engine.clients = jack_slist_prepend( engine.clients, client);
-//    engine.clients = jack_slist_append( engine.clients, client);
+
     engine.clients_vector.push_back( client );
-    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
+
     jack_engine_reset_rolling_usecs( engine );
 	
     if (jack_client_is_internal(client)) {

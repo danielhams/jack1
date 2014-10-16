@@ -114,8 +114,6 @@ static void jack_engine_driver_exit( jack_engine_t * engine );
 static int jack_engine_start_freewheeling( jack_engine_t & engine, jack_uuid_t );
 static int jack_client_feeds_transitive (jack_client_internal_t *source,
 					  jack_client_internal_t *dest);
-static int jack_client_sort (jack_client_internal_t *a,
-			      jack_client_internal_t *b);
 static void jack_engine_check_acyclic( jack_engine_t & engine );
 static void jack_engine_compute_all_port_total_latencies( jack_engine_t & engine );
 static void jack_engine_compute_port_total_latency( jack_engine_t & engine, jack_port_shared_t* );
@@ -664,61 +662,16 @@ static int jack_engine_drivers_read( jack_engine_t & engine, jack_nframes_t nfra
     for( jack_driver_t * sdriver : engine.slave_drivers ) {
 	sdriver->read( sdriver, nframes );
     }
-    /*
-    JSList *node;
-    for (node=engine->slave_drivers; node; node=jack_slist_next(node))
-    {
-	jack_driver_t *sdriver = (jack_driver_t*)node->data;
-	sdriver->read (sdriver, nframes);
-    }
-    */
 
     /* now the master driver is read */
     return engine.driver->read( engine.driver, nframes );
 }
 
-static JSList * jack_engine_process_internal(
-    jack_engine_t & engine, JSList *node, jack_nframes_t nframes)
-{
-    jack_client_internal_t *client;
-    jack_client_control_t *ctl;
-	
-    client = (jack_client_internal_t *) node->data;
-    ctl = client->control;
-	
-    /* internal client */
-
-    DEBUG ("invoking an internal client's (%s) callbacks", ctl->name);
-    ctl->state = Running;
-    engine.current_client = client;
-
-    /* XXX how to time out an internal client? */
-
-    if (ctl->sync_cb_cbset)
-	jack_call_sync_client (client->private_client);
-
-    if (ctl->process_cbset)
-	if (client->private_client->process (nframes, client->private_client->process_arg)) {
-	    jack_error ("internal client %s failed", ctl->name);
-	    engine.process_errors++;
-	}
-
-    if (ctl->timebase_cb_cbset)
-	jack_call_timebase_master (client->private_client);
-		
-    ctl->state = Finished;
-
-    if (engine.process_errors)
-	return NULL;		/* will stop the loop */
-    else
-	return jack_slist_next (node);
-}
-
 static vector<jack_client_internal_t*>::iterator
-jack_engine_process_internal_pp( jack_engine_t & engine,
-				 vector<jack_client_internal_t*>::iterator current_iterator,
-				 vector<jack_client_internal_t*>::iterator end_marker,
-				 jack_nframes_t nframes )
+jack_engine_process_internal( jack_engine_t & engine,
+			      vector<jack_client_internal_t*>::iterator current_iterator,
+			      vector<jack_client_internal_t*>::iterator end_marker,
+			      jack_nframes_t nframes )
 {
     jack_client_internal_t *client = *current_iterator;
     jack_client_control_t *ctl = client->control;
@@ -792,202 +745,10 @@ static int jack_engine_check_client_status( jack_engine_t & engine )
 }
 
 #ifdef JACK_USE_MACH_THREADS
-static JSList * jack_engine_process_external( jack_engine_t & engine, JSList *node )
-{
-    jack_client_internal_t * client = (jack_client_internal_t *) node->data;
-    jack_client_control_t *ctl;
-        
-    client = (jack_client_internal_t *) node->data;
-    ctl = client->control;
-
-    engine.current_client = client;
-
-    // a race exists if we do this after the write(2) 
-    ctl->state = Triggered; 
-    ctl->signalled_at = jack_get_microseconds();
-        
-    if (jack_client_resume(client) < 0) {
-	jack_error("Client will be removed\n");
-	ctl->state = Finished;
-    }
-        
-    return jack_slist_next (node);
-}
-#else /* !JACK_USE_MACH_THREADS */
-static JSList * jack_engine_process_external( jack_engine_t & engine, JSList *node )
-{
-    int status = 0;
-    char c = 0;
-    struct pollfd pfd[1];
-    int poll_timeout;
-    jack_time_t poll_timeout_usecs;
-    jack_client_internal_t *client;
-    jack_client_control_t *ctl;
-    jack_time_t now, then;
-    int pollret;
-
-    client = (jack_client_internal_t *) node->data;
-	
-    ctl = client->control;
-
-    /* external subgraph */
-
-    /* a race exists if we do this after the write(2) */
-    ctl->state = Triggered; 
-
-    ctl->signalled_at = jack_get_microseconds();
-
-    engine.current_client = client;
-
-    DEBUG ("calling process() on an external subgraph, fd==%d",
-	   client->subgraph_start_fd);
-
-    if (write (client->subgraph_start_fd, &c, sizeof (c)) != sizeof (c)) {
-	jack_error ("cannot initiate graph processing (%s)",
-		    strerror (errno));
-	engine.process_errors++;
-	jack_engine_signal_problems( engine );
-	return NULL; /* will stop the loop */
-    } 
-
-    then = jack_get_microseconds ();
-
-    if (engine.freewheeling) {
-	poll_timeout_usecs = 250000; /* 0.25 seconds */
-    } else {
-	poll_timeout_usecs = (engine.client_timeout_msecs > 0 ?
-			      engine.client_timeout_msecs * 1000 :
-			      engine.driver->period_usecs);
-    }
-
-  again:
-    poll_timeout = 1 + poll_timeout_usecs / 1000;
-    pfd[0].fd = client->subgraph_wait_fd;
-    pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
-
-    DEBUG ("waiting on fd==%d for process() subgraph to finish (timeout = %d, period_usecs = %d)",
-	   client->subgraph_wait_fd, poll_timeout, engine.driver->period_usecs);
-
-    if ((pollret = poll (pfd, 1, poll_timeout)) < 0) {
-	jack_error ("poll on subgraph processing failed (%s)",
-		    strerror (errno));
-	status = -1;
-    }
-
-    DEBUG ("\n\n\n\n\n back from subgraph poll, revents = 0x%x\n\n\n", pfd[0].revents);
-
-    if (pfd[0].revents & ~POLLIN) {
-	jack_error ("subgraph starting at %s lost client",
-		    client->control->name);
-	status = -2; 
-    }
-
-    if (pfd[0].revents & POLLIN) {
-
-	status = 0;
-
-    } else if (status == 0) {
-
-	/* no events, no errors, we woke up because poll()
-	   decided that time was up ...
-	*/
-
-	if (engine.freewheeling) {
-	    if (jack_engine_check_client_status( engine ) ) {
-		return NULL;
-	    } else {
-		/* all clients are fine - we're just not done yet. since
-		   we're freewheeling, that is fine.
-		*/
-		goto again;
-	    }
-	}
-
-#ifdef __linux		
-	if (linux_poll_bug_encountered( &engine, then, &poll_timeout_usecs)) {
-	    goto again;
-	}
-
-	if (poll_timeout_usecs < 200) {
-	    VERBOSE( &engine, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout_usecs);
-	} else {
-#endif
-			
-	    jack_error ("subgraph starting at %s timed out "
-			"(subgraph_wait_fd=%d, status = %d, state = %s, pollret = %d revents = 0x%x)", 
-			client->control->name,
-			client->subgraph_wait_fd, status, 
-			jack_client_state_name (client),
-			pollret, pfd[0].revents);
-	    status = 1;
-#ifdef __linux
-	}
-#endif
-    }
-
-    now = jack_get_microseconds ();
-
-    if (status != 0) {
-	VERBOSE( &engine, "at %" PRIu64
-		 " waiting on %d for %" PRIu64
-		 " usecs, status = %d sig = %" PRIu64
-		 " awa = %" PRIu64 " fin = %" PRIu64
-		 " dur=%" PRIu64,
-		 now,
-		 client->subgraph_wait_fd,
-		 now - then,
-		 status,
-		 ctl->signalled_at,
-		 ctl->awake_at,
-		 ctl->finished_at,
-		 ctl->finished_at? (ctl->finished_at -
-				    ctl->signalled_at): 0);
-
-	if( jack_engine_check_clients( engine, 1) ) {
-
-	    engine.process_errors++;
-	    return NULL;		/* will stop the loop */
-	}
-    } else {
-	engine.timeout_count = 0;
-    }
-
-
-    DEBUG ("reading byte from subgraph_wait_fd==%d",
-	   client->subgraph_wait_fd);
-
-    if (read (client->subgraph_wait_fd, &c, sizeof(c))
-	!= sizeof (c)) {
-	if (errno == EAGAIN) {
-	    jack_error ("pp: cannot clean up byte from graph wait "
-			"fd (%s) - no data present");
-	} else {
-	    jack_error ("pp: cannot clean up byte from graph wait "
-			"fd (%s)", strerror (errno));
-	    client->error++;
-	}
-	return NULL;	/* will stop the loop */
-    }
-
-    /* Move to next internal client (or end of client list) */
-    while (node) {
-	if (jack_client_is_internal ((jack_client_internal_t *)
-				     node->data)) {
-	    break;
-	}
-	node = jack_slist_next (node);
-    }
-	
-    return node;
-}
-
-#endif /* JACK_USE_MACH_THREADS */
-
-#ifdef JACK_USE_MACH_THREADS
 static vector<jack_client_internal_t*>::iterator
-jack_engine_process_external_pp( jack_engine_t & engine,
-				 vector<jack_client_internal_t*>::iterator current_iterator,
-				 vector<jack_client_internal_t*>::iterator end_marker )
+jack_engine_process_external( jack_engine_t & engine,
+			      vector<jack_client_internal_t*>::iterator current_iterator,
+			      vector<jack_client_internal_t*>::iterator end_marker )
 {
     jack_client_internal_t * client = *current_iterator;
     jack_client_control_t *ctl = client->control;
@@ -1007,9 +768,9 @@ jack_engine_process_external_pp( jack_engine_t & engine,
 }
 #else /* !JACK_USE_MACH_THREADS */
 static vector<jack_client_internal_t*>::iterator
-jack_engine_process_external_pp( jack_engine_t & engine,
-				 vector<jack_client_internal_t*>::iterator current_iterator,
-				 vector<jack_client_internal_t*>::iterator end_marker )
+jack_engine_process_external( jack_engine_t & engine,
+			      vector<jack_client_internal_t*>::iterator current_iterator,
+			      vector<jack_client_internal_t*>::iterator end_marker )
 {
     int status = 0;
     char c = 0;
@@ -1188,12 +949,6 @@ static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 
     // Can't change this until I work out how process_internal
     // and process_external update the JSList
-//    jack_client_internal_t * client;
-//    JSList * node;
-
-//    for( node = engine.clients; engine.process_errors == 0 && node; ) {
-//	client = (jack_client_internal_t *) node->data;
-
     vector<jack_client_internal_t*>::iterator current_iterator = engine.clients_vector.begin();
     vector<jack_client_internal_t*>::iterator end_marker = engine.clients_vector.end();
     for( ; engine.process_errors == 0 && current_iterator != end_marker ; ) {
@@ -1206,18 +961,15 @@ static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 	    (!ctl->process_cbset && !ctl->thread_cb_cbset) ||
 	    ctl->dead ) {
 	    ++current_iterator;
-//	    node = jack_slist_next(node);
 	} else if( jack_client_is_internal( client ) ) {
-	    current_iterator = jack_engine_process_internal_pp( engine,
+	    current_iterator = jack_engine_process_internal( engine,
 								current_iterator,
 								end_marker,
 								nframes );
-//	    node = jack_engine_process_internal( engine, node, nframes );
 	} else {
-	    current_iterator = jack_engine_process_external_pp( engine,
-								current_iterator,
-								end_marker );
-//	    node = jack_engine_process_external( engine, node );
+	    current_iterator = jack_engine_process_external( engine,
+							     current_iterator,
+							     end_marker );
 	}
     }
 
@@ -2089,7 +1841,6 @@ int jack_engine_get_fifo_fd( jack_engine_t & engine, unsigned int which_fifo )
 
 int jack_engine_rechain_graph( jack_engine_t & engine )
 {
-    JSList *node, *next;
     unsigned long n;
     int err = 0;
     jack_client_internal_t *subgraph_client, *next_client;
@@ -2106,18 +1857,12 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 
     event.type = GraphReordered;
 
-    // Take a copy of the clients_vector so our iterator isn't broken
-//    vector<jack_client_internal_t*> clients_vector_copy;
-//    vector<jack_client_internal_t*>::iterator current_iterator = clients_vector_copy.begin();
-//    vector<jack_client_internal_t*>::iterator end_marker = clients_vector_copy.end();
+    vector<jack_client_internal_t*>::iterator current_iterator = engine.clients_vector.begin();
+    vector<jack_client_internal_t*>::iterator end_marker = engine.clients_vector.end();
 
-    for (n = 0, node = engine.clients, next = NULL; node; node = next) {
-	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
-	next = jack_slist_next (node);
-
-//    for( n = 0 ; current_iterator != end_marker ; ++current_iterator ) {
-//	jack_client_internal_t * client = *current_iterator;
-//	vector<jack_client_internal_t*>::iterator next_iterator = current_iterator + 1;
+    for( n = 0 ; current_iterator != end_marker ; ++current_iterator ) {
+	jack_client_internal_t * client = *current_iterator;
+	vector<jack_client_internal_t*>::iterator next_iterator = current_iterator + 1;
                 
 	jack_client_control_t * ctl = client->control;
 
@@ -2131,26 +1876,18 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 
 	    /* find the next active client. its ok for
 	     * this to be NULL */
-	    while (next) {
-//	    while( next_iterator != end_marker ) {
-		if( client->control->active &&
-		    (client->control->process_cbset || client->control->thread_cb_cbset)) {
+	    while( next_iterator != end_marker ) {
+		if( ctl->active &&
+		    (ctl->process_cbset || ctl->thread_cb_cbset)) {
 		    break;
 		}
-		next = jack_slist_next (next);
-//		++next_iterator;
+		++next_iterator;
 	    };
 
-//	    if( next_iterator == end_marker ) {
-//		next_client = NULL;
-//	    } else {
-//		next_client = *next_iterator;
-//	    }
-	    if (next == NULL ) {
+	    if( next_iterator == end_marker ) {
 		next_client = NULL;
-	    }
-	    else {
-		next_client = (jack_client_internal_t*)next->data;
+	    } else {
+		next_client = *next_iterator;
 	    }
 
 	    client->execution_order = n;
@@ -2170,10 +1907,9 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 		    VERBOSE( &engine, "client %s: wait_fd="
 			     "%d, execution_order="
 			     "%lu.", 
-			     subgraph_client->
-			     control->name,
-			     subgraph_client->
-			     subgraph_wait_fd, n);
+			     subgraph_client->control->name,
+			     subgraph_client->subgraph_wait_fd,
+			     n);
 		    n++;
 		}
 
@@ -2206,10 +1942,9 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 		    VERBOSE( &engine, "client %s: "
 			     "start_fd=%d, execution"
 			     "_order=%lu.",
-			     subgraph_client->
-			     control->name,
-			     subgraph_client->
-			     subgraph_start_fd, n);
+			     subgraph_client->control->name,
+			     subgraph_client->subgraph_start_fd,
+			     n);
 
 		    /* this external client after
 		       this will have jackd as its
@@ -2225,8 +1960,8 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 			     "execution_order="
 			     "%lu.",
 			     ctl->name,
-			     subgraph_client->
-			     control->name, n);
+			     subgraph_client->control->name,
+			     n);
 		    subgraph_client->subgraph_wait_fd = -1;
 
 		    /* this external client after
@@ -2261,24 +1996,6 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
     VERBOSE( &engine, "-- jack_engine_rechain_graph()");
 
     return err;
-}
-
-static int jack_client_sort( jack_client_internal_t *a, jack_client_internal_t *b )
-{
-    /* drivers are forced to the front, ie considered as sources
-       rather than sinks for purposes of the sort */
-
-    if (jack_client_feeds_transitive (a, b) ||
-	(a->control->type == ClientDriver &&
-	 b->control->type != ClientDriver)) {
-	return -1;
-    } else if (jack_client_feeds_transitive (b, a) ||
-	       (b->control->type == ClientDriver &&
-		a->control->type != ClientDriver)) {
-	return 1;
-    } else {
-	return ( a < b ? -1 : ( a == b ? 0 : 1 ) );
-    }
 }
 
 struct jack_engine_clients_compare
@@ -2335,18 +2052,14 @@ void jack_engine_sort_graph( jack_engine_t & engine )
     /* called, obviously, must hold engine->client_lock */
 
     VERBOSE( &engine, "++ jack_engine_sort_graph");
-    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph presort", engine.clients_vector, engine.clients );
-    engine.clients = jack_slist_sort( engine.clients,
-				      (JCompareFunc) jack_client_sort);
 
     std::sort( engine.clients_vector.begin(), engine.clients_vector.end(), jack_engine_clients_compare() );
-    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph postsort", engine.clients_vector, engine.clients );
 
     jack_engine_compute_all_port_total_latencies( engine );
     jack_engine_compute_new_latency( engine );
     jack_engine_rechain_graph( engine );
     engine.timeout_count = 0;
-    CHECK_CLIENTS_LIST_MATCHES( "jack_engine_sort_graph postrechain", engine.clients_vector, engine.clients );
+
     VERBOSE( &engine, "-- jack_engine_sort_graph");
 }
 
@@ -2709,12 +2422,6 @@ static void jack_engine_notify_all_port_interested_clients(
  */
 void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 {
-    JSList *portnode, *connectionnode;
-    jack_client_control_t *ctl;
-    jack_port_internal_t *port;
-    jack_connection_internal_t* connection;
-    int m, o;
-	
     jack_info ("engine.c: <-- dump begins -->");
 
     if (take_lock) {
@@ -2722,8 +2429,12 @@ void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
     }
 
     int n = 0;
+    int m = 0;
+    int o = 0;
+    JSList * portnode, * connectionnode;
+
     for( jack_client_internal_t * client : engine.clients_vector ) {
-	ctl = client->control;
+	jack_client_control_t *ctl = client->control;
 
 	jack_info ("client #%d: %s (type: %d, process? %s, thread ? %s"
 		   " start=%d wait=%d",
@@ -2735,19 +2446,18 @@ void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 		   client->subgraph_start_fd,
 		   client->subgraph_wait_fd);
 
-	for(m = 0, portnode = client->ports; portnode;
-	    portnode = jack_slist_next (portnode)) {
-	    port = (jack_port_internal_t *) portnode->data;
+	for( portnode = client->ports;
+	     portnode;
+	     portnode = jack_slist_next (portnode)) {
+	    jack_port_internal_t * port = (jack_port_internal_t *) portnode->data;
 
 	    jack_info("\t port #%d: %s", ++m,
 		      port->shared->name);
 
-	    for(o = 0, connectionnode = port->connections; 
-		connectionnode; 
-		connectionnode =
-		    jack_slist_next (connectionnode)) {
-		connection = (jack_connection_internal_t *)
-		    connectionnode->data;
+	    for( connectionnode = port->connections; 
+		 connectionnode; 
+		 connectionnode = jack_slist_next (connectionnode)) {
+		jack_connection_internal_t* connection = (jack_connection_internal_t *)connectionnode->data;
 	
 		jack_info("\t\t connection #%d: %s %s",
 			  ++o,
@@ -2764,7 +2474,6 @@ void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 	jack_unlock_graph( (&engine) );
     }
 
-	
     jack_info("jack_engine.cpp: <-- dump ends -->");
 }
 
@@ -4133,7 +3842,7 @@ static void * jack_server_thread( void *arg )
 
 //	clients = jack_slist_length(engine->clients);
 	clients = engine->clients_vector.size();
-	assert( clients == jack_slist_length(engine->clients) );
+//	assert( clients == jack_slist_length(engine->clients) );
 
 	if( engine->pfd_size < fixed_fd_cnt + clients ) {
 	    if (engine->pfd) {
@@ -4439,7 +4148,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     pthread_mutex_init (&engine->request_lock, 0);
     pthread_mutex_init (&engine->problem_lock, 0);
 
-    engine->clients = 0;
+//    engine->clients = 0;
     engine->clients_vector.clear();
     engine->reserved_client_names = 0;
 

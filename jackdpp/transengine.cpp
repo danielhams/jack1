@@ -80,12 +80,8 @@ static inline void jack_sync_poll_deactivate( jack_engine_t & engine, jack_clien
  *   precondition: caller holds the graph lock. */
 static void jack_sync_poll_stop( jack_engine_t & engine )
 {
-//    JSList *node;
     long poll_count = 0;		/* count sync_poll clients */
 
-//    for (node = engine.clients; node; node = jack_slist_next (node)) {
-//	jack_client_internal_t *client =
-//	    (jack_client_internal_t *) node->data;
     for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (client->control->active_slowsync &&
 	    client->control->sync_poll) {
@@ -110,11 +106,8 @@ static void jack_sync_poll_stop( jack_engine_t & engine )
  *   precondition: caller holds the graph lock. */
 static void jack_sync_poll_start( jack_engine_t & engine )
 {
-//    JSList *node;
     long sync_count = 0;		/* count slow-sync clients */
 
-//    for (node = engine.clients; node; node = jack_slist_next (node)) {
-//	jack_client_internal_t *client = (jack_client_internal_t *) node->data;
     for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (client->control->active_slowsync) {
 	    client->control->sync_poll = 1;
@@ -258,7 +251,7 @@ void jack_transport_init( jack_engine_t & engine )
     memset (&ectl->pending_time, 0, sizeof(ectl->pending_time));
     memset (&ectl->request_time, 0, sizeof(ectl->request_time));
     ectl->prev_request = 0;
-    ectl->seq_number = 1;		/* can't start at 0 */
+//    ectl->seq_number = 1;		/* can't start at 0 */
     ectl->new_pos = 0;
     ectl->pending_pos = 0;
     ectl->pending_frame = 0;
@@ -266,6 +259,8 @@ void jack_transport_init( jack_engine_t & engine )
     ectl->sync_remain = 0;
     ectl->sync_timeout = 2000000;	/* 2 second default */
     ectl->sync_time_left = 0;
+
+    seq_number = 1;
 }
 
 /* when any client exits the graph (either dead or not active)

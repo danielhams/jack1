@@ -37,7 +37,7 @@
 #undef _POSIX_SOURCE
 #include <sys/capability.h>
 
-#include "jack/start.h"
+#include "jack/start.hpp"
 #include "md5.hpp"
 #include "jackpp_md5.hpp"
 

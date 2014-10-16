@@ -79,7 +79,7 @@
 /* capgetp and capsetp are linux only extensions, not posix */
 #undef _POSIX_SOURCE
 #include <sys/capability.h>
-#include "start.h"
+#include "start.hpp"
 
 static struct stat pipe_stat;
 
