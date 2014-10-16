@@ -1188,16 +1188,16 @@ static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 
     // Can't change this until I work out how process_internal
     // and process_external update the JSList
-    jack_client_internal_t * client;
-    JSList * node;
+//    jack_client_internal_t * client;
+//    JSList * node;
 
-    for( node = engine.clients; engine.process_errors == 0 && node; ) {
-	client = (jack_client_internal_t *) node->data;
+//    for( node = engine.clients; engine.process_errors == 0 && node; ) {
+//	client = (jack_client_internal_t *) node->data;
 
-//    vector<jack_client_internal_t*>::iterator current_iterator = engine.clients_vector.begin();
-//    vector<jack_client_internal_t*>::iterator end_marker = engine.clients_vector.end();
-//    for( ; engine.process_errors == 0 && current_iterator != end_marker ; ) {
-//	jack_client_internal_t * client = *current_iterator;
+    vector<jack_client_internal_t*>::iterator current_iterator = engine.clients_vector.begin();
+    vector<jack_client_internal_t*>::iterator end_marker = engine.clients_vector.end();
+    for( ; engine.process_errors == 0 && current_iterator != end_marker ; ) {
+	jack_client_internal_t * client = *current_iterator;
 	jack_client_control_t * ctl = client->control;
 
 	DEBUG( "considering client %s for processing", ctl->name );
@@ -1205,19 +1205,19 @@ static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 	if( !ctl->active ||
 	    (!ctl->process_cbset && !ctl->thread_cb_cbset) ||
 	    ctl->dead ) {
-//	    ++current_iterator;
-	    node = jack_slist_next(node);
+	    ++current_iterator;
+//	    node = jack_slist_next(node);
 	} else if( jack_client_is_internal( client ) ) {
-//	    current_iterator = jack_engine_process_internal_pp( engine,
-//								current_iterator,
-//								end_marker,
-//								nframes );
-	    node = jack_engine_process_internal( engine, node, nframes );
+	    current_iterator = jack_engine_process_internal_pp( engine,
+								current_iterator,
+								end_marker,
+								nframes );
+//	    node = jack_engine_process_internal( engine, node, nframes );
 	} else {
-//	    current_iterator = jack_engine_process_external_pp( engine,
-//								current_iterator,
-//								end_marker );
-	    node = jack_engine_process_external( engine, node );
+	    current_iterator = jack_engine_process_external_pp( engine,
+								current_iterator,
+								end_marker );
+//	    node = jack_engine_process_external( engine, node );
 	}
     }
 
@@ -2117,8 +2117,10 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 
 //    for( n = 0 ; current_iterator != end_marker ; ++current_iterator ) {
 //	jack_client_internal_t * client = *current_iterator;
-	jack_client_control_t * ctl = client->control;
+//	vector<jack_client_internal_t*>::iterator next_iterator = current_iterator + 1;
                 
+	jack_client_control_t * ctl = client->control;
+
 	if (!ctl->process_cbset && !ctl->thread_cb_cbset) {
 	    continue;
 	}
@@ -2130,12 +2132,9 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 	    /* find the next active client. its ok for
 	     * this to be NULL */
 	    while (next) {
-//	    vector<jack_client_internal_t*>::iterator next_iterator = current_iterator;
 //	    while( next_iterator != end_marker ) {
-//		next_client = *next_iterator;
-//		if( next_client->control->active &&
-//		    (next_client->control->process_cbset || next_client->control->thread_cb_cbset)) {
-		if (client->control->active && (client->control->process_cbset || client->control->thread_cb_cbset)) {
+		if( client->control->active &&
+		    (client->control->process_cbset || client->control->thread_cb_cbset)) {
 		    break;
 		}
 		next = jack_slist_next (next);
