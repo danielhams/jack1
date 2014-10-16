@@ -121,6 +121,7 @@ dnl about any nonsense that configure generates
 dnl 
 
 ORIGINAL_CFLAGS="$CFLAGS"
+ORIGINAL_CXXFLAGS="$CXXFLAGS"
 
 dnl Macros dir containing boost detection
 AC_CONFIG_MACRO_DIR([macros])
@@ -129,7 +130,6 @@ AC_ENABLE_STATIC(no)
 AC_ENABLE_SHARED(yes)
 AC_PROG_CC
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX_14(noext,mandatory)
 AC_PROG_LD
 AM_PROG_LIBTOOL
 AC_PROG_LN_S
@@ -143,6 +143,8 @@ dnl while looking for a compiler
 dnl
 
 CFLAGS="$ORIGINAL_CFLAGS"
+CXXFLAGS="$ORIGINAL_CXXFLAGS"
+AX_CXX_COMPILE_STDCXX_14(noext,mandatory)
 
 AC_MSG_CHECKING([platform dependencies])
 
