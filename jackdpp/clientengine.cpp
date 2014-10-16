@@ -96,7 +96,7 @@ int jack_engine_client_do_deactivate( jack_engine_t &engine,
 
     client->control->active = FALSE;
 
-    jack_transport_client_exit( &engine, client );
+    jack_transport_client_exit( engine, client );
 
     if( !jack_client_is_internal(client) &&
 	engine.external_client_cnt > 0) {
@@ -234,30 +234,33 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 	close (client->request_fd);
     }
 
-    VERBOSE( &engine, "before: client list contains %d", jack_slist_length (engine.clients));
+    VERBOSE( &engine, "before: client list contains %d", jack_slist_length(engine.clients) );
+    VERBOSE( &engine, "before: client vector contains %d",engine.clients_vector.size() );
+
+    auto cFinder = std::find_if( engine.clients_vector.begin(), engine.clients_vector.end(),
+				 [&client] ( jack_client_internal_t * ic ) {
+				     return jack_uuid_compare( ic->control->uuid, client->control->uuid ) == 0;
+				 } );
+
+    if( cFinder != engine.clients_vector.end() ) {
+	engine.clients_vector.erase( cFinder );
+	VERBOSE( &engine, "Found and removed from client vector via matching UUID" );
+    }
 
     for( node = engine.clients; node; node = jack_slist_next(node) ) {
 	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, client->control->uuid) == 0) {
 	    engine.clients = jack_slist_remove_link( engine.clients, node );
 	    jack_slist_free_1(node);
 
-	    auto cFinder = std::find_if( engine.clients_vector.begin(), engine.clients_vector.end(), 
-					 [&client] ( jack_client_internal_t * ic ) {
-					     return jack_uuid_compare( ic->control->uuid, client->control->uuid ) == 0;
-					 } );
-
-	    if( cFinder != engine.clients_vector.end() ) {
-		engine.clients_vector.erase( cFinder );
-	    }
-
-	    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
-
 	    VERBOSE( &engine, "removed from client list, via matching UUID");
 	    break;
 	}
     }
 
+    CHECK_CLIENTS_LIST_MATCHES( __FUNCTION__, engine.clients_vector, engine.clients );
+
     VERBOSE( &engine, "after: client list contains %d", jack_slist_length (engine.clients));
+    VERBOSE( &engine, "after: client vector contains %d", engine.clients_vector.size() );
 
     jack_engine_client_delete( engine, client );
 
@@ -994,7 +997,7 @@ int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
     {
 	client->control->active = TRUE;
 
-	jack_transport_activate( &engine, client );
+	jack_transport_activate( engine, client );
 
 	/* we call this to make sure the FIFO is
 	 * built+ready by the time the client needs
@@ -1002,8 +1005,7 @@ int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
 	 * this point.
 	 */
 
-	jack_engine_get_fifo_fd( engine,
-				 ++engine.external_client_cnt);
+	jack_engine_get_fifo_fd( engine, ++engine.external_client_cnt);
 	jack_engine_sort_graph( engine );
 
 

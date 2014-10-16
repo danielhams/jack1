@@ -1049,9 +1049,9 @@ static void jack_engine_calc_cpu_load( jack_engine_t & engine )
 		     engine.driver->period_usecs)) * 50.0f
 	    + (engine.control->cpu_load * 0.5f);
 
-	VERBOSE( &engine, "load = %.4f max usecs: %.3f, "
-		 "spare = %.3f", engine.control->cpu_load,
-		 max_usecs, engine.spare_usecs);
+//	VERBOSE( &engine, "load = %.4f max usecs: %.3f, "
+//		 "spare = %.3f", engine.control->cpu_load,
+//		 max_usecs, engine.spare_usecs);
     }
 
 }
@@ -1060,7 +1060,7 @@ static void jack_engine_post_process( jack_engine_t & engine )
 {
     /* precondition: caller holds the graph lock. */
 
-    jack_transport_cycle_end( &engine );
+    jack_transport_cycle_end( engine );
     jack_engine_calc_cpu_load( engine );
     jack_engine_check_clients( engine, 0 );
 }
@@ -3608,28 +3608,25 @@ static void jack_engine_do_request( jack_engine_t & engine, jack_request_t *req,
 	    break;
 
 	case SetTimeBaseClient:
-	    req->status = jack_timebase_set( &engine,
+	    req->status = jack_timebase_set( engine,
 					     req->x.timebase.client_id,
 					     req->x.timebase.conditional);
 	    break;
 
 	case ResetTimeBaseClient:
-	    req->status = jack_timebase_reset( &engine, req->x.client_id);
+	    req->status = jack_timebase_reset( engine, req->x.client_id);
 	    break;
 
 	case SetSyncClient:
-	    req->status = jack_transport_client_set_sync( &engine,
-						req->x.client_id);
+	    req->status = jack_transport_client_set_sync( engine, req->x.client_id);
 	    break;
 
 	case ResetSyncClient:
-	    req->status = jack_transport_client_reset_sync( &engine,
-						  req->x.client_id);
+	    req->status = jack_transport_client_reset_sync( engine, req->x.client_id);
 	    break;
 
 	case SetSyncTimeout:
-	    req->status = jack_transport_set_sync_timeout( &engine,
-							   req->x.timeout);
+	    req->status = jack_transport_set_sync_timeout( engine, req->x.timeout);
 	    break;
 
 #ifdef USE_CAPABILITIES
@@ -4336,7 +4333,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     engine->first_wakeup = 1;
 
     engine->control->buffer_size = 0;
-    jack_transport_init( engine.get() );
+    jack_transport_init( *engine );
     jack_engine_set_sample_rate( engine.get(), 0 );
     engine->control->internal = 0;
 
