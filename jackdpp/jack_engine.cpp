@@ -121,7 +121,7 @@ static void jack_engine_compute_all_port_total_latencies( jack_engine_t & engine
 static void jack_engine_compute_port_total_latency( jack_engine_t & engine, jack_port_shared_t* );
 static int jack_engine_check_client_status( jack_engine_t & engine );
 static int jack_engine_do_session_notify( jack_engine_t & engine, jack_request_t *req, int reply_fd );
-static void jack_engine_do_get_client_by_uuid( jack_engine_t & engine, jack_request_t *req);
+static void jack_engine_client_fill_request_port_name_by_uuid( jack_engine_t & engine, jack_request_t *req);
 static void jack_engine_do_get_uuid_by_client_name( jack_engine_t & engine, jack_request_t *req );
 static void jack_engine_do_reserve_name( jack_engine_t & engine, jack_request_t *req );
 static void jack_engine_do_session_reply( jack_engine_t & engine, jack_request_t *req );
@@ -529,13 +529,17 @@ int jack_engine_deliver_event(
 
 static void jack_engine_deliver_event_to_all( jack_engine_t & engine, jack_event_t *event )
 {
-    JSList *node;
+//    JSList *node;
 
     jack_rdlock_graph( (&engine) );
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_engine_deliver_event( engine,
+//				   (jack_client_internal_t *) node->data,
+//				   event);
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	jack_engine_deliver_event( engine,
-				   (jack_client_internal_t *) node->data,
-				   event);
+				   client,
+				   event );
     }
     jack_unlock_graph( (&engine) );
 }
@@ -718,7 +722,7 @@ static JSList * jack_engine_process_internal(
 
 static int jack_engine_check_client_status( jack_engine_t & engine )
 {
-    JSList *node;
+//    JSList *node;
     int err = 0;
 
     /* we are already late, or something else went wrong,
@@ -726,9 +730,9 @@ static int jack_engine_check_client_status( jack_engine_t & engine )
        clients.
     */
 	
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-	jack_client_internal_t *client = (jack_client_internal_t *) node->data;
-		
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (client->control->type == ClientExternal) {
 	    if (kill (client->control->pid, 0)) {
 		VERBOSE( &engine,
@@ -948,23 +952,30 @@ static JSList * jack_engine_process_external( jack_engine_t & engine, JSList *no
 static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 {
     /* precondition: caller has graph_lock */
-    jack_client_internal_t *client;
-    JSList *node;
 
     engine.process_errors = 0;
 
-    for( node = engine.clients; node; node = jack_slist_next (node)) {
-	jack_client_control_t *ctl =
-	    ((jack_client_internal_t *) node->data)->control;
+//    for( node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_control_t *ctl =
+//	    ((jack_client_internal_t *) node->data)->control;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
+	jack_client_control_t * ctl = client->control;
 	ctl->state = NotTriggered;
 	ctl->timed_out = 0;
 	ctl->awake_at = 0;
 	ctl->finished_at = 0;
     }
 
+    // Can't change this until I work out how process_internal
+    // and process_external update the JSList
+    jack_client_internal_t *client;
+    JSList *node;
     for( node = engine.clients; engine.process_errors == 0 && node; ) {
-
 	client = (jack_client_internal_t *) node->data;
+//    for( auto cIter = engine.clients_vector.begin(), end = engine.clients_vector.end() ;
+//	 engine.process_errors == 0 && cIter != end ;
+//	 ++cIter ) {
+//	jack_client_internal_t * client = *cIter;
 		
 	DEBUG ("considering client %s for processing",
 	       client->control->name);
@@ -1526,8 +1537,8 @@ void jack_engine_property_change_notify( jack_engine_t & engine,
 					 const char* key )
 {
     jack_event_t event;
-    jack_client_internal_t *client;
-    JSList *node;
+//    jack_client_internal_t *client;
+//    JSList *node;
 
     event.type = PropertyChange;
     event.z.property_change = change;
@@ -1539,10 +1550,9 @@ void jack_engine_property_change_notify( jack_engine_t & engine,
 	event.y.key_size = 0;
     }
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-		
-	client = (jack_client_internal_t *) node->data;
-
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	client = (jack_client_internal_t *) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (!client->control->active) {
 	    continue;
 	}
@@ -1592,16 +1602,15 @@ void jack_engine_port_registration_notify(
     jack_port_id_t port_id, int yn)
 {
     jack_event_t event;
-    jack_client_internal_t *client;
-    JSList *node;
+//    jack_client_internal_t *client;
+//    JSList *node;
 
     event.type = (yn ? PortRegistered : PortUnregistered);
     event.x.port_id = port_id;
 	
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-		
-	client = (jack_client_internal_t *) node->data;
-
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	client = (jack_client_internal_t *) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (!client->control->active) {
 	    continue;
 	}
@@ -2439,7 +2448,7 @@ static void jack_engine_notify_all_port_interested_clients(
     jack_port_id_t b,
     int connected )
 {
-    JSList *node;
+//    JSList *node;
     jack_event_t event;
   
     event.type = (connected ? PortConnected : PortDisconnected);
@@ -2452,9 +2461,10 @@ static void jack_engine_notify_all_port_interested_clients(
     jack_client_internal_t* src_client = jack_engine_client_internal_by_id( engine, src);
     jack_client_internal_t* dst_client = jack_engine_client_internal_by_id( engine, dst);
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
-	if (src_client != client &&  dst_client  != client && client->control->port_connect_cbset != FALSE) {
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
+	if (src_client != client && dst_client != client && client->control->port_connect_cbset != FALSE) {
 			
 	    /* one of the ports belong to this client or it has a port connect callback */
 	    jack_engine_deliver_event( engine, client, &event);
@@ -2467,12 +2477,13 @@ static void jack_engine_notify_all_port_interested_clients(
  */
 void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 {
-    JSList *clientnode, *portnode, *connectionnode;
-    jack_client_internal_t *client;
+//    JSList *clientnode;
+    JSList *portnode, *connectionnode;
+//    jack_client_internal_t *client;
     jack_client_control_t *ctl;
     jack_port_internal_t *port;
     jack_connection_internal_t* connection;
-    int n, m, o;
+    int m, o;
 	
     jack_info ("engine.c: <-- dump begins -->");
 
@@ -2480,9 +2491,11 @@ void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 	jack_rdlock_graph( (&engine) );
     }
 
-    for (n = 0, clientnode = engine.clients; clientnode;
-	 clientnode = jack_slist_next (clientnode)) {
-	client = (jack_client_internal_t *) clientnode->data;
+    int n = 0;
+//    for (n = 0, clientnode = engine.clients; clientnode;
+//	 clientnode = jack_slist_next (clientnode)) {
+//	client = (jack_client_internal_t *) clientnode->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	ctl = client->control;
 
 	jack_info ("client #%d: %s (type: %d, process? %s, thread ? %s"
@@ -2757,7 +2770,9 @@ static int jack_engine_port_do_disconnect_all( jack_engine_t & engine,
  */
 static void jack_engine_check_acyclic( jack_engine_t & engine )
 {
-    JSList *srcnode, *dstnode, *portnode, *connnode;
+//    JSList *srcnode;
+    JSList *dstnode;
+    JSList *portnode, *connnode;
     jack_client_internal_t *src, *dst;
     jack_port_internal_t *port;
     jack_connection_internal_t *conn;
@@ -2766,10 +2781,12 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 
     VERBOSE( &engine, "checking for graph become acyclic");
 
-    for (srcnode = engine.clients; srcnode;
-	 srcnode = jack_slist_next (srcnode)) {
-
-	src = (jack_client_internal_t *) srcnode->data;
+//    for (srcnode = engine.clients; srcnode;
+//	 srcnode = jack_slist_next (srcnode)) {
+//	src = (jack_client_internal_t *) srcnode->data;
+    for( auto cvIter = engine.clients_vector.begin(), end = engine.clients_vector.end() ;
+	 cvIter != end ; ++cvIter ) {
+	src = *cvIter;
 	src->tfedcount = src->fedcount;
 	unsortedclients++;
     }
@@ -2781,10 +2798,12 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 	
 	stuck = TRUE;
 
-	for (srcnode = engine.clients; srcnode;
-	     srcnode = jack_slist_next (srcnode)) {
-
-	    src = (jack_client_internal_t *) srcnode->data;
+//	for (srcnode = engine.clients; srcnode;
+//	     srcnode = jack_slist_next (srcnode)) {
+//	    src = (jack_client_internal_t *) srcnode->data;
+	for( auto cvIter = engine.clients_vector.begin(), end = engine.clients_vector.end() ;
+	     cvIter != end ; ++cvIter ) {
+	    src = *cvIter;
 			
 	    if (!src->tfedcount) {
 			
@@ -2792,11 +2811,9 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 		unsortedclients--;
 		src->tfedcount = -1;
 				
-		for (dstnode = src->truefeeds; dstnode;
+		for( dstnode = src->truefeeds; dstnode;
 		     dstnode = jack_slist_next (dstnode)) {
-				     
-		    dst = (jack_client_internal_t *)
-			dstnode->data;
+		    dst = (jack_client_internal_t *)dstnode->data;
 		    dst->tfedcount--;
 		}
 	    }
@@ -2811,10 +2828,12 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 	VERBOSE( &engine, "graph has become acyclic");
 
 	/* turn feedback connections around in sortfeeds */
-	for (srcnode = engine.clients; srcnode;
-	     srcnode = jack_slist_next (srcnode)) {
-
-	    src = (jack_client_internal_t *) srcnode->data;
+//	for (srcnode = engine.clients; srcnode;
+//	     srcnode = jack_slist_next (srcnode)) {
+//	    src = (jack_client_internal_t *) srcnode->data;
+	for( auto cvIter = engine.clients_vector.begin(), end = engine.clients_vector.end() ;
+	     cvIter != end ; ++cvIter ) {
+	    src = *cvIter;
 
 	    for (portnode = src->ports; portnode;
 		 portnode = jack_slist_next (portnode)) {
@@ -2902,15 +2921,24 @@ int jack_engine_do_get_port_connections( jack_engine_t & engine, jack_request_t 
     req->status = 0;
 
     /* figure out if this is an internal or external client */
-
+    /*
     for (node = engine.clients; node; node = jack_slist_next (node)) {
-		
 	if (((jack_client_internal_t *) node->data)->request_fd
 	    == reply_fd) {
 	    internal = jack_client_is_internal(
 		(jack_client_internal_t *) node->data);
 	    break;
 	}
+    }
+    */
+    auto iFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&reply_fd] ( jack_client_internal_t * client ) {
+				     return client->request_fd == reply_fd;
+				 } );
+
+    if( iFinder != engine.clients_vector.end() ) {
+	internal = jack_client_is_internal( *iFinder );
     }
 
     if (!internal) {
@@ -3099,8 +3127,8 @@ int jack_engine_set_buffer_size_request( jack_engine_t & engine, jack_nframes_t 
 
 static void jack_engine_compute_new_latency( jack_engine_t & engine )
 {
-    JSList *node;
-    JSList *reverse_list = NULL;
+//    JSList *node;
+//    JSList *reverse_list = NULL;
     jack_event_t event;
 
     VALGRIND_MEMSET (&event, 0, sizeof (event));
@@ -3112,10 +3140,10 @@ static void jack_engine_compute_new_latency( jack_engine_t & engine )
      * capture latency callback.
      * also builds up list in reverse graph order.
      */
-    for (node = engine.clients; node; node = jack_slist_next(node)) {
-
-	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
-	reverse_list = jack_slist_prepend (reverse_list, client);
+//    for (node = engine.clients; node; node = jack_slist_next(node)) {
+//	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
+//	reverse_list = jack_slist_prepend (reverse_list, client);
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	jack_engine_deliver_event( engine, client, &event);
     }
 
@@ -3126,8 +3154,11 @@ static void jack_engine_compute_new_latency( jack_engine_t & engine )
     /* now issue playback latency callbacks in reverse graphorder
      */
     event.x.n  = 1;
-    for (node = reverse_list; node; node = jack_slist_next(node)) {
-	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
+//    for (node = reverse_list; node; node = jack_slist_next(node)) {
+//	jack_client_internal_t* client = (jack_client_internal_t *) node->data;
+    for( auto rcIter = engine.clients_vector.rbegin(), end = engine.clients_vector.rend() ;
+	 rcIter != end ; ++rcIter ) {
+	jack_client_internal_t * client = *rcIter;
 	jack_engine_deliver_event( engine, client, &event);
     }
 
@@ -3135,7 +3166,7 @@ static void jack_engine_compute_new_latency( jack_engine_t & engine )
 	jack_engine_deliver_event( engine, engine.driver->internal_client, &event);
     }
 
-    jack_slist_free (reverse_list);
+//    jack_slist_free (reverse_list);
 }
 
 static jack_nframes_t jack_engine_get_port_total_latency(
@@ -3273,8 +3304,9 @@ static void jack_engine_compute_all_port_total_latencies( jack_engine_t & engine
     }
 }
 
-static void jack_engine_do_get_client_by_uuid( jack_engine_t & engine, jack_request_t *req )
+static void jack_engine_client_fill_request_port_name_by_uuid( jack_engine_t & engine, jack_request_t *req )
 {
+    /*
     JSList *node;
     req->status = -1;
     for (node = engine.clients; node; node = jack_slist_next (node)) {
@@ -3285,12 +3317,27 @@ static void jack_engine_do_get_client_by_uuid( jack_engine_t & engine, jack_requ
 	    return;
 	}
     }
+    */
+    auto cFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&req] ( jack_client_internal_t * client ) {
+				     return jack_uuid_compare( client->control->uuid, req->x.client_id ) == 0;
+				 } );
+
+    if( cFinder != engine.clients_vector.end() ) {
+	jack_client_internal_t * client = *cFinder;
+	snprintf( req->x.port_info.name, sizeof(req->x.port_info.name), "%s", client->control->name );
+	req->status = 0;
+    }
+    else {
+	req->status = -1;
+    }
 }
 
 static void jack_engine_do_get_uuid_by_client_name( jack_engine_t & engine, jack_request_t *req )
 {
-    JSList *node;
-    req->status = -1;
+//    JSList *node;
+//    req->status = -1;
 
     if (strcmp (req->x.name, "system") == 0) {
 	/* request concerns the driver */
@@ -3298,9 +3345,13 @@ static void jack_engine_do_get_uuid_by_client_name( jack_engine_t & engine, jack
 	    jack_uuid_copy (&req->x.client_id, engine.driver->internal_client->control->uuid);
 	    req->status = 0;
 	}
+	else {
+	    req->status = -1;
+	}
 	return;
     }
-        
+
+    /*
     for (node = engine.clients; node; node = jack_slist_next (node)) {
 	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
 	if (strcmp ((const char *)client->control->name, req->x.name) == 0) {
@@ -3309,11 +3360,28 @@ static void jack_engine_do_get_uuid_by_client_name( jack_engine_t & engine, jack
 	    return;
 	}
     }
+    */
+
+    auto cFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&req] ( jack_client_internal_t * client ) {
+				     return strcmp( (const char*)client->control->name, req->x.name ) == 0;
+				 } );
+
+    if( cFinder != engine.clients_vector.end() ) {
+	jack_client_internal_t * client = *cFinder;
+	jack_uuid_copy( &req->x.client_id, client->control->uuid );
+	req->status = 0;
+    }
+    else {
+	req->status = -1;
+    }
 }
 
 static void jack_engine_do_reserve_name( jack_engine_t & engine, jack_request_t *req )
 {
     jack_reserved_name_t *reservation;
+    /*
     JSList *node;
     // check is name is free...
     for (node = engine.clients; node; node = jack_slist_next (node)) {
@@ -3322,6 +3390,17 @@ static void jack_engine_do_reserve_name( jack_engine_t & engine, jack_request_t 
 	    req->status = -1;
 	    return;
 	}
+    }
+    */
+    auto nFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&req] ( jack_client_internal_t * client ) {
+				     return !strcmp( (char*)client->control->name, req->x.reservename.name );
+				 } );
+
+    if( nFinder != engine.clients_vector.end() ) {
+	req->status = -1;
+	return;
     }
 
     reservation = (jack_reserved_name_t*)malloc (sizeof (jack_reserved_name_t));
@@ -3375,7 +3454,7 @@ static int jack_engine_send_session_reply( jack_engine_t & engine, jack_client_i
 
 static int jack_engine_do_session_notify( jack_engine_t & engine, jack_request_t *req, int reply_fd )
 {
-    JSList *node;
+//    JSList *node;
     jack_event_t event;
   
     int reply;
@@ -3404,8 +3483,9 @@ static int jack_engine_do_session_notify( jack_engine_t & engine, jack_request_t
 	goto send_final;
     }
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_internal_t* client = (jack_client_internal_t*) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (client->control->session_cbset) {
 
 	    // in case we only want to send to a special client.
@@ -3426,7 +3506,7 @@ static int jack_engine_do_session_notify( jack_engine_t & engine, jack_request_t
 			    event.x.name, client->control->name, strerror (errno));
 		break;
 	    }
-	    reply = jack_engine_deliver_event( engine, client, &event);
+	    reply = jack_engine_deliver_event( engine, client, &event );
 
 	    if (reply == 1) {
 		// delayed reply
@@ -3696,7 +3776,7 @@ static void jack_engine_do_request( jack_engine_t & engine, jack_request_t *req,
 
 	case GetClientByUUID:
 	    jack_rdlock_graph( (&engine) );
-	    jack_engine_do_get_client_by_uuid( engine, req );
+	    jack_engine_client_fill_request_port_name_by_uuid( engine, req );
 	    jack_unlock_graph( (&engine) );
 	    break;
 	case GetUUIDByClientName:
@@ -3750,27 +3830,40 @@ int internal_client_request( void * ptr, jack_request_t * request )
     return request->status;
 }
 
-static int handle_external_client_request (jack_engine_t *engine, int fd)
+static int handle_external_client_request( jack_engine_t * engine, int fd )
 {
     /* CALLER holds read lock on graph */
 
     jack_request_t req;
     jack_client_internal_t *client = 0;
     int reply_fd;
-    JSList *node;
+//    JSList *node;
     ssize_t r;
 
-    for (node = engine->clients; node; node = jack_slist_next (node)) {
-	if (((jack_client_internal_t *) node->data)->request_fd == fd) {
-	    client = (jack_client_internal_t *) node->data;
-	    break;
-	}
-    }
+    auto cFinder = std::find_if( engine->clients_vector.begin(),
+				 engine->clients_vector.end(),
+				 [&fd] ( jack_client_internal_t * client ) {
+				     return client->request_fd == fd;
+				 } );
 
-    if (client == NULL) {
-	jack_error ("client input on unknown fd %d!", fd);
+    if( cFinder == engine->clients_vector.end() ) {
+	jack_error( "Client input on unknown fd %d!", fd );
 	return -1;
     }
+
+    client = *cFinder;
+
+    // for (node = engine->clients; node; node = jack_slist_next (node)) {
+    // 	if (((jack_client_internal_t *) node->data)->request_fd == fd) {
+    // 	    client = (jack_client_internal_t *) node->data;
+    // 	    break;
+    // 	}
+    // }
+
+    // if (client == NULL) {
+    // 	jack_error ("client input on unknown fd %d!", fd);
+    // 	return -1;
+    // }
 
     if ((r = read (client->request_fd, &req, sizeof (req)))
 	< (ssize_t) sizeof (req)) {
@@ -3867,9 +3960,9 @@ static int handle_client_ack_connection (jack_engine_t *engine, int client_fd)
     return 0;
 }
 
-static void * jack_server_thread (void *arg)
+static void * jack_server_thread( void *arg )
 {
-    jack_engine_t *engine = (jack_engine_t *) arg;
+    jack_engine_t *engine = (jack_engine_t *)arg;
     struct sockaddr_un client_addr;
     socklen_t client_addrlen;
     int problemsProblemsPROBLEMS = 0;
@@ -3880,20 +3973,21 @@ static void * jack_server_thread (void *arg)
     int stop_freewheeling;
 
     while (!done) {
-	JSList* node;
-	int clients;
+//	JSList* node;
+	size_t clients;
 
 	jack_rdlock_graph (engine);
 
-	clients = jack_slist_length (engine->clients);
+//	clients = jack_slist_length(engine->clients);
+	clients = engine->clients_vector.size();
+	assert( clients == jack_slist_length(engine->clients) );
 
-	if ((ssize_t)engine->pfd_size < fixed_fd_cnt + clients) {
+	if( engine->pfd_size < fixed_fd_cnt + clients ) {
 	    if (engine->pfd) {
 		free (engine->pfd);
 	    }
                         
-	    engine->pfd = (struct pollfd *) malloc(sizeof(struct pollfd) *
-						   (fixed_fd_cnt + clients));
+	    engine->pfd = (struct pollfd *)malloc(sizeof(struct pollfd) * (fixed_fd_cnt + clients));
 				
 	    if (engine->pfd == NULL) {
 		/*
@@ -3921,9 +4015,9 @@ static void * jack_server_thread (void *arg)
 	engine->pfd[2].events = POLLIN|POLLERR;
 	engine->pfd_max = fixed_fd_cnt;
 		
-	for (node = engine->clients; node; node = node->next) {
-
-	    jack_client_internal_t* client = (jack_client_internal_t*)(node->data);
+//	for (node = engine->clients; node; node = node->next) {
+//	    jack_client_internal_t* client = (jack_client_internal_t*)(node->data);
+	for( jack_client_internal_t * client : engine->clients_vector ) {
 
 	    if (client->request_fd < 0 || client->error >= JACK_ERROR_WITH_SOCKETS) {
 		continue;
@@ -4193,6 +4287,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     pthread_mutex_init (&engine->problem_lock, 0);
 
     engine->clients = 0;
+    engine->clients_vector.clear();
     engine->reserved_client_names = 0;
 
     engine->pfd_size = 0;
@@ -4683,17 +4778,27 @@ void jack_engine_signal_problems( jack_engine_t & engine )
 jack_client_internal_t * jack_engine_client_by_name( jack_engine_t & engine, const char *name )
 {
     jack_client_internal_t *client = NULL;
-    JSList *node;
+//    JSList *node;
 
     jack_rdlock_graph( (&engine) );
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-	if (strcmp ((const char *) ((jack_client_internal_t *)
-				    node->data)->control->name,
-		    name) == 0) {
-	    client = (jack_client_internal_t *) node->data;
-	    break;
-	}
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	if (strcmp ((const char *) ((jack_client_internal_t *)
+//				    node->data)->control->name,
+//		    name) == 0) {
+//	    client = (jack_client_internal_t *) node->data;
+//	    break;
+//	}
+//    }
+    auto cFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&name] ( jack_client_internal_t * client ) {
+				     return strcmp( (const char *)client->control->name,
+						    name ) == 0;
+				 } );
+
+    if( cFinder != engine.clients_vector.end() ) {
+	client = *cFinder;
     }
 
     jack_unlock_graph( (&engine) );
@@ -4702,17 +4807,25 @@ jack_client_internal_t * jack_engine_client_by_name( jack_engine_t & engine, con
 
 jack_client_internal_t * jack_engine_client_internal_by_id( jack_engine_t & engine, jack_uuid_t id )
 {
-    jack_client_internal_t *client = NULL;
-    JSList *node;
+    jack_client_internal_t * client = NULL;
+//    JSList *node;
 
     /* call tree ***MUST HOLD*** the graph lock */
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, id) == 0) {
+//	    client = (jack_client_internal_t *) node->data;
+//	    break;
+//	}
+//    }
+    auto cFinder = std::find_if( engine.clients_vector.begin(),
+				 engine.clients_vector.end(),
+				 [&id] ( jack_client_internal_t * client ) {
+				     return jack_uuid_compare( client->control->uuid, id) == 0;
+				 } );
 
-	if (jack_uuid_compare (((jack_client_internal_t *) node->data)->control->uuid, id) == 0) {
-	    client = (jack_client_internal_t *) node->data;
-	    break;
-	}
+    if( cFinder != engine.clients_vector.end() ) {
+	client = *cFinder;
     }
 
     return client;

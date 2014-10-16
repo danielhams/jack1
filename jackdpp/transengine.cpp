@@ -80,12 +80,13 @@ static inline void jack_sync_poll_deactivate( jack_engine_t & engine, jack_clien
  *   precondition: caller holds the graph lock. */
 static void jack_sync_poll_stop( jack_engine_t & engine )
 {
-    JSList *node;
+//    JSList *node;
     long poll_count = 0;		/* count sync_poll clients */
 
-    for (node = engine.clients; node; node = jack_slist_next (node)) {
-	jack_client_internal_t *client =
-	    (jack_client_internal_t *) node->data;
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_internal_t *client =
+//	    (jack_client_internal_t *) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
 	if (client->control->active_slowsync &&
 	    client->control->sync_poll) {
 	    client->control->sync_poll = 0;
@@ -109,25 +110,25 @@ static void jack_sync_poll_stop( jack_engine_t & engine )
  *   precondition: caller holds the graph lock. */
 static void jack_sync_poll_start( jack_engine_t & engine )
 {
-	JSList *node;
-	long sync_count = 0;		/* count slow-sync clients */
+//    JSList *node;
+    long sync_count = 0;		/* count slow-sync clients */
 
-	for (node = engine.clients; node; node = jack_slist_next (node)) {
-		jack_client_internal_t *client =
-			(jack_client_internal_t *) node->data;
-		if (client->control->active_slowsync) {
-			client->control->sync_poll = 1;
-			sync_count++;
-		}
+//    for (node = engine.clients; node; node = jack_slist_next (node)) {
+//	jack_client_internal_t *client = (jack_client_internal_t *) node->data;
+    for( jack_client_internal_t * client : engine.clients_vector ) {
+	if (client->control->active_slowsync) {
+	    client->control->sync_poll = 1;
+	    sync_count++;
 	}
+    }
 
-	//JOQ: check invariant for debugging...
-	assert (sync_count == engine.control->sync_clients);
-	engine.control->sync_remain = sync_count;
-	engine.control->sync_time_left = engine.control->sync_timeout;
-	VERBOSE( &engine, "transport Starting, sync poll of %" PRIu32
-		 " clients for %8.6f secs", engine.control->sync_remain,
-		 (double) (engine.control->sync_time_left / 1000000.0));
+    //JOQ: check invariant for debugging...
+    assert (sync_count == engine.control->sync_clients);
+    engine.control->sync_remain = sync_count;
+    engine.control->sync_time_left = engine.control->sync_timeout;
+    VERBOSE( &engine, "transport Starting, sync poll of %" PRIu32
+	     " clients for %8.6f secs", engine.control->sync_remain,
+	     (double) (engine.control->sync_time_left / 1000000.0));
 }
 
 /* check for sync timeout */
