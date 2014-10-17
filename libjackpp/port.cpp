@@ -193,8 +193,8 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
     port->shared = shared;
     port->type_info = &client->engine->port_types[ptid];
     pthread_mutex_init (&port->connection_lock, NULL);
-    port->connections = 0;
-//    port->connections_vector.clear();
+//    port->connections = 0;
+    port->connections_vector.clear();
     port->tied = NULL;
 
     if (jack_uuid_compare (client->control->uuid, port->shared->client_id) == 0) {
@@ -312,8 +312,8 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 int
 jack_port_connected (const jack_port_t *port)
 {
-//    return port->connections_vector.size() > 0;
-    return jack_slist_length (port->connections);
+    return port->connections_vector.size() > 0;
+//    return jack_slist_length (port->connections);
 }
 
 int
@@ -331,9 +331,9 @@ jack_port_connected_to (const jack_port_t *port, const char *portname)
 
     pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
-//    for( jack_port_t * other_port : port->connections_vector ) {
-    for (node = port->connections; node; node = jack_slist_next (node)) {
-	jack_port_t *other_port = (jack_port_t *) node->data;
+    for( jack_port_t * other_port : port->connections_vector ) {
+//    for (node = port->connections; node; node = jack_slist_next (node)) {
+//	jack_port_t *other_port = (jack_port_t *) node->data;
 	if (jack_port_name_equals (other_port->shared, portname)) {
 	    ret = TRUE;
 	    break;
@@ -360,19 +360,23 @@ jack_port_get_connections (const jack_port_t *port)
 
     pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
-//    uint32_t num_port_connections = port->connections_vector.size();
-    if (port->connections != NULL) {
+    uint32_t num_port_connections = port->connections_vector.size();
 
-	ret = (const char **)malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
+    if( num_port_connections > 0 ) {
+
+	ret = (const char **)malloc (sizeof (char *) * (num_port_connections + 1));
 	if (ret == NULL) {
 	    pthread_mutex_unlock (&((jack_port_t *)port)->connection_lock);
 	    return NULL;
 	}
 
 //	for( jack_port_t * other_port : port->connections_vector ) {
-	for (n = 0, node = port->connections; node;
-	     node = jack_slist_next (node), ++n) {
-	    jack_port_t* other =(jack_port_t *) node->data;
+	vector<jack_port_t*>::const_iterator pc_iter = port->connections_vector.begin();
+	vector<jack_port_t*>::const_iterator pc_end = port->connections_vector.end();
+	for( n = 0 ; pc_iter != pc_end ; ++pc_iter, ++n ) {
+	    jack_port_t * other = *pc_iter;
+//	for (n = 0, node = port->connections; node; node = jack_slist_next (node), ++n) {
+//	    jack_port_t* other = (jack_port_t *)node->data;
 	    ret[n] = other->shared->name;
 	}
 	ret[n] = NULL;
@@ -585,9 +589,9 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
        made/broken during this phase (enforced by the jack
        server), there is no need to take the connection lock here
     */
-//    uint32_t num_port_connections = port->connections_vector.size();
-    if ((node = port->connections) == NULL) {
-
+    uint32_t num_port_connections = port->connections_vector.size();
+//    if ((node = port->connections) == NULL) {
+    if( num_port_connections == 0 ) {
 	if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
 	    return NULL;
 	}
@@ -596,13 +600,14 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
     }
 
-    if ((next = jack_slist_next (node)) == NULL) {
+//    if ((next = jack_slist_next (node)) == NULL) {
+    if( num_port_connections == 1 ) {
 
 	/* one connection: use zero-copy mode - just pass
 	   the buffer of the connected (output) port.
 	*/
-	return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
-//	return jack_port_get_buffer( port->connections_vector[0], nframes );
+//	return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
+	return jack_port_get_buffer( port->connections_vector[0], nframes );
     }
 
     /* Multiple connections.  Use a local buffer and mix the
@@ -678,8 +683,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 	*/
 
 	pthread_mutex_lock (&port->connection_lock);
-//	for( jack_port_t * other_port : port->connections_vector ) {
-	for (node = port->connections; node; node = jack_slist_next (node)) {
+	for( jack_port_t * other_port : port->connections_vector ) {
+//	for (node = port->connections; node; node = jack_slist_next (node)) {
 			
 	    /* drop the lock because if there is a feedback loop,
 	       we will deadlock. XXX much worse things will
@@ -687,8 +692,8 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
 	    */
 
 	    pthread_mutex_unlock (&port->connection_lock);
-	    jack_port_request_monitor ((jack_port_t *) node->data, onoff);
-//	    jack_port_request_monitor( other_port, onoff );
+//	    jack_port_request_monitor ((jack_port_t *) node->data, onoff);
+	    jack_port_request_monitor( other_port, onoff );
 	    pthread_mutex_lock (&port->connection_lock);
 	}
 	pthread_mutex_unlock (&port->connection_lock);
@@ -917,10 +922,11 @@ static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
        during this time.
     */
 
-    node = port->connections;
-//    vector<jack_port_t*>::iterator connection_iterator = port->connections_vector.begin();
-    input = (jack_port_t *) node->data;
-//    input = *connection_iterator;
+//    node = port->connections;
+//    input = (jack_port_t *) node->data;
+    vector<jack_port_t*>::iterator pc_iter = port->connections_vector.begin();
+    vector<jack_port_t*>::iterator pc_end = port->connections_vector.end();
+    input = *pc_iter;
     buffer = (jack_default_audio_sample_t*)port->mix_buffer;
 
 #ifndef USE_DYNSIMD
@@ -929,17 +935,14 @@ static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
     opt_copy (buffer, jack_output_port_buffer (input), nframes);
 #endif /* USE_DYNSIMD */
 
-//    for( vector<jack_port_t*>::iterator end = port->connections_vector.end() ;
-//	 connection_iterator != end ;
-//	 ++connection_iterator ) {
-//	input = *connection_iterator;
-    for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
-	input = (jack_port_t *) node->data;
+    for( input = *(++pc_iter) ; pc_iter != pc_end ; ++pc_iter ) {
+//    for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
+//	input = (jack_port_t *) node->data;
 
 #ifndef USE_DYNSIMD
 	n = nframes;
 	dst = buffer;
-	src = (jack_default_audio_sample_t*)jack_output_port_buffer (input);
+	src = (jack_default_audio_sample_t*)jack_output_port_buffer( input );
 
 	while (n--) {
 	    *dst++ += *src++;

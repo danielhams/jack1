@@ -231,8 +231,8 @@ jack_midi_clear_buffer(void           *port_buffer)
 static void
 jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 {
-    JSList         *node;
-    jack_port_t    *input;
+//    JSList         *node;
+//    jack_port_t    *input;
     jack_nframes_t  num_events = 0;
     jack_nframes_t  i          = 0;
     int             err        = 0;
@@ -259,9 +259,9 @@ jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 	
     /* Iterate through all connections to see how many events we need to mix,
      * and initialise their 'last event read' (last_write_loc) to 0 */
-//    for( jack_port_t * input : port->connections_vector ) {
-    for (node = port->connections; node; node = jack_slist_next(node)) {
-	input = (jack_port_t *) node->data;
+    for( jack_port_t * input : port->connections_vector ) {
+//    for (node = port->connections; node; node = jack_slist_next(node)) {
+//	input = (jack_port_t *) node->data;
 	in_info = (jack_midi_port_info_private_t *) jack_output_port_buffer(input);
 	num_events += in_info->event_count;
 	lost_events += in_info->events_lost;
@@ -276,10 +276,10 @@ jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 
 	/* Find the earliest unread event, to mix next
 	 * (search for an event earlier than earliest_event) */
-//	for( jack_port_t * in_port : port->connections_vector ) {
-	for (node = port->connections; node; node = jack_slist_next(node)) {
-	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer(((jack_port_t *) node->data));
-//	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer( in_port );
+//	for (node = port->connections; node; node = jack_slist_next(node)) {
+//	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer(((jack_port_t *) node->data));
+	for( jack_port_t * in_port : port->connections_vector ) {
+	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer( in_port );
 	    in_events = (jack_midi_port_internal_event_t *) (in_info + 1);
 
 	    /* If there are unread events left in this port.. */

@@ -405,36 +405,37 @@ static void jack_client_free (jack_client_t *client)
 
 void jack_client_fix_port_buffers (jack_client_t *client)
 {
-	JSList *node;
-	jack_port_t *port;
+    JSList *node;
+    jack_port_t *port;
 
-	/* This releases all local memory owned by input ports
-	   and sets the buffer pointer to NULL. This will cause
-	   jack_port_get_buffer() to reallocate space for the
-	   buffer on the next call (if there is one).
-	*/
+    /* This releases all local memory owned by input ports
+       and sets the buffer pointer to NULL. This will cause
+       jack_port_get_buffer() to reallocate space for the
+       buffer on the next call (if there is one).
+    */
 
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-		port = (jack_port_t *) node->data;
+    for (node = client->ports; node; node = jack_slist_next (node)) {
+	port = (jack_port_t *) node->data;
 
-		if (port->shared->flags & JackPortIsInput) {
-			if (port->mix_buffer) {
-				size_t buffer_size =
-					jack_port_type_buffer_size( port->type_info,
-								    client->engine->buffer_size );
-				jack_pool_release (port->mix_buffer);
-				port->mix_buffer = NULL;
-				pthread_mutex_lock (&port->connection_lock);
-				if (jack_slist_length (port->connections) > 1) {
-					port->mix_buffer = jack_pool_alloc (buffer_size);
-					port->fptr.buffer_init (port->mix_buffer,
-								buffer_size,
-								client->engine->buffer_size);
-				}
-				pthread_mutex_unlock (&port->connection_lock);
-			}
+	if (port->shared->flags & JackPortIsInput) {
+	    if (port->mix_buffer) {
+		size_t buffer_size =
+		    jack_port_type_buffer_size( port->type_info,
+						client->engine->buffer_size );
+		jack_pool_release (port->mix_buffer);
+		port->mix_buffer = NULL;
+		pthread_mutex_lock (&port->connection_lock);
+		if( port->connections_vector.size() > 1 ) {
+//		if (jack_slist_length (port->connections) > 1) {
+		    port->mix_buffer = jack_pool_alloc (buffer_size);
+		    port->fptr.buffer_init (port->mix_buffer,
+					    buffer_size,
+					    client->engine->buffer_size);
 		}
+		pthread_mutex_unlock (&port->connection_lock);
+	    }
 	}
+    }
 }
 
 static void jack_client_erase_control_port_connection(
@@ -474,7 +475,8 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 		pthread_mutex_lock (&control_port->connection_lock);
 
 		if ((control_port->shared->flags & JackPortIsInput)
-		    && (control_port->connections != NULL)
+//		    && (control_port->connections != NULL)
+		    && (control_port->connections_vector.size() > 0)
 		    && (control_port->mix_buffer == NULL)  ) {
 		    size_t buffer_size =
 			jack_port_type_buffer_size( control_port->type_info,
@@ -485,26 +487,37 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 						    client->engine->buffer_size);
 		}
 
-		control_port->connections = jack_slist_prepend (control_port->connections,
-								(void *) other);
+//		control_port->connections = jack_slist_prepend (control_port->connections,
+//								(void *) other);
+		control_port->connections_vector.push_back( other );
 		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
 			
 	    case PortDisconnected:
+	    {
 		/* jack_port_by_id_int() always returns an internal
 		 * port that does not need to be deallocated
 		 */
 		control_port = jack_port_by_id_int (client, event->x.self_id,
 						    &need_free);
 		pthread_mutex_lock (&control_port->connection_lock);
+
+		vector<jack_port_t*>::iterator pc_iter = control_port->connections_vector.begin();
+		vector<jack_port_t*>::iterator pc_end = control_port->connections_vector.end();
+
+		for( ; pc_iter != pc_end ; ++pc_iter ) {
+		    other = *pc_iter;
 			
-		for (node = control_port->connections; node; node = jack_slist_next (node)) {
-		    other = (jack_port_t *) node->data;
+//		for (node = control_port->connections; node; node = jack_slist_next (node)) {
+//		    other = (jack_port_t *) node->data;
 
 		    if (other->shared->id == event->y.other_id) {
-			control_port->connections = jack_slist_remove_link( control_port->connections,
-									    node);
-			jack_slist_free_1 (node);
+//			control_port->connections = jack_slist_remove_link( control_port->connections,
+//									    node);
+//			jack_slist_free_1 (node);
+
+			jack_client_erase_control_port_connection( control_port->connections_vector,
+								   other );
 			free (other);
 			break;
 		    }
@@ -512,7 +525,7 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 
 		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
-
+	    }
 	    default:
 		/* impossible */
 		break;
@@ -561,11 +574,12 @@ static void jack_port_recalculate_latency (jack_port_t *port, jack_latency_callb
     JSList *node;
 
     pthread_mutex_lock (&port->connection_lock);
-    for (node = port->connections; node; node = jack_slist_next (node)) {
-	jack_port_t *other = (jack_port_t*)node->data;
+//    for (node = port->connections; node; node = jack_slist_next (node)) {
+//	jack_port_t *other = (jack_port_t*)node->data;
+    for( jack_port_t * other : port->connections_vector ) {
 	jack_latency_range_t other_latency;
 
-	jack_port_get_latency_range (other, mode, &other_latency);
+	jack_port_get_latency_range( other, mode, &other_latency );
 
 	if (other_latency.max > latency.max)
 	    latency.max = other_latency.max;
@@ -2533,8 +2547,9 @@ int jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 
 	pthread_mutex_lock (&port->connection_lock);
 
-	if (port->connections == NULL) {
-		pthread_mutex_unlock (&port->connection_lock);
+//	if (port->connections == NULL) {
+	if( port->connections_vector.size() == 0 ) {
+	    pthread_mutex_unlock (&port->connection_lock);
 		return 0;
 	}
 
