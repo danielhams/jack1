@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
   Copyright (C) 2003 Bob Ham <rah@bash.sh
     

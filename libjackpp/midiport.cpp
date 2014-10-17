@@ -17,6 +17,9 @@
     Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 */
 
+#include <string>
+#include <vector>
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -26,6 +29,9 @@
 #include <jack/midiport.h>
 
 #include "port.hpp"
+
+using std::string;
+using std::vector;
 
 enum { MIDI_INLINE_MAX = 4 }; /* 4 bytes for default event size */
 
@@ -225,103 +231,104 @@ jack_midi_clear_buffer(void           *port_buffer)
 static void
 jack_midi_port_mixdown(jack_port_t    *port, jack_nframes_t nframes)
 {
-	JSList         *node;
-	jack_port_t    *input;
-	jack_nframes_t  num_events = 0;
-	jack_nframes_t  i          = 0;
-	int             err        = 0;
-	jack_nframes_t  lost_events = 0;
+    JSList         *node;
+    jack_port_t    *input;
+    jack_nframes_t  num_events = 0;
+    jack_nframes_t  i          = 0;
+    int             err        = 0;
+    jack_nframes_t  lost_events = 0;
 
-	/* The next (single) event to mix in to the buffer */
-	jack_midi_port_info_private_t   *earliest_info;
-	jack_midi_port_internal_event_t *earliest_event;
-	jack_midi_data_t                *earliest_buffer;
+    /* The next (single) event to mix in to the buffer */
+    jack_midi_port_info_private_t   *earliest_info;
+    jack_midi_port_internal_event_t *earliest_event;
+    jack_midi_data_t                *earliest_buffer;
 	
-	jack_midi_port_info_private_t   *in_info;   /* For finding next event */
-	jack_midi_port_internal_event_t *in_events; /* Corresponds to in_info */
-	jack_midi_port_info_private_t   *out_info;  /* Output 'buffer' */
+    jack_midi_port_info_private_t   *in_info;   /* For finding next event */
+    jack_midi_port_internal_event_t *in_events; /* Corresponds to in_info */
+    jack_midi_port_info_private_t   *out_info;  /* Output 'buffer' */
 
-	jack_midi_clear_buffer(port->mix_buffer);
+    jack_midi_clear_buffer(port->mix_buffer);
 	
-	out_info = (jack_midi_port_info_private_t *) port->mix_buffer;
+    out_info = (jack_midi_port_info_private_t *) port->mix_buffer;
 
-	/* This function uses jack_midi_port_info_private_t.last_write_loc of the
-	 * source ports to store indices of the last event read from that buffer
-	 * so far.  This is OK because last_write_loc is used when writing events
-	 * to a buffer, which at this stage is already complete so the value
-	 * can be safely smashed. */
+    /* This function uses jack_midi_port_info_private_t.last_write_loc of the
+     * source ports to store indices of the last event read from that buffer
+     * so far.  This is OK because last_write_loc is used when writing events
+     * to a buffer, which at this stage is already complete so the value
+     * can be safely smashed. */
 	
-	/* Iterate through all connections to see how many events we need to mix,
-	 * and initialise their 'last event read' (last_write_loc) to 0 */
+    /* Iterate through all connections to see how many events we need to mix,
+     * and initialise their 'last event read' (last_write_loc) to 0 */
+//    for( jack_port_t * input : port->connections_vector ) {
+    for (node = port->connections; node; node = jack_slist_next(node)) {
+	input = (jack_port_t *) node->data;
+	in_info = (jack_midi_port_info_private_t *) jack_output_port_buffer(input);
+	num_events += in_info->event_count;
+	lost_events += in_info->events_lost;
+	in_info->last_write_loc = 0;
+    }
+
+    /* Write the events in the order of their timestamps */
+    for (i = 0; i < num_events; ++i) {
+	earliest_info = NULL;
+	earliest_event = NULL;
+	earliest_buffer = NULL;
+
+	/* Find the earliest unread event, to mix next
+	 * (search for an event earlier than earliest_event) */
+//	for( jack_port_t * in_port : port->connections_vector ) {
 	for (node = port->connections; node; node = jack_slist_next(node)) {
-		input = (jack_port_t *) node->data;
-		in_info =
-			(jack_midi_port_info_private_t *) jack_output_port_buffer(input);
-		num_events += in_info->event_count;
-		lost_events += in_info->events_lost;
-		in_info->last_write_loc = 0;
+	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer(((jack_port_t *) node->data));
+//	    in_info = (jack_midi_port_info_private_t *)jack_output_port_buffer( in_port );
+	    in_events = (jack_midi_port_internal_event_t *) (in_info + 1);
+
+	    /* If there are unread events left in this port.. */
+	    if (in_info->event_count > in_info->last_write_loc) {
+		/* .. and this event is the new earliest .. */
+		/* NOTE: that's why we compare time with <, not <= */
+		if (earliest_info == NULL
+		    || in_events[in_info->last_write_loc].time
+		    < earliest_event->time) {
+		    /* .. then set this event as the next earliest */
+		    earliest_info = in_info;
+		    earliest_event = (jack_midi_port_internal_event_t *)
+			(&in_events[in_info->last_write_loc]);
+		}
+	    }
 	}
 
-	/* Write the events in the order of their timestamps */
-	for (i = 0; i < num_events; ++i) {
-		earliest_info = NULL;
-		earliest_event = NULL;
-		earliest_buffer = NULL;
-
-		/* Find the earliest unread event, to mix next
-		 * (search for an event earlier than earliest_event) */
-		for (node = port->connections; node; node = jack_slist_next(node)) {
-			in_info = (jack_midi_port_info_private_t *)
-				jack_output_port_buffer(((jack_port_t *) node->data));
-			in_events = (jack_midi_port_internal_event_t *) (in_info + 1);
-
-			/* If there are unread events left in this port.. */
-			if (in_info->event_count > in_info->last_write_loc) {
-				/* .. and this event is the new earliest .. */
-				/* NOTE: that's why we compare time with <, not <= */
-				if (earliest_info == NULL
-						|| in_events[in_info->last_write_loc].time
-					       < earliest_event->time) {
-					/* .. then set this event as the next earliest */
-					earliest_info = in_info;
-					earliest_event = (jack_midi_port_internal_event_t *)
-						(&in_events[in_info->last_write_loc]);
-				}
-			}
-		}
-
-		if (earliest_info && earliest_event) {
-			earliest_buffer = (jack_midi_data_t *) earliest_info;
+	if (earliest_info && earliest_event) {
+	    earliest_buffer = (jack_midi_data_t *) earliest_info;
 			
-			/* Write event to output */
-			err = jack_midi_event_write(
-				jack_port_buffer(port),
-				earliest_event->time,
-				jack_midi_event_data(earliest_buffer, earliest_event),
-				earliest_event->size);
+	    /* Write event to output */
+	    err = jack_midi_event_write(
+		jack_port_buffer(port),
+		earliest_event->time,
+		jack_midi_event_data(earliest_buffer, earliest_event),
+		earliest_event->size);
 			
-			earliest_info->last_write_loc++;
+	    earliest_info->last_write_loc++;
 
-			if (err) {
-				out_info->events_lost = num_events - i;
-				break;
-			}
-		}
+	    if (err) {
+		out_info->events_lost = num_events - i;
+		break;
+	    }
 	}
-	assert(out_info->event_count == num_events - out_info->events_lost);
+    }
+    assert(out_info->event_count == num_events - out_info->events_lost);
 
-	// inherit total lost events count from all connected ports.
-	out_info->events_lost += lost_events;
+    // inherit total lost events count from all connected ports.
+    out_info->events_lost += lost_events;
 }
 
 
 uint32_t
 jack_midi_get_lost_event_count(void           *port_buffer)
 {
-	return ((jack_midi_port_info_private_t *) port_buffer)->events_lost;
+    return ((jack_midi_port_info_private_t *) port_buffer)->events_lost;
 }
 
 jack_port_functions_t jack_builtin_midi_functions = {
-	.buffer_init    = jack_midi_buffer_init,
-	.mixdown = jack_midi_port_mixdown, 
+    .buffer_init    = jack_midi_buffer_init,
+    .mixdown = jack_midi_port_mixdown,
 };

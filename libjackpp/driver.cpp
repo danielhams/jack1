@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     

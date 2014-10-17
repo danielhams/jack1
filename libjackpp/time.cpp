@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "bsd"; -*- */
 /*
     Copyright (C) 2001-2003 Paul Davis
     Copyright (C) 2005 Jussi Laako
