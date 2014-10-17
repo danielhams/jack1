@@ -43,6 +43,9 @@
 
 #include "local.hpp"
 
+using std::string;
+using std::vector;
+
 static void    jack_generic_buffer_init(void *port_buffer,
                                       size_t buffer_size,
 				      jack_nframes_t nframes);
@@ -177,46 +180,47 @@ jack_port_t *
 jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
 	       jack_control_t *control)
 {
-	jack_port_shared_t *shared = &control->ports[port_id];
-	jack_port_type_id_t ptid = shared->ptype_id;
-	jack_port_t *port;
+    jack_port_shared_t *shared = &control->ports[port_id];
+    jack_port_type_id_t ptid = shared->ptype_id;
+    jack_port_t *port;
 
-	if ((port = (jack_port_t *) malloc (sizeof (jack_port_t))) == NULL) {
-		return NULL;
-	}
+    if ((port = (jack_port_t *) malloc (sizeof (jack_port_t))) == NULL) {
+	return NULL;
+    }
 	
-	port->mix_buffer = NULL;
-	port->client_segment_base = NULL;
-	port->shared = shared;
-	port->type_info = &client->engine->port_types[ptid];
-	pthread_mutex_init (&port->connection_lock, NULL);
-	port->connections = 0;
-	port->tied = NULL;
+    port->mix_buffer = NULL;
+    port->client_segment_base = NULL;
+    port->shared = shared;
+    port->type_info = &client->engine->port_types[ptid];
+    pthread_mutex_init (&port->connection_lock, NULL);
+    port->connections = 0;
+//    port->connections_vector.clear();
+    port->tied = NULL;
 
-	if (jack_uuid_compare (client->control->uuid, port->shared->client_id) == 0) {
+    if (jack_uuid_compare (client->control->uuid, port->shared->client_id) == 0) {
 			
-		/* It's our port, so initialize the pointers to port
-		 * functions within this address space.  These builtin
-		 * definitions can be overridden by the client. 
-		 */
-		jack_port_functions_t *port_functions = jack_get_port_functions(ptid);
-		if (port_functions == NULL)
-			port_functions = &jack_builtin_NULL_functions;
-		port->fptr = *port_functions;
-		port->shared->has_mixdown = (port->fptr.mixdown ? TRUE : FALSE);
-	}
+	/* It's our port, so initialize the pointers to port
+	 * functions within this address space.  These builtin
+	 * definitions can be overridden by the client.
+	 */
+	jack_port_functions_t *port_functions = jack_get_port_functions(ptid);
+	if (port_functions == NULL)
+	    port_functions = &jack_builtin_NULL_functions;
+	port->fptr = *port_functions;
+	port->shared->has_mixdown = (port->fptr.mixdown ? TRUE : FALSE);
+    }
 
-	/* set up a base address so that port->offset can be used to
-	   compute the correct location. we don't store the location
-	   directly, because port->client_segment_base and/or
-	   port->offset can change if the buffer size or port counts
-	   are changed.
-	*/
+    /* set up a base address so that port->offset can be used to
+       compute the correct location. we don't store the location
+       directly, because port->client_segment_base and/or
+       port->offset can change if the buffer size or port counts
+       are changed.
+    */
 
-	port->client_segment_base =
-		(void **) &client->port_segment[ptid].attached_at;
+    port->client_segment_base =
+	(void **) &client->port_segment[ptid].attached_at;
 
-	return port;
+    return port;
 }
 
 size_t 
@@ -308,73 +312,74 @@ jack_port_unregister (jack_client_t *client, jack_port_t *port)
 int
 jack_port_connected (const jack_port_t *port)
 {
-	return jack_slist_length (port->connections);
+//    return port->connections_vector.size() > 0;
+    return jack_slist_length (port->connections);
 }
 
 int
 jack_port_connected_to (const jack_port_t *port, const char *portname)
 {
-	JSList *node;
-	int ret = FALSE;
+    JSList *node;
+    int ret = FALSE;
 
-	/* XXX this really requires a cross-process lock
-	   so that ports/connections cannot go away
-	   while we are checking for them. that's hard,
-	   and has a non-trivial performance impact
-	   for jackd.
-	*/  
+    /* XXX this really requires a cross-process lock
+       so that ports/connections cannot go away
+       while we are checking for them. that's hard,
+       and has a non-trivial performance impact
+       for jackd.
+    */
 
-	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+    pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
-	for (node = port->connections; node; node = jack_slist_next (node)) {
-		jack_port_t *other_port = (jack_port_t *) node->data;
-		
-		if (jack_port_name_equals (other_port->shared, portname)) {
-			ret = TRUE;
-			break;
-		}
+//    for( jack_port_t * other_port : port->connections_vector ) {
+    for (node = port->connections; node; node = jack_slist_next (node)) {
+	jack_port_t *other_port = (jack_port_t *) node->data;
+	if (jack_port_name_equals (other_port->shared, portname)) {
+	    ret = TRUE;
+	    break;
 	}
+    }
 
-	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
-	return ret;
+    pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+    return ret;
 }
 
 const char **
 jack_port_get_connections (const jack_port_t *port)
 {
-	const char **ret = NULL;
-	JSList *node;
-	unsigned int n;
+    const char **ret = NULL;
+    JSList *node;
+    unsigned int n;
 
-	/* XXX this really requires a cross-process lock
-	   so that ports/connections cannot go away
-	   while we are checking for them. that's hard,
-	   and has a non-trivial performance impact
-	   for jackd.
-	*/  
+    /* XXX this really requires a cross-process lock
+       so that ports/connections cannot go away
+       while we are checking for them. that's hard,
+       and has a non-trivial performance impact
+       for jackd.
+    */
 
-	pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
+    pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
-	if (port->connections != NULL) {
+//    uint32_t num_port_connections = port->connections_vector.size();
+    if (port->connections != NULL) {
 
-		ret = (const char **)
-			malloc (sizeof (char *)
-				* (jack_slist_length (port->connections) + 1));
-		if (ret == NULL) {
-			pthread_mutex_unlock (&((jack_port_t *)port)->connection_lock);
-			return NULL;
-		}
-
-		for (n = 0, node = port->connections; node;
-		     node = jack_slist_next (node), ++n) {
-			jack_port_t* other =(jack_port_t *) node->data;
-			ret[n] = other->shared->name;
-		}
-		ret[n] = NULL;
+	ret = (const char **)malloc (sizeof (char *) * (jack_slist_length (port->connections) + 1));
+	if (ret == NULL) {
+	    pthread_mutex_unlock (&((jack_port_t *)port)->connection_lock);
+	    return NULL;
 	}
 
-	pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
-	return ret;
+//	for( jack_port_t * other_port : port->connections_vector ) {
+	for (n = 0, node = port->connections; node;
+	     node = jack_slist_next (node), ++n) {
+	    jack_port_t* other =(jack_port_t *) node->data;
+	    ret[n] = other->shared->name;
+	}
+	ret[n] = NULL;
+    }
+
+    pthread_mutex_unlock (&((jack_port_t *) port)->connection_lock);
+    return ret;
 }
 
 /* SERVER-SIDE (all) connection querying */
@@ -558,58 +563,59 @@ jack_port_set_latency (jack_port_t *port, jack_nframes_t nframes)
 void *
 jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 {
-	JSList *node, *next;
+    JSList *node, *next;
 
-	/* Output port.  The buffer was assigned by the engine
-	   when the port was registered.
-	*/
-	if (port->shared->flags & JackPortIsOutput) {
-		if (port->tied) {
-			return jack_port_get_buffer (port->tied, nframes);
-		}
+    /* Output port.  The buffer was assigned by the engine
+       when the port was registered.
+    */
+    if (port->shared->flags & JackPortIsOutput) {
+	if (port->tied) {
+	    return jack_port_get_buffer (port->tied, nframes);
+	}
                 
-                if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
-                        return NULL;
-                }
-
-		return jack_output_port_buffer (port);
+	if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
+	    return NULL;
 	}
 
-	/* Input port.  Since this can only be called from the
-	   process() callback, and since no connections can be
-	   made/broken during this phase (enforced by the jack
-	   server), there is no need to take the connection lock here
+	return jack_output_port_buffer (port);
+    }
+
+    /* Input port.  Since this can only be called from the
+       process() callback, and since no connections can be
+       made/broken during this phase (enforced by the jack
+       server), there is no need to take the connection lock here
+    */
+//    uint32_t num_port_connections = port->connections_vector.size();
+    if ((node = port->connections) == NULL) {
+
+	if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
+	    return NULL;
+	}
+
+	/* no connections; return a zero-filled buffer */
+	return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
+    }
+
+    if ((next = jack_slist_next (node)) == NULL) {
+
+	/* one connection: use zero-copy mode - just pass
+	   the buffer of the connected (output) port.
 	*/
-	if ((node = port->connections) == NULL) {
-		
-                if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
-                        return NULL;
-                }
+	return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
+//	return jack_port_get_buffer( port->connections_vector[0], nframes );
+    }
 
-		/* no connections; return a zero-filled buffer */
-		return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
-	}
-
-	if ((next = jack_slist_next (node)) == NULL) {
-
-		/* one connection: use zero-copy mode - just pass
-		   the buffer of the connected (output) port.
-		*/
-		return jack_port_get_buffer (((jack_port_t *) node->data),
-					     nframes);
-	}
-
-	/* Multiple connections.  Use a local buffer and mix the
-	   incoming data into that buffer.  We have already
-	   established the existence of a mixdown function during the
-	   connection process.
-	*/
-	if (port->mix_buffer == NULL) {
-		jack_error( "internal jack error: mix_buffer not allocated" );
-		return NULL;
-	}
-	port->fptr.mixdown (port, nframes);
-	return (void *) port->mix_buffer;
+    /* Multiple connections.  Use a local buffer and mix the
+       incoming data into that buffer.  We have already
+       established the existence of a mixdown function during the
+       connection process.
+    */
+    if (port->mix_buffer == NULL) {
+	jack_error( "internal jack error: mix_buffer not allocated" );
+	return NULL;
+    }
+    port->fptr.mixdown (port, nframes);
+    return (void *) port->mix_buffer;
 }
 
 size_t
@@ -657,38 +663,38 @@ int
 jack_port_request_monitor (jack_port_t *port, int onoff)
 
 {
-	if (onoff) {
-		port->shared->monitor_requests++;
-	} else if (port->shared->monitor_requests) {
-		port->shared->monitor_requests--;
-	}
+    if (onoff) {
+	port->shared->monitor_requests++;
+    } else if (port->shared->monitor_requests) {
+	port->shared->monitor_requests--;
+    }
 
-	if ((port->shared->flags & JackPortIsOutput) == 0) {
+    if ((port->shared->flags & JackPortIsOutput) == 0) {
 
-		JSList *node;
+	JSList *node;
 
-		/* this port is for input, so recurse over each of the 
-		   connected ports.
-		 */
+	/* this port is for input, so recurse over each of the
+	   connected ports.
+	*/
 
-		pthread_mutex_lock (&port->connection_lock);
-		for (node = port->connections; node;
-		     node = jack_slist_next (node)) {
+	pthread_mutex_lock (&port->connection_lock);
+//	for( jack_port_t * other_port : port->connections_vector ) {
+	for (node = port->connections; node; node = jack_slist_next (node)) {
 			
-			/* drop the lock because if there is a feedback loop,
-			   we will deadlock. XXX much worse things will
-			   happen if there is a feedback loop !!!
-			*/
+	    /* drop the lock because if there is a feedback loop,
+	       we will deadlock. XXX much worse things will
+	       happen if there is a feedback loop !!!
+	    */
 
-			pthread_mutex_unlock (&port->connection_lock);
-			jack_port_request_monitor ((jack_port_t *) node->data,
-						   onoff);
-			pthread_mutex_lock (&port->connection_lock);
-		}
-		pthread_mutex_unlock (&port->connection_lock);
+	    pthread_mutex_unlock (&port->connection_lock);
+	    jack_port_request_monitor ((jack_port_t *) node->data, onoff);
+//	    jack_port_request_monitor( other_port, onoff );
+	    pthread_mutex_lock (&port->connection_lock);
 	}
+	pthread_mutex_unlock (&port->connection_lock);
+    }
 
-	return 0;
+    return 0;
 }
 	
 int 
@@ -890,56 +896,58 @@ static inline float f_max(float x, float a)
 	return (x);
 }
 
-static void 
-jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
+static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
-	JSList *node;
-	jack_port_t *input;
+    JSList *node;
+    jack_port_t *input;
 #ifndef ARCH_X86
-	jack_nframes_t n;
-	jack_default_audio_sample_t *dst, *src;
+    jack_nframes_t n;
+    jack_default_audio_sample_t *dst, *src;
 #endif
-	jack_default_audio_sample_t *buffer;
+    jack_default_audio_sample_t *buffer;
 
-	/* by the time we've called this, we've already established
-	   the existence of more than one connection to this input
-	   port and allocated a mix_buffer.
-	*/
+    /* by the time we've called this, we've already established
+       the existence of more than one connection to this input
+       port and allocated a mix_buffer.
+    */
 
-	/* no need to take connection lock, since this is called
-	   from the process() callback, and the jack server
-	   ensures that no changes to connections happen
-	   during this time.
-	*/
+    /* no need to take connection lock, since this is called
+       from the process() callback, and the jack server
+       ensures that no changes to connections happen
+       during this time.
+    */
 
-	node = port->connections;
+    node = port->connections;
+//    vector<jack_port_t*>::iterator connection_iterator = port->connections_vector.begin();
+    input = (jack_port_t *) node->data;
+//    input = *connection_iterator;
+    buffer = (jack_default_audio_sample_t*)port->mix_buffer;
+
+#ifndef USE_DYNSIMD
+    memcpy (buffer, jack_output_port_buffer (input), sizeof (jack_default_audio_sample_t) * nframes);
+#else /* USE_DYNSIMD */
+    opt_copy (buffer, jack_output_port_buffer (input), nframes);
+#endif /* USE_DYNSIMD */
+
+//    for( vector<jack_port_t*>::iterator end = port->connections_vector.end() ;
+//	 connection_iterator != end ;
+//	 ++connection_iterator ) {
+//	input = *connection_iterator;
+    for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
 	input = (jack_port_t *) node->data;
-	buffer = (jack_default_audio_sample_t*)port->mix_buffer;
 
 #ifndef USE_DYNSIMD
-	memcpy (buffer, jack_output_port_buffer (input),
-		sizeof (jack_default_audio_sample_t) * nframes);
-#else /* USE_DYNSIMD */
-	opt_copy (buffer, jack_output_port_buffer (input), nframes);
-#endif /* USE_DYNSIMD */
+	n = nframes;
+	dst = buffer;
+	src = (jack_default_audio_sample_t*)jack_output_port_buffer (input);
 
-	for (node = jack_slist_next (node); node;
-	     node = jack_slist_next (node)) {
-
-		input = (jack_port_t *) node->data;
-
-#ifndef USE_DYNSIMD
-		n = nframes;
-		dst = buffer;
-		src = (jack_default_audio_sample_t*)jack_output_port_buffer (input);
-
-		while (n--) {
-			*dst++ += *src++;
-		}
-#else /* USE_DYNSIMD */
-		opt_mix (buffer, jack_output_port_buffer (input), nframes);
-#endif /* USE_DYNSIMD */
+	while (n--) {
+	    *dst++ += *src++;
 	}
+#else /* USE_DYNSIMD */
+	opt_mix (buffer, jack_output_port_buffer (input), nframes);
+#endif /* USE_DYNSIMD */
+    }
 }
 
 
