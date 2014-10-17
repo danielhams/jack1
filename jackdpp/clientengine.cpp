@@ -233,19 +233,19 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 	close (client->request_fd);
     }
 
-    VERBOSE( &engine, "before: client vector contains %d", engine.clients_vector.size() );
+    VERBOSE( &engine, "before: client vector contains %d", engine.clients.size() );
 
-    auto cFinder = std::find_if( engine.clients_vector.begin(), engine.clients_vector.end(),
+    auto cFinder = std::find_if( engine.clients.begin(), engine.clients.end(),
 				 [&client] ( jack_client_internal_t * ic ) {
 				     return jack_uuid_compare( ic->control->uuid, client->control->uuid ) == 0;
 				 } );
 
-    if( cFinder != engine.clients_vector.end() ) {
-	engine.clients_vector.erase( cFinder );
+    if( cFinder != engine.clients.end() ) {
+	engine.clients.erase( cFinder );
 	VERBOSE( &engine, "Found and removed from client vector via matching UUID" );
     }
 
-    VERBOSE( &engine, "after: client vector contains %d", engine.clients_vector.size() );
+    VERBOSE( &engine, "after: client vector contains %d", engine.clients.size() );
 
     jack_engine_client_delete( engine, client );
 
@@ -254,7 +254,7 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 
 	/* count external clients only when deciding whether to shutdown */
 
-	for( jack_client_internal_t * client : engine.clients_vector ) {
+	for( jack_client_internal_t * client : engine.clients ) {
 	    if( client->control->type == ClientExternal ) {
 		++external_clients;
 	    }
@@ -286,7 +286,7 @@ int jack_engine_check_clients( jack_engine_t & engine, int with_timeout_check)
     /* CALLER MUST HOLD graph read lock */
     int errs = 0;
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 
 	if (client->error) {
 	    VERBOSE( &engine, "client %s already marked with error = %d\n", client->control->name, client->error);
@@ -356,10 +356,10 @@ void jack_engine_remove_clients( jack_engine_t & engine, int* exit_freewheeling_
     VERBOSE( &engine, "++ Removing failed clients ...");
 
     // Take a copy of the clients vector so we don't get invalid iterators
-    std::vector<jack_client_internal_t*> clients_vector_copy = engine.clients_vector;
+    std::vector<jack_client_internal_t*> clients_copy = engine.clients;
 
     /* remove all dead clients */
-    for( jack_client_internal_t * client : clients_vector_copy ) {
+    for( jack_client_internal_t * client : clients_copy ) {
 
 	VERBOSE( &engine, "client %s error status %d", client->control->name, client->error);
 		
@@ -419,7 +419,7 @@ void jack_engine_client_registration_notify( jack_engine_t & engine,
     event.type = (yn ? ClientRegistered : ClientUnregistered);
     snprintf (event.x.name, sizeof (event.x.name), "%s", name);
 	
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 
 	if (!client->control->active) {
 	    continue;
@@ -449,7 +449,7 @@ static int jack_engine_client_id_by_name( jack_engine_t & engine, const char *na
 
     jack_rdlock_graph( (&engine) );
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 	if( strcmp((const char *)client->control->name, name) == 0) {
 	    jack_uuid_copy (&id, client->control->uuid);
 	    ret = 0;
@@ -463,14 +463,18 @@ static int jack_engine_client_id_by_name( jack_engine_t & engine, const char *na
 
 static int jack_engine_client_name_reserved( jack_engine_t & engine, const char *name )
 {
-    JSList *node;
-    for (node = engine.reserved_client_names; node; node = jack_slist_next (node)) {
-	jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-	if (!strcmp (reservation->name, name)) {
-	    return 1;
-	}
+    auto cnFinder = std::find_if( engine.reserved_client_names.begin(),
+				  engine.reserved_client_names.end(),
+				  [&name] ( jack_reserved_name_t * res ) {
+				      return strcmp( res->name, name ) == 0;
+				  } );
+
+    if( cnFinder != engine.reserved_client_names.end() ) {
+	return 1;
     }
-    return 0;
+    else {
+	return 0;
+    }
 }
 
 /* generate a unique client name
@@ -658,7 +662,7 @@ static void jack_engine_ensure_uuid_unique( jack_engine_t & engine, jack_uuid_t 
 
     jack_lock_graph( (&engine) );
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 	if( jack_uuid_compare( client->control->uuid, uuid ) == 0 ) {
 	    jack_uuid_clear( &uuid );
 	}
@@ -729,7 +733,7 @@ static jack_client_internal_t * jack_engine_setup_client(
     /* add new client to the clients list */
     jack_lock_graph( (&engine) );
 
-    engine.clients_vector.push_back( client );
+    engine.clients.push_back( client );
 
     jack_engine_reset_rolling_usecs( engine );
 	
@@ -813,18 +817,22 @@ static jack_status_t jack_engine_handle_unload_client( jack_engine_t & engine, j
 
 static char * jack_engine_get_reserved_name (jack_engine_t & engine, jack_uuid_t uuid)
 {
-    JSList *node;
-    for( node = engine.reserved_client_names; node; node = jack_slist_next (node) ) {
-	jack_reserved_name_t *reservation = (jack_reserved_name_t *) node->data;
-	if( jack_uuid_compare(reservation->uuid, uuid) != 0 ) {
-	    char *retval = strdup (reservation->name);
-	    free (reservation);
-	    engine.reserved_client_names =
-		jack_slist_remove (engine.reserved_client_names, reservation);
-	    return retval;
-	}
+    auto rnFinder = std::find_if( engine.reserved_client_names.begin(),
+				  engine.reserved_client_names.end(),
+				  [&uuid] ( jack_reserved_name_t * res ) {
+				      return jack_uuid_compare( res->uuid, uuid ) == 0;
+				  } );
+
+    if( rnFinder != engine.reserved_client_names.end() ) {
+	jack_reserved_name_t * res = *rnFinder;
+	char * retval = strdup( res->name );
+	engine.reserved_client_names.erase( rnFinder );
+	free( res );
+	return retval;
     }
-    return 0;
+    else {
+	return 0;
+    }
 }
 
 int jack_engine_client_create( jack_engine_t & engine, int client_fd )
@@ -993,7 +1001,7 @@ int jack_engine_client_deactivate( jack_engine_t & engine, jack_uuid_t id )
 
     jack_lock_graph( (&engine) );
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 	if( jack_uuid_compare( client->control->uuid, id) == 0 ) {
 	    JSList *portnode;
 	    jack_port_internal_t *port;
@@ -1019,8 +1027,8 @@ int jack_engine_mark_client_socket_error( jack_engine_t & engine, int fd )
 {
     /* CALLER MUST HOLD GRAPH LOCK */
 
-    auto cFinder = std::find_if( engine.clients_vector.begin(),
-				 engine.clients_vector.end(),
+    auto cFinder = std::find_if( engine.clients.begin(),
+				 engine.clients.end(),
 				 [&fd] ( jack_client_internal_t * client ) {
 				     if( jack_client_is_internal( client ) ) {
 					 return false;
@@ -1030,7 +1038,7 @@ int jack_engine_mark_client_socket_error( jack_engine_t & engine, int fd )
 				     }
 				 } );
 
-    if( cFinder != engine.clients_vector.end() ) {
+    if( cFinder != engine.clients.end() ) {
 	jack_client_internal_t * client = *cFinder;
 	VERBOSE( &engine, "marking client %s with SOCKET error state = "
 		 "%s errors = %d", client->control->name,

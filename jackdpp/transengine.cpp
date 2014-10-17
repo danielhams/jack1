@@ -82,7 +82,7 @@ static void jack_sync_poll_stop( jack_engine_t & engine )
 {
     long poll_count = 0;		/* count sync_poll clients */
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 	if (client->control->active_slowsync &&
 	    client->control->sync_poll) {
 	    client->control->sync_poll = 0;
@@ -108,7 +108,7 @@ static void jack_sync_poll_start( jack_engine_t & engine )
 {
     long sync_count = 0;		/* count slow-sync clients */
 
-    for( jack_client_internal_t * client : engine.clients_vector ) {
+    for( jack_client_internal_t * client : engine.clients ) {
 	if (client->control->active_slowsync) {
 	    client->control->sync_poll = 1;
 	    sync_count++;

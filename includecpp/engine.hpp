@@ -157,9 +157,8 @@ struct _jack_engine {
     volatile int    new_clients_allowed;
 
     /* these are protected by `client_lock' */
-    std::vector<jack_client_internal_t*> clients_vector;
-    JSList	   *reserved_client_names;
-    std::vector<jack_reserved_name_t*> reserved_client_names_vector;
+    std::vector<jack_client_internal_t*> clients;
+    std::vector<jack_reserved_name_t*> reserved_client_names;
 
     // Actually fixed size based on options
     std::vector<jack_port_internal_t> internal_ports;
