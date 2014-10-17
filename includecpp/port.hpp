@@ -20,6 +20,9 @@
 #ifndef __jack_port_h__
 #define __jack_port_h__
 
+#include <string>
+#include <vector>
+
 #include <pthread.h>
 #include <string.h>
 
@@ -167,6 +170,7 @@ struct _jack_port {
     jack_port_functions_t    fptr;
     pthread_mutex_t          connection_lock;
     JSList                   *connections;
+    std::vector<jack_port_t*> connections_vector;
 };
 
 /*  Inline would be cleaner, but it needs to be fast even in
