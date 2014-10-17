@@ -1719,7 +1719,7 @@ int jack_engine_port_do_register( jack_engine_t & engine, jack_request_t *req, i
 
     port->shared = shared;
     port->connections = 0;
-    port->connections_vector.clear();
+//    port->connections_vector.clear();
     port->buffer_info = NULL;
 	
     if (jack_engine_port_assign_buffer( engine, port) ) {
@@ -2161,6 +2161,7 @@ static int jack_engine_port_disconnect_internal(
 	}
     }
 
+    /*
     for( jack_connection_internal_t * connection : srcport->connections_vector ) {
 	if( connection->source == srcport &&
 	    connection->destination == dstport ) {
@@ -2172,74 +2173,12 @@ static int jack_engine_port_disconnect_internal(
 
 	    jack_engine_port_connection_remove( engine, dstport->connections_vector, connection );
 			
-//	    src_id = srcport->shared->id;
-//	    dst_id = dstport->shared->id;
-
-	    /* this is a bit harsh, but it basically says
-	       that if we actually do a disconnect, and
-	       its the last one, then make sure that any
-	       input monitoring is turned off on the
-	       srcport. this isn't ideal for all
-	       situations, but it works better for most of
-	       them.
-	    */
-//	    if (srcport->connections_vector.size() == 0) {
-//		srcport->shared->monitor_requests = 0;
-//	    }
-
-//	    jack_engine_send_connection_notification( engine, srcport->shared->client_id,
-//					       src_id, dst_id, FALSE);
-
-//	    jack_engine_send_connection_notification( engine, dstport->shared->client_id,
-//					       dst_id, src_id, FALSE);
-
-	    /* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
-			
-//	    jack_engine_notify_all_port_interested_clients( engine, srcport->shared->client_id, dstport->shared->client_id,
-//						     src_id, dst_id, 0);
-
-	    // Currently handled by the jslist code.
-/*								    
-	    if (connection->dir) {
-		jack_client_internal_t *src;
-		jack_client_internal_t *dst;
-			
-		src = jack_engine_client_internal_by_id 
-		    (engine, srcport->shared->client_id);
-
-		dst =  jack_engine_client_internal_by_id
-		    (engine, dstport->shared->client_id);
-
-		src->truefeeds = jack_slist_remove
-		    (src->truefeeds, dst);
-
-		dst->fedcount--;					
-				
-		if (connection->dir == 1) {
-		    /* normal connection: remove dest from
-		       source's sortfeeds list *
-		    src->sortfeeds = jack_slist_remove
-			(src->sortfeeds, dst);
-		} else {
-		    /* feedback connection: remove source
-		       from dest's sortfeeds list *
-		    dst->sortfeeds = jack_slist_remove
-			(dst->sortfeeds, src);
-		    engine.feedbackcount--;
-		    VERBOSE( &engine,
-			     "feedback count down to %d",
-			     engine->feedbackcount);
-					
-		}
-	    } /* else self-connection: do nothing *
-*/
-
-	    ret = 0;
 	    break;
 	}
     }
 
     CHECK_CONNECTIONS_VECTOR_MATCHES( __FUNCTION__, srcport->connections_vector, srcport->connections );
+    */
 
     if( check_acyclic ) {
 	jack_engine_check_acyclic( engine );

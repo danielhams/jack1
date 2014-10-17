@@ -57,7 +57,7 @@ typedef struct _jack_connection_internal {
 typedef struct _jack_port_internal {
     struct _jack_port_shared *shared;
     JSList                   *connections;
-    std::vector<jack_connection_internal_t*> connections_vector;
+//    std::vector<jack_connection_internal_t*> connections_vector;
     jack_port_buffer_info_t  *buffer_info;
 } jack_port_internal_t;
 
