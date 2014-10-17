@@ -2074,10 +2074,30 @@ static int jack_engine_port_disconnect_internal(
     jack_port_id_t src_id, dst_id;
     int check_acyclic = engine.feedbackcount;
 
-    /* call tree **** MUST HOLD **** engine->client_lock. */
-    for (node = srcport->connections; node;
-	 node = jack_slist_next (node)) {
+//    CHECK_CONNECTIONS_VECTOR_MATCHES( "jack_engine_port_disconnect_internal predisconnect",
+//				      srcport->connections_vector, srcport->connections );
 
+    /* call tree **** MUST HOLD **** engine->client_lock. */
+    // Clear the vector entry first then let the JSList thing actually free it and do
+    // any work
+    /*
+    for( jack_connection_internal_t * connection : srcport->connections_vector ) {
+	if( connection->source == srcport &&
+	    connection->destination == dstport ) {
+	    VERBOSE( &engine, "connections_vector DIS-connect %s and %s",
+		     srcport->shared->name,
+		     dstport->shared->name);
+
+	    jack_engine_port_connection_remove( engine, srcport->connections_vector, connection );
+	    jack_engine_port_connection_remove( engine, dstport->connections_vector, connection );
+
+	    break;
+	}
+    }
+    */
+
+    /* call tree **** MUST HOLD **** engine->client_lock. */
+    for (node = srcport->connections; node; node = jack_slist_next (node)) {
 	connect = (jack_connection_internal_t *) node->data;
 
 	if (connect->source == srcport &&
@@ -2086,25 +2106,23 @@ static int jack_engine_port_disconnect_internal(
 	    VERBOSE( &engine, "DIS-connect %s and %s",
 		     srcport->shared->name,
 		     dstport->shared->name);
-			
-	    srcport->connections =
-		jack_slist_remove (srcport->connections,
-				   connect);
-	    dstport->connections =
-		jack_slist_remove (dstport->connections,
-				   connect);
+
+	    srcport->connections = jack_slist_remove (srcport->connections,
+						      connect);
+	    dstport->connections = jack_slist_remove (dstport->connections,
+						      connect);
 
 	    src_id = srcport->shared->id;
 	    dst_id = dstport->shared->id;
 
-	    /* this is a bit harsh, but it basically says
-	       that if we actually do a disconnect, and
-	       its the last one, then make sure that any
-	       input monitoring is turned off on the
-	       srcport. this isn't ideal for all
-	       situations, but it works better for most of
-	       them.
-	    */
+	    // this is a bit harsh, but it basically says
+	    // that if we actually do a disconnect, and
+	    // its the last one, then make sure that any
+	    // input monitoring is turned off on the
+	    // srcport. this isn't ideal for all
+	    // situations, but it works better for most of
+	    // them.
+
 	    if (srcport->connections == NULL) {
 		srcport->shared->monitor_requests = 0;
 	    }
@@ -2114,7 +2132,8 @@ static int jack_engine_port_disconnect_internal(
 	    jack_engine_send_connection_notification (
 		engine, dstport->shared->client_id, dst_id, src_id, FALSE);
 
-	    /* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
+	    // send a port connection notification just once to everyone who cares
+	    // excluding clients involved in the connection
 			
 	    jack_engine_notify_all_port_interested_clients(
 		engine,
@@ -2138,13 +2157,13 @@ static int jack_engine_port_disconnect_internal(
 		dst->fedcount--;					
 				
 		if (connect->dir == 1) {
-		    /* normal connection: remove dest from
-		       source's sortfeeds list */ 
+		    // normal connection: remove dest from
+		    // source's sortfeeds list
 		    src->sortfeeds = jack_slist_remove
 			(src->sortfeeds, dst);
 		} else {
-		    /* feedback connection: remove source
-		       from dest's sortfeeds list */
+		    // feedback connection: remove source
+		    // from dest's sortfeeds list
 		    dst->sortfeeds = jack_slist_remove
 			(dst->sortfeeds, src);
 		    engine.feedbackcount--;
@@ -2153,7 +2172,7 @@ static int jack_engine_port_disconnect_internal(
 			     engine.feedbackcount);
 					
 		}
-	    } /* else self-connection: do nothing */
+	    } // else self-connection: do nothing
 
 	    free (connect);
 	    ret = 0;
@@ -2161,24 +2180,8 @@ static int jack_engine_port_disconnect_internal(
 	}
     }
 
-    /*
-    for( jack_connection_internal_t * connection : srcport->connections_vector ) {
-	if( connection->source == srcport &&
-	    connection->destination == dstport ) {
-	    VERBOSE( &engine, "DIS-connect %s and %s",
-		     srcport->shared->name,
-		     dstport->shared->name);
-
-	    jack_engine_port_connection_remove( engine, srcport->connections_vector, connection );
-
-	    jack_engine_port_connection_remove( engine, dstport->connections_vector, connection );
-			
-	    break;
-	}
-    }
-
-    CHECK_CONNECTIONS_VECTOR_MATCHES( __FUNCTION__, srcport->connections_vector, srcport->connections );
-    */
+//    CHECK_CONNECTIONS_VECTOR_MATCHES( "jack_engine_port_disconnect_internal postdisconnect",
+//				      srcport->connections_vector, srcport->connections );
 
     if( check_acyclic ) {
 	jack_engine_check_acyclic( engine );
@@ -2192,8 +2195,16 @@ static int jack_engine_port_disconnect_internal(
 void jack_engine_port_clear_connections( jack_engine_t & engine,
 					 jack_port_internal_t *port )
 {
-    JSList *node, *next;
+    // Take a copy so our iterators aren't invalidated
+//    vector<jack_connection_internal_t*> port_connections = port->connections_vector;
+//    for( jack_connection_internal_t * connection : port_connections ) {
+//	jack_engine_port_disconnect_internal (
+//	    engine,
+//	    connection->source,
+//	    connection->destination);
+//    }
 
+    JSList *node, *next;
     for (node = port->connections; node; ) {
 	next = jack_slist_next (node);
 	jack_engine_port_disconnect_internal (
@@ -2205,6 +2216,7 @@ void jack_engine_port_clear_connections( jack_engine_t & engine,
 
     jack_slist_free (port->connections);
     port->connections = 0;
+//    port->connections_vector.clear();
 }
 
 int jack_engine_port_do_unregister( jack_engine_t & engine, jack_request_t *req )
@@ -2378,11 +2390,20 @@ void jack_engine_dump_configuration( jack_engine_t & engine, int take_lock )
 	    jack_info("\t port #%d: %s", ++m,
 		      port->shared->name);
 
-	    for( connectionnode = port->connections; 
-		 connectionnode; 
-		 connectionnode = jack_slist_next (connectionnode)) {
+	    /*
+	    for( jack_connection_internal_t * connection : port->connections_vector ) {
+		jack_info("\t\t connection #%d: %s %s",
+			  ++o,
+			  (port->shared->flags
+			   & JackPortIsInput)? "<-": "->",
+			  (port->shared->flags & JackPortIsInput)?
+			  connection->source->shared->name:
+			  connection->destination->shared->name);
+	    }
+	    */
+	    for( connectionnode = port->connections; connectionnode; connectionnode = jack_slist_next (connectionnode)) {
 		jack_connection_internal_t* connection = (jack_connection_internal_t *)connectionnode->data;
-	
+
 		jack_info("\t\t connection #%d: %s %s",
 			  ++o,
 			  (port->shared->flags
@@ -2472,6 +2493,13 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	return -1;
     }
 
+    /*
+    for( jack_connection_internal_t * con : srcport->connections_vector ) {
+	if( con->destination == dstport ) {
+	    return EEXIST;
+	}
+    }
+    */
     for (it = srcport->connections; it; it = it->next) {
 	if (((jack_connection_internal_t *)it->data)->destination
 	    == dstport) {
@@ -2479,8 +2507,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	}
     }
 
-    connection = (jack_connection_internal_t *)
-	malloc (sizeof (jack_connection_internal_t));
+    connection = (jack_connection_internal_t *)malloc( sizeof (jack_connection_internal_t) );
 
     connection->source = srcport;
     connection->destination = dstport;
@@ -2493,8 +2520,8 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
     jack_lock_graph( (&engine) );
 
     if (dstport->connections && !dstport->shared->has_mixdown) {
-	jack_port_type_info_t *port_type =
-	    jack_engine_port_type_info( engine, dstport);
+//    if( dstport->connections_vector.size() > 0 && !dstport->shared->has_mixdown) {
+	jack_port_type_info_t *port_type = jack_engine_port_type_info( engine, dstport);
 	jack_error ("cannot make multiple connections to a port of"
 		    " type [%s]", port_type->type_name);
 	free (connection);
@@ -2520,8 +2547,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	}
 	else if (srcclient != dstclient) {
 		
-	    srcclient->truefeeds = jack_slist_prepend
-		(srcclient->truefeeds, dstclient);
+	    srcclient->truefeeds = jack_slist_prepend( srcclient->truefeeds, dstclient );
 
 	    dstclient->fedcount++;				
 
@@ -2538,8 +2564,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 			 srcport->shared->name,
 			 dstport->shared->name);
 				 
-		dstclient->sortfeeds = jack_slist_prepend
-		    (dstclient->sortfeeds, srcclient);
+		dstclient->sortfeeds = jack_slist_prepend( dstclient->sortfeeds, srcclient );
 
 		connection->dir = -1;
 		engine.feedbackcount++;
@@ -2551,13 +2576,11 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 		
 		/* this is not a feedback connection */
 
-		VERBOSE( &engine,
-			 "connect %s and %s (forward)",
+		VERBOSE( &engine, "connect %s and %s (forward)",
 			 srcport->shared->name,
 			 dstport->shared->name);
 
-		srcclient->sortfeeds = jack_slist_prepend
-		    (srcclient->sortfeeds, dstclient);
+		srcclient->sortfeeds = jack_slist_prepend( srcclient->sortfeeds, dstclient );
 
 		connection->dir = 1;
 	    }
@@ -2574,10 +2597,10 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	    connection->dir = 0;
 	}
 
-	dstport->connections =
-	    jack_slist_prepend (dstport->connections, connection);
-	srcport->connections =
-	    jack_slist_prepend (srcport->connections, connection);
+	dstport->connections = jack_slist_prepend (dstport->connections, connection);
+//	dstport->connections_vector.push_back( connection );
+	srcport->connections = jack_slist_prepend (srcport->connections, connection);
+//	srcport->connections_vector.push_back( connection );
 		
 	DEBUG ("actually sorted the graph...");
 
@@ -2593,7 +2616,8 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	/* send a port connection notification just once to everyone who cares excluding clients involved in the connection */
 
 	jack_engine_notify_all_port_interested_clients(
-	    engine, srcport->shared->client_id, dstport->shared->client_id, src_id, dst_id, 1);
+	    engine, srcport->shared->client_id, dstport->shared->client_id,
+	    src_id, dst_id, 1);
 
 	jack_engine_sort_graph( engine );
     }
@@ -2690,11 +2714,11 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 
 		port = (jack_port_internal_t *) portnode->data;
 			
+//		for( jack_connection_internal_t * connection : port->connections_vector ) {
 		for (connnode = port->connections; connnode;
 		     connnode = jack_slist_next (connnode)) {
 				
-		    conn = (jack_connection_internal_t*)
-			connnode->data;
+		    conn = (jack_connection_internal_t*)connnode->data;
 				
 		    if (conn->dir == -1 )
 					
@@ -2707,15 +2731,13 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 				 conn->srcclient->control->name,
 				 conn->dstclient->control->name);
 			conn->dir = 1;
-			conn->dstclient->sortfeeds = 
-			    jack_slist_remove
-			    (conn->dstclient->sortfeeds,
-			     conn->srcclient);
+			conn->dstclient->sortfeeds = jack_slist_remove(
+			    conn->dstclient->sortfeeds,
+			    conn->srcclient );
 					     
-			conn->srcclient->sortfeeds =
-			    jack_slist_prepend
-			    (conn->srcclient->sortfeeds,
-			     conn->dstclient );
+			conn->srcclient->sortfeeds = jack_slist_prepend(
+			    conn->srcclient->sortfeeds,
+			    conn->dstclient );
 		    }
 		}
 	    }
@@ -2768,6 +2790,7 @@ int jack_engine_do_get_port_connections( jack_engine_t & engine, jack_request_t 
     DEBUG ("Getting connections for port '%s'.", port->shared->name);
 
     req->x.port_connections.nports = jack_slist_length (port->connections);
+//    req->x.port_connections.nports = port->connections_vector.size();
     req->status = 0;
 
     /* figure out if this is an internal or external client */
@@ -2790,25 +2813,23 @@ int jack_engine_do_get_port_connections( jack_engine_t & engine, jack_request_t 
 	    goto out;
 	}
     } else {
-	req->x.port_connections.ports = (const char**)
-	    malloc (sizeof (char *)
-		    * req->x.port_connections.nports);
+	req->x.port_connections.ports =
+	    (const char**)malloc (sizeof (char *) * req->x.port_connections.nports);
     }
 
     if (req->type == GetPortConnections) {
 		
+//	for( jack_connection_internal_t * connection : port->connections_vector ) {
 	for (i = 0, node = port->connections; node;
 	     node = jack_slist_next (node), ++i) {
+	    jack_connection_internal_t * tst_con = (jack_connection_internal_t*)node->data;
 
 	    jack_port_id_t port_id;
-			
-	    if (((jack_connection_internal_t *) node->data)->source
-		== port) {
-		port_id = ((jack_connection_internal_t *)
-			   node->data)->destination->shared->id;
+
+	    if ( tst_con->source == port ) {
+		port_id = tst_con->destination->shared->id;
 	    } else {
-		port_id = ((jack_connection_internal_t *)
-			   node->data)->source->shared->id;
+		port_id = tst_con->source->shared->id;
 	    }
 			
 	    if (internal) {
@@ -2827,11 +2848,9 @@ int jack_engine_do_get_port_connections( jack_engine_t & engine, jack_request_t 
 		 * names. we write the port id's to
 		 * the reply fd.
 		 */
-		if (write (reply_fd, &port_id,
-			   sizeof (port_id))
+		if (write (reply_fd, &port_id, sizeof (port_id))
 		    < (ssize_t) sizeof (port_id)) {
-		    jack_error ("cannot write port id "
-				"to client");
+		    jack_error ("cannot write port id to client");
 		    goto out;
 		}
 	    }
@@ -3026,18 +3045,14 @@ static jack_nframes_t jack_engine_get_port_total_latency(
     jack_info ("%sFor port %s (%s)", prefix, port->shared->name, (toward_port ? "toward" : "away"));
 #endif
 	
+//    for( jack_connection_internal_t * connection : port->connections_vector ) {
     for (node = port->connections; node; node = jack_slist_next (node)) {
+	jack_connection_internal_t * connection = (jack_connection_internal_t *)node->data;
 
 	jack_nframes_t this_latency;
-	jack_connection_internal_t *connection;
 
-	connection = (jack_connection_internal_t *) node->data;
-
-		
-	if ((toward_port &&
-	     (connection->source->shared == port->shared)) ||
-	    (!toward_port &&
-	     (connection->destination->shared == port->shared))) {
+	if ((toward_port && (connection->source->shared == port->shared)) ||
+	    (!toward_port && (connection->destination->shared == port->shared))) {
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
 	    jack_info ("%s\tskip connection %s->%s",
@@ -3061,8 +3076,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 
 	if (connection->destination == port) {
 
-	    if (connection->source->shared->flags
-		& JackPortIsTerminal) {
+	    if (connection->source->shared->flags & JackPortIsTerminal) {
 		this_latency = connection->source->shared->latency;
 	    } else {
 		this_latency = jack_engine_get_port_total_latency(
@@ -3074,8 +3088,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 
 	    /* "port" is the source, so get the latency of
 	     * the destination */
-	    if (connection->destination->shared->flags
-		& JackPortIsTerminal) {
+	    if (connection->destination->shared->flags & JackPortIsTerminal) {
 		this_latency = connection->destination->shared->latency;
 	    } else {
 		this_latency = jack_engine_get_port_total_latency(
@@ -3503,8 +3516,7 @@ static void jack_engine_do_request( jack_engine_t & engine, jack_request_t *req,
 	case GetPortConnections:
 	case GetPortNConnections:
 	    //JOQ bug: reply_fd may be NULL if internal request
-	    if ((req->status =
-		 jack_engine_do_get_port_connections( engine, req, *reply_fd))
+	    if ((req->status = jack_engine_do_get_port_connections( engine, req, *reply_fd))
 		== 0) {
 		/* we have already replied, don't do it again */
 		*reply_fd = -1;
@@ -4146,6 +4158,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     engine->internal_ports.resize( engine->port_max );
 
     for (i = 0; i < engine->port_max; i++) {
+//	engine->internal_ports[i].connections_vector.clear();
 	engine->internal_ports[i].connections = 0;
     }
 
