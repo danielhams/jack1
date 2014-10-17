@@ -1,8 +1,8 @@
 /*
     (Original file engine.h)
     Copyright (C) 2001-2003 Paul Davis
-	(Modifications for C++ engine.hpp)
-	Copyright (C) 2014 Daniel Hams
+    (Modifications for C++ engine.hpp)
+    Copyright (C) 2014 Daniel Hams
 	    
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -191,44 +191,5 @@ struct _jack_engine {
     int midi_out_cnt;
     int midi_in_cnt;
 };
-
-/* public functions */
-/*
-
-// D Hams
-// This is stuff I'm moving into jack_engine.[h|c]pp
-
-jack_engine_t  *jack_engine_new (int real_time, int real_time_priority,
-				 int do_mlock, int do_unlock,
-				 const char *server_name, int temporary,
-				 int verbose, int client_timeout,
-				 unsigned int port_max,
-                                 pid_t waitpid, jack_nframes_t frame_time_offset, int nozombies,
-				 int timeout_count_threshold,
-				 JSList *drivers);
-
-void		jack_engine_delete (jack_engine_t *);
-
-int		jack_engine_load_driver (jack_engine_t *engine,
-					 jack_driver_desc_t * driver_desc,
-					 JSList * driver_params);
-int		jack_engine_load_slave_driver (jack_engine_t *engine,
-					       jack_driver_desc_t * driver_desc,
-					       JSList * driver_params);
-int jack_drivers_start (jack_engine_t *engine);
-
-int jack_use_driver (jack_engine_t *engine, struct _jack_driver *driver);
-
-void jack_engine_sort_graph (jack_engine_t *engine);
-
-int jack_engine_deliver_event (jack_engine_t *, jack_client_internal_t *, const jack_event_t *, ...);
-
-
-// private engine functions (are used by clients)
-void		jack_engine_reset_rolling_usecs (jack_engine_t *engine);
-int		internal_client_request (void* ptr, jack_request_t *request);
-int		jack_get_fifo_fd (jack_engine_t *engine,
-				  unsigned int which_fifo);
-*/
 
 #endif

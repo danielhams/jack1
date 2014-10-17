@@ -86,13 +86,9 @@ static int jack_engine_port_do_disconnect( jack_engine_t & engine,
 					    const char *destination_port);
 static int jack_engine_port_do_disconnect_all( jack_engine_t & engine,
 						jack_port_id_t);
-//static int jack_engine_port_do_unregister( jack_engine_t & engine, jack_request_t *);
 static int jack_engine_port_do_register( jack_engine_t & engine, jack_request_t *, int );
 static int jack_engine_do_get_port_connections( jack_engine_t & engine,
 						jack_request_t *req, int reply_fd );
-//static int jack_engine_port_disconnect_internal( jack_engine_t & engine,
-//						  jack_port_internal_t *src, 
-//						  jack_port_internal_t *dst);
 static int jack_engine_send_connection_notification( jack_engine_t &,
 						     jack_uuid_t,
 						     jack_port_id_t,
@@ -217,21 +213,22 @@ void jack_engine_place_port_buffers( jack_engine_t & engine,
 	pti->freelist = jack_slist_remove_link (pti->freelist,
 						pti->freelist);
 	port_type->zero_buffer_offset = bi->offset;
-	if (ptid == JACK_AUDIO_PORT_TYPE)
+	if (ptid == JACK_AUDIO_PORT_TYPE) {
 	    engine.silent_buffer = bi;
+	}
     }
     /* initialize buffers */
-	{
-	    size_t i;
-	    jack_shm_info_t *shm_info = &engine.port_segment[ptid];
-	    char* shm_segment = (char *) jack_shm_addr(shm_info);
+    {
+	size_t i;
+	jack_shm_info_t *shm_info = &engine.port_segment[ptid];
+	char* shm_segment = (char *) jack_shm_addr(shm_info);
 
-	    bi = pti->info;
-	    for (i=0; i<nports; ++i, ++bi)
-		pfuncs->buffer_init(shm_segment + bi->offset, one_buffer, nframes);
-	}
+	bi = pti->info;
+	for (i=0; i<nports; ++i, ++bi)
+	    pfuncs->buffer_init(shm_segment + bi->offset, one_buffer, nframes);
+    }
 
-	pthread_mutex_unlock (&pti->lock);
+    pthread_mutex_unlock (&pti->lock);
 }
 
 #ifdef __linux
@@ -269,9 +266,7 @@ linux_poll_bug_encountered (jack_engine_t* engine, jack_time_t then, jack_time_t
 }
 #endif
 
-int jack_engine_deliver_event(
-    jack_engine_t & engine,
-    jack_client_internal_t *client,
+int jack_engine_deliver_event( jack_engine_t & engine, jack_client_internal_t *client,
     const jack_event_t *event, ...)
 {
     va_list ap;
@@ -947,8 +942,6 @@ static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 	ctl->finished_at = 0;
     }
 
-    // Can't change this until I work out how process_internal
-    // and process_external update the JSList
     vector<jack_client_internal_t*>::iterator current_iterator = engine.clients_vector.begin();
     vector<jack_client_internal_t*>::iterator end_marker = engine.clients_vector.end();
     for( ; engine.process_errors == 0 && current_iterator != end_marker ; ) {
@@ -982,14 +975,6 @@ static int jack_engine_drivers_write( jack_engine_t & engine, jack_nframes_t nfr
     for( jack_driver_t * sdriver : engine.slave_drivers ) {
 	sdriver->write( sdriver, nframes );
     }
-    /*
-    JSList *node;
-    for (node=engine->slave_drivers; node; node=jack_slist_next(node))
-    {
-	jack_driver_t *sdriver = (jack_driver_t*)node->data;
-	sdriver->write (sdriver, nframes);
-    }
-    */
 
     /* now the master driver is written */
     return engine.driver->write( engine.driver, nframes );
@@ -2706,7 +2691,6 @@ static int jack_engine_port_do_disconnect_all( jack_engine_t & engine,
  */
 static void jack_engine_check_acyclic( jack_engine_t & engine )
 {
-//    JSList *srcnode;
     JSList *dstnode;
     JSList *portnode, *connnode;
     jack_client_internal_t *src, *dst;
@@ -3318,7 +3302,6 @@ static int jack_engine_send_session_reply( jack_engine_t & engine, jack_client_i
 
 static int jack_engine_do_session_notify( jack_engine_t & engine, jack_request_t *req, int reply_fd )
 {
-//    JSList *node;
     jack_event_t event;
   
     int reply;
@@ -3699,7 +3682,6 @@ static int handle_external_client_request( jack_engine_t * engine, int fd )
     jack_request_t req;
     jack_client_internal_t *client = 0;
     int reply_fd;
-//    JSList *node;
     ssize_t r;
 
     auto cFinder = std::find_if( engine->clients_vector.begin(),
@@ -3714,18 +3696,6 @@ static int handle_external_client_request( jack_engine_t * engine, int fd )
     }
 
     client = *cFinder;
-
-    // for (node = engine->clients; node; node = jack_slist_next (node)) {
-    // 	if (((jack_client_internal_t *) node->data)->request_fd == fd) {
-    // 	    client = (jack_client_internal_t *) node->data;
-    // 	    break;
-    // 	}
-    // }
-
-    // if (client == NULL) {
-    // 	jack_error ("client input on unknown fd %d!", fd);
-    // 	return -1;
-    // }
 
     if ((r = read (client->request_fd, &req, sizeof (req)))
 	< (ssize_t) sizeof (req)) {
@@ -3835,14 +3805,11 @@ static void * jack_server_thread( void *arg )
     int stop_freewheeling;
 
     while (!done) {
-//	JSList* node;
 	size_t clients;
 
 	jack_rdlock_graph (engine);
 
-//	clients = jack_slist_length(engine->clients);
 	clients = engine->clients_vector.size();
-//	assert( clients == jack_slist_length(engine->clients) );
 
 	if( engine->pfd_size < fixed_fd_cnt + clients ) {
 	    if (engine->pfd) {
@@ -3877,8 +3844,6 @@ static void * jack_server_thread( void *arg )
 	engine->pfd[2].events = POLLIN|POLLERR;
 	engine->pfd_max = fixed_fd_cnt;
 		
-//	for (node = engine->clients; node; node = node->next) {
-//	    jack_client_internal_t* client = (jack_client_internal_t*)(node->data);
 	for( jack_client_internal_t * client : engine->clients_vector ) {
 
 	    if (client->request_fd < 0 || client->error >= JACK_ERROR_WITH_SOCKETS) {
@@ -4148,7 +4113,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
     pthread_mutex_init (&engine->request_lock, 0);
     pthread_mutex_init (&engine->problem_lock, 0);
 
-//    engine->clients = 0;
     engine->clients_vector.clear();
     engine->reserved_client_names = 0;
 
