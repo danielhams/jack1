@@ -56,6 +56,8 @@
 #include "intsimd.hpp"
 #include "messagebuffer.hpp"
 
+#include <algorithm>
+
 #include <sysdeps/time.h>
 
 #include "local.hpp"
@@ -67,6 +69,9 @@
 #ifdef JACK_USE_MACH_THREADS
 #include <sysdeps/pThreadUtilities.h>
 #endif
+
+using std::string;
+using std::vector;
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
@@ -414,7 +419,7 @@ void jack_client_fix_port_buffers (jack_client_t *client)
 
 		if (port->shared->flags & JackPortIsInput) {
 			if (port->mix_buffer) {
-				size_t buffer_size = 
+				size_t buffer_size =
 					jack_port_type_buffer_size( port->type_info,
 								    client->engine->buffer_size );
 				jack_pool_release (port->mix_buffer);
@@ -422,8 +427,8 @@ void jack_client_fix_port_buffers (jack_client_t *client)
 				pthread_mutex_lock (&port->connection_lock);
 				if (jack_slist_length (port->connections) > 1) {
 					port->mix_buffer = jack_pool_alloc (buffer_size);
-					port->fptr.buffer_init (port->mix_buffer, 
-								buffer_size, 
+					port->fptr.buffer_init (port->mix_buffer,
+								buffer_size,
 								client->engine->buffer_size);
 				}
 				pthread_mutex_unlock (&port->connection_lock);
@@ -432,87 +437,95 @@ void jack_client_fix_port_buffers (jack_client_t *client)
 	}
 }
 
+static void jack_client_erase_control_port_connection(
+    vector<jack_port_t*> & connections_vector,
+    jack_port_t * port_to_erase )
+{
+    auto pFinder = std::find( connections_vector.begin(),
+			      connections_vector.end(),
+			      port_to_erase );
+
+    if( pFinder != connections_vector.end() ) {
+	connections_vector.erase( pFinder );
+    }
+}
+
 int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *event)
 {
-	jack_port_t *control_port;
-	jack_port_t *other = 0;
-	JSList *node;
-	int need_free = FALSE;
+    jack_port_t *control_port;
+    jack_port_t *other = 0;
+    JSList *node;
+    int need_free = FALSE;
         
-	if (jack_uuid_compare (client->engine->ports[event->x.self_id].client_id, client->control->uuid) == 0 ||
-	    jack_uuid_compare (client->engine->ports[event->y.other_id].client_id, client->control->uuid) == 0) {
+    if (jack_uuid_compare (client->engine->ports[event->x.self_id].client_id, client->control->uuid) == 0 ||
+	jack_uuid_compare (client->engine->ports[event->y.other_id].client_id, client->control->uuid) == 0) {
 
-		/* its one of ours */
+	/* its one of ours */
 
-		switch (event->type) {
-		case PortConnected:
-			other = jack_port_new (client, event->y.other_id,
-					       client->engine);
-			/* jack_port_by_id_int() always returns an internal
-			 * port that does not need to be deallocated 
-			 */
-			control_port = jack_port_by_id_int (client, event->x.self_id,
-							    &need_free);
-			pthread_mutex_lock (&control_port->connection_lock);
+	switch (event->type) {
+	    case PortConnected:
+		other = jack_port_new (client, event->y.other_id,
+				       client->engine);
+		/* jack_port_by_id_int() always returns an internal
+		 * port that does not need to be deallocated
+		 */
+		control_port = jack_port_by_id_int (client, event->x.self_id,
+						    &need_free);
+		pthread_mutex_lock (&control_port->connection_lock);
 
-			if ((control_port->shared->flags & JackPortIsInput)
-			 && (control_port->connections != NULL) 
-			 && (control_port->mix_buffer == NULL)  ) {
-				size_t buffer_size = 
-					jack_port_type_buffer_size( control_port->type_info,
-								    client->engine->buffer_size );
-				control_port->mix_buffer = jack_pool_alloc (buffer_size);
-				control_port->fptr.buffer_init (control_port->mix_buffer, 
-								buffer_size, 
-								client->engine->buffer_size);
-			}
-
-			control_port->connections =
-				jack_slist_prepend (control_port->connections,
-						    (void *) other);
-			pthread_mutex_unlock (&control_port->connection_lock);
-			break;
-			
-		case PortDisconnected:
-			/* jack_port_by_id_int() always returns an internal
-			 * port that does not need to be deallocated 
-			 */
-			control_port = jack_port_by_id_int (client, event->x.self_id,
-							    &need_free);
-			pthread_mutex_lock (&control_port->connection_lock);
-			
-			for (node = control_port->connections; node;
-			     node = jack_slist_next (node)) {
-				
-				other = (jack_port_t *) node->data;
-
-				if (other->shared->id == event->y.other_id) {
-					control_port->connections =
-						jack_slist_remove_link (
-							control_port->connections,
-							node);
-					jack_slist_free_1 (node);
-					free (other);
-					break;
-				}
-			}
-			
-			pthread_mutex_unlock (&control_port->connection_lock);
-			break;
-			
-		default:
-			/* impossible */
-			break;
+		if ((control_port->shared->flags & JackPortIsInput)
+		    && (control_port->connections != NULL)
+		    && (control_port->mix_buffer == NULL)  ) {
+		    size_t buffer_size =
+			jack_port_type_buffer_size( control_port->type_info,
+						    client->engine->buffer_size );
+		    control_port->mix_buffer = jack_pool_alloc (buffer_size);
+		    control_port->fptr.buffer_init (control_port->mix_buffer,
+						    buffer_size,
+						    client->engine->buffer_size);
 		}
-	}
 
-	if (client->control->port_connect_cbset) {
-		client->port_connect (event->x.self_id, event->y.other_id,
-					       (event->type == PortConnected ? 1 : 0), 
-					       client->port_connect_arg);
-	}
+		control_port->connections = jack_slist_prepend (control_port->connections,
+								(void *) other);
+		pthread_mutex_unlock (&control_port->connection_lock);
+		break;
+			
+	    case PortDisconnected:
+		/* jack_port_by_id_int() always returns an internal
+		 * port that does not need to be deallocated
+		 */
+		control_port = jack_port_by_id_int (client, event->x.self_id,
+						    &need_free);
+		pthread_mutex_lock (&control_port->connection_lock);
+			
+		for (node = control_port->connections; node; node = jack_slist_next (node)) {
+		    other = (jack_port_t *) node->data;
 
-	return 0;
+		    if (other->shared->id == event->y.other_id) {
+			control_port->connections = jack_slist_remove_link( control_port->connections,
+									    node);
+			jack_slist_free_1 (node);
+			free (other);
+			break;
+		    }
+		}
+
+		pthread_mutex_unlock (&control_port->connection_lock);
+		break;
+
+	    default:
+		/* impossible */
+		break;
+	}
+    }
+
+    if (client->control->port_connect_cbset) {
+	client->port_connect (event->x.self_id, event->y.other_id,
+			      (event->type == PortConnected ? 1 : 0),
+			      client->port_connect_arg);
+    }
+
+    return 0;
 }
 
 int jack_client_handle_session_callback (jack_client_t *client, jack_event_t *event)
@@ -544,131 +557,131 @@ int jack_client_handle_session_callback (jack_client_t *client, jack_event_t *ev
 
 static void jack_port_recalculate_latency (jack_port_t *port, jack_latency_callback_mode_t mode)
 {
-	jack_latency_range_t latency = { UINT32_MAX, 0 };
-	JSList *node;
+    jack_latency_range_t latency = { UINT32_MAX, 0 };
+    JSList *node;
 
-	pthread_mutex_lock (&port->connection_lock);
-	for (node = port->connections; node; node = jack_slist_next (node)) {
-		jack_port_t *other = (jack_port_t*)node->data;
-		jack_latency_range_t other_latency;
+    pthread_mutex_lock (&port->connection_lock);
+    for (node = port->connections; node; node = jack_slist_next (node)) {
+	jack_port_t *other = (jack_port_t*)node->data;
+	jack_latency_range_t other_latency;
 
-		jack_port_get_latency_range (other, mode, &other_latency);
+	jack_port_get_latency_range (other, mode, &other_latency);
 
-		if (other_latency.max > latency.max)
-			latency.max = other_latency.max;
-		if (other_latency.min < latency.min)
-			latency.min = other_latency.min;
+	if (other_latency.max > latency.max)
+	    latency.max = other_latency.max;
+	if (other_latency.min < latency.min)
+	    latency.min = other_latency.min;
 
-	}
-	pthread_mutex_unlock (&port->connection_lock);
+    }
+    pthread_mutex_unlock (&port->connection_lock);
 
-	if (latency.min == UINT32_MAX)
-		latency.min = 0;
+    if (latency.min == UINT32_MAX)
+	latency.min = 0;
 
-	jack_port_set_latency_range (port, mode, &latency);
+    jack_port_set_latency_range (port, mode, &latency);
 }
 
 int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event, int is_driver)
 {
-	jack_latency_callback_mode_t mode = (event->x.n==0) ? JackCaptureLatency : JackPlaybackLatency;
-	JSList *node;
-	jack_latency_range_t latency = { UINT32_MAX, 0 };
+    jack_latency_callback_mode_t mode = (event->x.n==0) ? JackCaptureLatency : JackPlaybackLatency;
+    JSList *node;
+    jack_latency_range_t latency = { UINT32_MAX, 0 };
 
-	/* first setup all latency values of the ports.
-	 * this is based on the connections of the ports.
+    /* first setup all latency values of the ports.
+     * this is based on the connections of the ports.
+     */
+    for (node = client->ports; node; node = jack_slist_next (node)) {
+	jack_port_t *port = (jack_port_t*)node->data;
+
+	if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
+	    jack_port_recalculate_latency (port, mode);
+	}
+	if ((jack_port_flags (port) & JackPortIsInput) && (mode == JackCaptureLatency)) {
+	    jack_port_recalculate_latency (port, mode);
+	}
+    }
+
+    /* for a driver invocation without its own latency callback, this is enough.
+     * input and output ports do not depend on each other.
+     */
+    if (is_driver && !client->control->latency_cbset) {
+	return 0;
+    }
+
+    if (!client->control->latency_cbset) {
+	/*
+	 * default action is to assume all ports depend on each other.
+	 * then always take the maximum latency.
 	 */
-	for (node = client->ports; node; node = jack_slist_next (node)) {
+
+	if (mode == JackPlaybackLatency) {
+	    /* iterate over all OutputPorts, to find maximum playback latency
+	     */
+	    for (node = client->ports; node; node = jack_slist_next (node)) {
 		jack_port_t *port = (jack_port_t*)node->data;
 
-		if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
-			jack_port_recalculate_latency (port, mode);
+		if (port->shared->flags & JackPortIsOutput) {
+		    jack_latency_range_t other_latency;
+
+		    jack_port_get_latency_range (port, mode, &other_latency);
+		    if (other_latency.max > latency.max)
+			latency.max = other_latency.max;
+		    if (other_latency.min < latency.min)
+			latency.min = other_latency.min;
 		}
-		if ((jack_port_flags (port) & JackPortIsInput) && (mode == JackCaptureLatency)) {
-			jack_port_recalculate_latency (port, mode);
+	    }
+
+	    if (latency.min == UINT32_MAX)
+		latency.min = 0;
+
+	    /* now set the found latency on all input ports
+	     */
+	    for (node = client->ports; node; node = jack_slist_next (node)) {
+		jack_port_t *port = (jack_port_t*)node->data;
+
+		if (port->shared->flags & JackPortIsInput) {
+		    jack_port_set_latency_range (port, mode, &latency);
 		}
+	    }
 	}
+	if (mode == JackCaptureLatency) {
+	    /* iterate over all InputPorts, to find maximum playback latency
+	     */
+	    for (node = client->ports; node; node = jack_slist_next (node)) {
+		jack_port_t *port = (jack_port_t*)node->data;
 
-	/* for a driver invocation without its own latency callback, this is enough.
-	 * input and output ports do not depend on each other.
-	 */
-	if (is_driver && !client->control->latency_cbset) {
-		return 0;
-        }
+		if (port->shared->flags & JackPortIsInput) {
+		    jack_latency_range_t other_latency;
 
-	if (!client->control->latency_cbset) {
-		/*
-		 * default action is to assume all ports depend on each other.
-		 * then always take the maximum latency.
-		 */
-
-		if (mode == JackPlaybackLatency) {
-			/* iterate over all OutputPorts, to find maximum playback latency
-			 */
-			for (node = client->ports; node; node = jack_slist_next (node)) {
-				jack_port_t *port = (jack_port_t*)node->data;
-
-				if (port->shared->flags & JackPortIsOutput) {
-					jack_latency_range_t other_latency;
-
-					jack_port_get_latency_range (port, mode, &other_latency);
-					if (other_latency.max > latency.max)
-						latency.max = other_latency.max;
-					if (other_latency.min < latency.min)
-						latency.min = other_latency.min;
-				}
-			}
-
-			if (latency.min == UINT32_MAX)
-				latency.min = 0;
-
-			/* now set the found latency on all input ports
-			 */
-			for (node = client->ports; node; node = jack_slist_next (node)) {
-				jack_port_t *port = (jack_port_t*)node->data;
-
-				if (port->shared->flags & JackPortIsInput) {
-					jack_port_set_latency_range (port, mode, &latency);
-				}
-			}
+		    jack_port_get_latency_range (port, mode, &other_latency);
+		    if (other_latency.max > latency.max)
+			latency.max = other_latency.max;
+		    if (other_latency.min < latency.min)
+			latency.min = other_latency.min;
 		}
-		if (mode == JackCaptureLatency) {
-			/* iterate over all InputPorts, to find maximum playback latency
-			 */
-			for (node = client->ports; node; node = jack_slist_next (node)) {
-				jack_port_t *port = (jack_port_t*)node->data;
+	    }
 
-				if (port->shared->flags & JackPortIsInput) {
-					jack_latency_range_t other_latency;
+	    if (latency.min == UINT32_MAX)
+		latency.min = 0;
 
-					jack_port_get_latency_range (port, mode, &other_latency);
-					if (other_latency.max > latency.max)
-						latency.max = other_latency.max;
-					if (other_latency.min < latency.min)
-						latency.min = other_latency.min;
-				}
-			}
+	    /* now set the found latency on all output ports
+	     */
+	    for (node = client->ports; node; node = jack_slist_next (node)) {
+		jack_port_t *port = (jack_port_t*)node->data;
 
-			if (latency.min == UINT32_MAX)
-				latency.min = 0;
-
-			/* now set the found latency on all output ports
-			 */
-			for (node = client->ports; node; node = jack_slist_next (node)) {
-				jack_port_t *port = (jack_port_t*)node->data;
-
-				if (port->shared->flags & JackPortIsOutput) {
-					jack_port_set_latency_range (port, mode, &latency);
-				}
-			}
+		if (port->shared->flags & JackPortIsOutput) {
+		    jack_port_set_latency_range (port, mode, &latency);
 		}
-		return 0;
+	    }
 	}
-
-	/* we have a latency callback setup by the client,
-	 * lets use it...
-	 */
-	client->latency_cb ( mode, client->latency_cb_arg);
 	return 0;
+    }
+
+    /* we have a latency callback setup by the client,
+     * lets use it...
+     */
+    client->latency_cb ( mode, client->latency_cb_arg);
+    return 0;
 }
 
 #if JACK_USE_MACH_THREADS
