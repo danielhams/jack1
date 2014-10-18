@@ -464,6 +464,30 @@ struct _jack_request {
     int32_t status;
 } POST_PACKED_STRUCTURE;
 
+/* Structures for ports and connections between them */
+typedef struct {
+    jack_shm_info_t* shm_info;
+    jack_shmsize_t   offset;
+} jack_port_buffer_info_t;
+
+struct _jack_port_internal;
+struct _jack_client_internal;
+
+typedef struct _jack_connection_internal {
+    struct _jack_port_internal *source;
+    struct _jack_port_internal *destination;
+    signed int dir; /* -1 = feedback, 0 = self, 1 = forward */
+    struct _jack_client_internal *srcclient;
+    struct _jack_client_internal *dstclient;
+} jack_connection_internal_t;
+
+/* The engine keeps an array of these in its local memory. */
+typedef struct _jack_port_internal {
+    struct _jack_port_shared *shared;
+    std::vector<jack_connection_internal_t*> connections_vector;
+    jack_port_buffer_info_t  *buffer_info;
+} jack_port_internal_t;
+
 /* Per-client structure allocated in the server's address space.
  * It's here because its not part of the engine structure.
  */
@@ -476,7 +500,7 @@ typedef struct _jack_client_internal {
     int        event_fd;
     int        subgraph_start_fd;
     int        subgraph_wait_fd;
-    JSList    *ports;    /* protected by engine->client_lock */
+    std::vector<jack_port_internal_t*> ports_vector; /* protected by engine->client_lock */
     JSList    *truefeeds;    /* protected by engine->client_lock */
     JSList    *sortfeeds;    /* protected by engine->client_lock */
     int	       fedcount;

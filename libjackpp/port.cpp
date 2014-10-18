@@ -184,7 +184,7 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
     jack_port_type_id_t ptid = shared->ptype_id;
     jack_port_t *port;
 
-    if ((port = (jack_port_t *) malloc (sizeof (jack_port_t))) == NULL) {
+    if( (port = new jack_port_t()) == NULL ) {
 	return NULL;
     }
 	
@@ -193,7 +193,6 @@ jack_port_new (const jack_client_t *client, jack_port_id_t port_id,
     port->shared = shared;
     port->type_info = &client->engine->port_types[ptid];
     pthread_mutex_init (&port->connection_lock, NULL);
-//    port->connections = 0;
     port->connections_vector.clear();
     port->tied = NULL;
 
@@ -313,13 +312,11 @@ int
 jack_port_connected (const jack_port_t *port)
 {
     return port->connections_vector.size() > 0;
-//    return jack_slist_length (port->connections);
 }
 
 int
 jack_port_connected_to (const jack_port_t *port, const char *portname)
 {
-    JSList *node;
     int ret = FALSE;
 
     /* XXX this really requires a cross-process lock
@@ -332,8 +329,6 @@ jack_port_connected_to (const jack_port_t *port, const char *portname)
     pthread_mutex_lock (&((jack_port_t *) port)->connection_lock);
 
     for( jack_port_t * other_port : port->connections_vector ) {
-//    for (node = port->connections; node; node = jack_slist_next (node)) {
-//	jack_port_t *other_port = (jack_port_t *) node->data;
 	if (jack_port_name_equals (other_port->shared, portname)) {
 	    ret = TRUE;
 	    break;
@@ -348,7 +343,6 @@ const char **
 jack_port_get_connections (const jack_port_t *port)
 {
     const char **ret = NULL;
-    JSList *node;
     unsigned int n;
 
     /* XXX this really requires a cross-process lock
@@ -370,13 +364,10 @@ jack_port_get_connections (const jack_port_t *port)
 	    return NULL;
 	}
 
-//	for( jack_port_t * other_port : port->connections_vector ) {
 	vector<jack_port_t*>::const_iterator pc_iter = port->connections_vector.begin();
 	vector<jack_port_t*>::const_iterator pc_end = port->connections_vector.end();
 	for( n = 0 ; pc_iter != pc_end ; ++pc_iter, ++n ) {
 	    jack_port_t * other = *pc_iter;
-//	for (n = 0, node = port->connections; node; node = jack_slist_next (node), ++n) {
-//	    jack_port_t* other = (jack_port_t *)node->data;
 	    ret[n] = other->shared->name;
 	}
 	ret[n] = NULL;
@@ -567,8 +558,6 @@ jack_port_set_latency (jack_port_t *port, jack_nframes_t nframes)
 void *
 jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 {
-    JSList *node, *next;
-
     /* Output port.  The buffer was assigned by the engine
        when the port was registered.
     */
@@ -590,7 +579,6 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
        server), there is no need to take the connection lock here
     */
     uint32_t num_port_connections = port->connections_vector.size();
-//    if ((node = port->connections) == NULL) {
     if( num_port_connections == 0 ) {
 	if (port->client_segment_base == NULL || *port->client_segment_base == MAP_FAILED) {
 	    return NULL;
@@ -600,13 +588,11 @@ jack_port_get_buffer (jack_port_t *port, jack_nframes_t nframes)
 	return (void *) (*(port->client_segment_base) + port->type_info->zero_buffer_offset);
     }
 
-//    if ((next = jack_slist_next (node)) == NULL) {
     if( num_port_connections == 1 ) {
 
 	/* one connection: use zero-copy mode - just pass
 	   the buffer of the connected (output) port.
 	*/
-//	return jack_port_get_buffer (((jack_port_t *) node->data), nframes);
 	return jack_port_get_buffer( port->connections_vector[0], nframes );
     }
 
@@ -675,24 +661,13 @@ jack_port_request_monitor (jack_port_t *port, int onoff)
     }
 
     if ((port->shared->flags & JackPortIsOutput) == 0) {
-
-	JSList *node;
-
 	/* this port is for input, so recurse over each of the
 	   connected ports.
 	*/
 
 	pthread_mutex_lock (&port->connection_lock);
 	for( jack_port_t * other_port : port->connections_vector ) {
-//	for (node = port->connections; node; node = jack_slist_next (node)) {
-			
-	    /* drop the lock because if there is a feedback loop,
-	       we will deadlock. XXX much worse things will
-	       happen if there is a feedback loop !!!
-	    */
-
 	    pthread_mutex_unlock (&port->connection_lock);
-//	    jack_port_request_monitor ((jack_port_t *) node->data, onoff);
 	    jack_port_request_monitor( other_port, onoff );
 	    pthread_mutex_lock (&port->connection_lock);
 	}
@@ -903,7 +878,6 @@ static inline float f_max(float x, float a)
 
 static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 {
-    JSList *node;
     jack_port_t *input;
 #ifndef ARCH_X86
     jack_nframes_t n;
@@ -922,8 +896,6 @@ static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
        during this time.
     */
 
-//    node = port->connections;
-//    input = (jack_port_t *) node->data;
     vector<jack_port_t*>::iterator pc_iter = port->connections_vector.begin();
     vector<jack_port_t*>::iterator pc_end = port->connections_vector.end();
     input = *pc_iter;
@@ -936,9 +908,6 @@ static void jack_audio_port_mixdown (jack_port_t *port, jack_nframes_t nframes)
 #endif /* USE_DYNSIMD */
 
     for( input = *(++pc_iter) ; pc_iter != pc_end ; ++pc_iter ) {
-//    for (node = jack_slist_next (node); node; node = jack_slist_next (node)) {
-//	input = (jack_port_t *) node->data;
-
 #ifndef USE_DYNSIMD
 	n = nframes;
 	dst = buffer;

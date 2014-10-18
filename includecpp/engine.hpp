@@ -38,28 +38,6 @@ struct _jack_port_internal;
 /* Structures is allocated by the engine in local memory to keep track
  * of port buffers and connections.
  */
-typedef struct {
-    jack_shm_info_t* shm_info;
-    jack_shmsize_t   offset;
-} jack_port_buffer_info_t;
-
-struct _jack_port_internal;
-
-typedef struct _jack_connection_internal {
-    struct _jack_port_internal *source;
-    struct _jack_port_internal *destination;
-    signed int dir; /* -1 = feedback, 0 = self, 1 = forward */
-    jack_client_internal_t *srcclient;
-    jack_client_internal_t *dstclient;
-} jack_connection_internal_t;
-
-/* The engine keeps an array of these in its local memory. */
-typedef struct _jack_port_internal {
-    struct _jack_port_shared *shared;
-//    JSList                   *connections;
-    std::vector<jack_connection_internal_t*> connections_vector;
-    jack_port_buffer_info_t  *buffer_info;
-} jack_port_internal_t;
 
 /* The engine's internal port type structure. */
 typedef struct _jack_port_buffer_list {

@@ -26,7 +26,7 @@
 #include "unlock.hpp"
 #include "internal.hpp"
 
-static char* blacklist[] = {
+static const char* blacklist[] = {
 	"/libgtk",
 	"/libqt",
 	"/libfltk",
@@ -34,13 +34,13 @@ static char* blacklist[] = {
 	NULL
 };
 
-static char* whitelist[] = {
+static const char* whitelist[] = {
 	"/libc-",
 	"/libardour",
 	NULL
 };
 
-static char* library_roots[] = {
+static const char* library_roots[] = {
 	"/lib",
 	"/usr/lib",
 	"/usr/local/lib",

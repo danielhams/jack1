@@ -23,13 +23,4 @@
 #include <vector>
 #include <memory>
 
-#include "jack_options_parser.hpp"
-
-#include "internal.hpp"
-#include "engine.hpp"
-
-void CHECK_CONNECTIONS_VECTOR_MATCHES( const char * source,
-    std::vector<jack_connection_internal_t*> & connections_vector,
-    JSList * connections_jsl );
-
 #endif

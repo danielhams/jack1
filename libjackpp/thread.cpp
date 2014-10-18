@@ -49,7 +49,7 @@ jack_set_thread_creator (jack_thread_creator_t jtc)
 }
 
 static inline void
-log_result (char *msg, int res)
+log_result( const char *msg, int res )
 {
 	char outbuf[500];
 	snprintf(outbuf, sizeof(outbuf),

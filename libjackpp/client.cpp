@@ -55,6 +55,7 @@
 #include "varargs.hpp"
 #include "intsimd.hpp"
 #include "messagebuffer.hpp"
+#include "jack_constants.hpp"
 
 #include <algorithm>
 
@@ -120,7 +121,7 @@ static void init_cpu ()
 
 #endif /* USE_DYNSIMD */
 
-char *jack_tmpdir = DEFAULT_TMP_DIR;
+char *jack_tmpdir = (char*)DEFAULT_TMP_DIR;
 
 static int jack_get_tmpdir ()
 {
@@ -426,7 +427,6 @@ void jack_client_fix_port_buffers (jack_client_t *client)
 		port->mix_buffer = NULL;
 		pthread_mutex_lock (&port->connection_lock);
 		if( port->connections_vector.size() > 1 ) {
-//		if (jack_slist_length (port->connections) > 1) {
 		    port->mix_buffer = jack_pool_alloc (buffer_size);
 		    port->fptr.buffer_init (port->mix_buffer,
 					    buffer_size,
@@ -455,7 +455,6 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 {
     jack_port_t *control_port;
     jack_port_t *other = 0;
-    JSList *node;
     int need_free = FALSE;
         
     if (jack_uuid_compare (client->engine->ports[event->x.self_id].client_id, client->control->uuid) == 0 ||
@@ -475,7 +474,6 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 		pthread_mutex_lock (&control_port->connection_lock);
 
 		if ((control_port->shared->flags & JackPortIsInput)
-//		    && (control_port->connections != NULL)
 		    && (control_port->connections_vector.size() > 0)
 		    && (control_port->mix_buffer == NULL)  ) {
 		    size_t buffer_size =
@@ -487,8 +485,6 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 						    client->engine->buffer_size);
 		}
 
-//		control_port->connections = jack_slist_prepend (control_port->connections,
-//								(void *) other);
 		control_port->connections_vector.push_back( other );
 		pthread_mutex_unlock (&control_port->connection_lock);
 		break;
@@ -508,14 +504,7 @@ int jack_client_handle_port_connection (jack_client_t *client, jack_event_t *eve
 		for( ; pc_iter != pc_end ; ++pc_iter ) {
 		    other = *pc_iter;
 			
-//		for (node = control_port->connections; node; node = jack_slist_next (node)) {
-//		    other = (jack_port_t *) node->data;
-
 		    if (other->shared->id == event->y.other_id) {
-//			control_port->connections = jack_slist_remove_link( control_port->connections,
-//									    node);
-//			jack_slist_free_1 (node);
-
 			jack_client_erase_control_port_connection( control_port->connections_vector,
 								   other );
 			free (other);
@@ -571,11 +560,9 @@ int jack_client_handle_session_callback (jack_client_t *client, jack_event_t *ev
 static void jack_port_recalculate_latency (jack_port_t *port, jack_latency_callback_mode_t mode)
 {
     jack_latency_range_t latency = { UINT32_MAX, 0 };
-    JSList *node;
 
     pthread_mutex_lock (&port->connection_lock);
-//    for (node = port->connections; node; node = jack_slist_next (node)) {
-//	jack_port_t *other = (jack_port_t*)node->data;
+
     for( jack_port_t * other : port->connections_vector ) {
 	jack_latency_range_t other_latency;
 
@@ -1007,141 +994,141 @@ int start_server (const char *server_name, jack_options_t options)
 	return 0;			/* (probably) successful */
 }
 
-static int jack_request_client (ClientType type,
-		     const char* client_name, jack_options_t options,
-		     jack_status_t *status, jack_varargs_t *va,
-		     jack_client_connect_result_t *res, int *req_fd)
+static int jack_request_client (
+    ClientType type, const char* client_name, jack_options_t options,
+    jack_status_t *status, jack_varargs_t *va,
+    jack_client_connect_result_t *res, int *req_fd)
 {
-	jack_client_connect_request_t req;
+    jack_client_connect_request_t req;
 
-	*req_fd = -1;
-	memset (&req, 0, sizeof (req));
-	req.options = options;
+    *req_fd = -1;
+    memset (&req, 0, sizeof (req));
+    req.options = options;
 
-	if (strlen (client_name) >= sizeof (req.name)) {
-		jack_error ("\"%s\" is too long to be used as a JACK client"
-			    " name.\n"
-			    "Please use %lu characters or less.",
-			    client_name, sizeof (req.name));
-		return -1;
-	}
+    if (strlen (client_name) >= sizeof (req.name)) {
+	jack_error ("\"%s\" is too long to be used as a JACK client"
+		    " name.\n"
+		    "Please use %lu characters or less.",
+		    client_name, sizeof (req.name));
+	return -1;
+    }
 
-	if (va->load_name
-	    && (strlen (va->load_name) > sizeof (req.object_path) - 1)) {
-		jack_error ("\"%s\" is too long to be used as a JACK shared"
-			    " object name.\n"
-			     "Please use %lu characters or less.",
-			    va->load_name, sizeof (req.object_path) - 1);
-		return -1;
-	}
+    if (va->load_name
+	&& (strlen (va->load_name) > sizeof (req.object_path) - 1)) {
+	jack_error ("\"%s\" is too long to be used as a JACK shared"
+		    " object name.\n"
+		    "Please use %lu characters or less.",
+		    va->load_name, sizeof (req.object_path) - 1);
+	return -1;
+    }
 
-	if (va->load_init
-	    && (strlen (va->load_init) > sizeof (req.object_data) - 1)) {
-		jack_error ("\"%s\" is too long to be used as a JACK shared"
-			    " object data string.\n"
-			     "Please use %lu characters or less.",
-			    va->load_init, sizeof (req.object_data) - 1);
-		return -1;
-	}
+    if (va->load_init
+	&& (strlen (va->load_init) > sizeof (req.object_data) - 1)) {
+	jack_error ("\"%s\" is too long to be used as a JACK shared"
+		    " object data string.\n"
+		    "Please use %lu characters or less.",
+		    va->load_init, sizeof (req.object_data) - 1);
+	return -1;
+    }
 	
-	if ((*req_fd = server_connect (va->server_name)) < 0) {
-		int trys;
-		if (start_server(va->server_name, options)) {
-			*status = (jack_status_t)(*status | (JackFailure|JackServerFailed));
-			goto fail;
-		}
-		trys = 5;
-		do {
-			sleep(1);
-			if (--trys < 0) {
-				*status = (jack_status_t)(*status | (JackFailure|JackServerFailed));
-				goto fail;
-			}
-		} while ((*req_fd = server_connect (va->server_name)) < 0);
-		*status = (jack_status_t)(*status | JackServerStarted);
+    if ((*req_fd = server_connect (va->server_name)) < 0) {
+	int trys;
+	if (start_server(va->server_name, options)) {
+	    *status = (jack_status_t)(*status | (JackFailure|JackServerFailed));
+	    goto fail;
 	}
-
-	/* format connection request */
-
-	if (va->sess_uuid && strlen (va->sess_uuid)) {
-		if (jack_uuid_parse (va->sess_uuid, &req.uuid) != 0) {
-                        jack_error ("Given UUID [%s] is not parseable", va->sess_uuid);
-                        goto fail;
-                }
-        } else {
-		jack_uuid_clear (&req.uuid);
-        }
-	req.protocol_v = jack_protocol_version;
-	req.load = TRUE;
-	req.type = type;
-	snprintf (req.name, sizeof (req.name),
-		  "%s", client_name);
-	snprintf (req.object_path, sizeof (req.object_path),
-		  "%s", va->load_name);
-	snprintf (req.object_data, sizeof (req.object_data),
-		  "%s", va->load_init);
-
-	if (write (*req_fd, &req, sizeof (req)) != sizeof (req)) {
-		jack_error ("cannot send request to jack server (%s)",
-			    strerror (errno));
-		*status = (jack_status_t)(*status | (JackFailure|JackServerError));
+	trys = 5;
+	do {
+	    sleep(1);
+	    if (--trys < 0) {
+		*status = (jack_status_t)(*status | (JackFailure|JackServerFailed));
 		goto fail;
+	    }
+	} while ((*req_fd = server_connect (va->server_name)) < 0);
+	*status = (jack_status_t)(*status | JackServerStarted);
+    }
+
+    /* format connection request */
+
+    if (va->sess_uuid && strlen (va->sess_uuid)) {
+	if (jack_uuid_parse (va->sess_uuid, &req.uuid) != 0) {
+	    jack_error ("Given UUID [%s] is not parseable", va->sess_uuid);
+	    goto fail;
 	}
+    } else {
+	jack_uuid_clear (&req.uuid);
+    }
+    req.protocol_v = jack_protocol_version;
+    req.load = TRUE;
+    req.type = type;
+    snprintf (req.name, sizeof (req.name),
+	      "%s", client_name);
+    snprintf (req.object_path, sizeof (req.object_path),
+	      "%s", va->load_name);
+    snprintf (req.object_data, sizeof (req.object_data),
+	      "%s", va->load_init);
 
-	if (read (*req_fd, res, sizeof (*res)) != sizeof (*res)) {
+    if (write (*req_fd, &req, sizeof (req)) != sizeof (req)) {
+	jack_error ("cannot send request to jack server (%s)",
+		    strerror (errno));
+	*status = (jack_status_t)(*status | (JackFailure|JackServerError));
+	goto fail;
+    }
 
-		if (errno == 0) {
-			/* server shut the socket */
-			jack_error ("could not attach as client");
-			*status = (jack_status_t)(*status | (JackFailure|JackServerError));
-			goto fail;
-		}
+    if (read (*req_fd, res, sizeof (*res)) != sizeof (*res)) {
+
+	if (errno == 0) {
+	    /* server shut the socket */
+	    jack_error ("could not attach as client");
+	    *status = (jack_status_t)(*status | (JackFailure|JackServerError));
+	    goto fail;
+	}
 		
-		if (errno == ECONNRESET) {
-			jack_error ("could not attach as JACK client "
-				    "(server has exited)");
-			*status = (jack_status_t)(*status | (JackFailure|JackServerError));
-			goto fail;
-		}
+	if (errno == ECONNRESET) {
+	    jack_error ("could not attach as JACK client "
+			"(server has exited)");
+	    *status = (jack_status_t)(*status | (JackFailure|JackServerError));
+	    goto fail;
+	}
 		
-		jack_error ("cannot read response from jack server (%s)",
-			    strerror (errno));
-		*status = (jack_status_t)(*status | (JackFailure|JackServerError));
-		goto fail;
+	jack_error ("cannot read response from jack server (%s)",
+		    strerror (errno));
+	*status = (jack_status_t)(*status | (JackFailure|JackServerError));
+	goto fail;
+    }
+
+    *status = (jack_status_t)(*status | res->status);		/* return server status bits */
+
+    if (*status & JackFailure) {
+	if (*status & JackVersionError) {
+	    jack_error ("client linked with incompatible libjack"
+			" version.");
 	}
+	jack_error ("could not attach to JACK server");
+	*status = (jack_status_t)(*status | (JackServerError));
+	goto fail;
+    }
 
-	*status = (jack_status_t)(*status | res->status);		/* return server status bits */
-
-	if (*status & JackFailure) {
-		if (*status & JackVersionError) {
-			jack_error ("client linked with incompatible libjack"
-				    " version.");
-		}
-		jack_error ("could not attach to JACK server");
-		*status = (jack_status_t)(*status | (JackServerError));
-		goto fail;
-	}
-
-	switch (type) {
+    switch (type) {
 	case ClientDriver:
 	case ClientInternal:
-		close (*req_fd);
-		*req_fd = -1;
-		break;
+	    close (*req_fd);
+	    *req_fd = -1;
+	    break;
 
 	default:
-		break;
-	}
+	    break;
+    }
 
-	return 0;
+    return 0;
 
   fail:
-        jack_error ("attempt to connect to server failed");
-	if (*req_fd >= 0) {
-		close (*req_fd);
-		*req_fd = -1;
-	}
-	return -1;
+    jack_error ("attempt to connect to server failed");
+    if (*req_fd >= 0) {
+	close (*req_fd);
+	*req_fd = -1;
+    }
+    return -1;
 }
 
 int jack_attach_port_segment (jack_client_t *client, jack_port_type_id_t ptid)
@@ -1382,25 +1369,25 @@ char * jack_get_client_name (jack_client_t *client)
 	return client->name;
 }
 
-int jack_internal_client_new (const char *client_name,
-			  const char *so_name, const char *so_data)
+int jack_internal_client_new( const char *client_name,
+			      const char *so_name, const char *so_data)
 {
-	jack_client_connect_result_t res;
-	int req_fd;
-	jack_varargs_t va;
-	jack_status_t status;
-	jack_options_t options = JackUseExactName;
+    jack_client_connect_result_t res;
+    int req_fd;
+    jack_varargs_t va;
+    jack_status_t status;
+    jack_options_t options = JackUseExactName;
 
-	if (getenv("JACK_START_SERVER") == NULL) {
-	    options = (jack_options_t)(options | JackNoStartServer);
-	}
+    if (getenv("JACK_START_SERVER") == NULL) {
+	options = (jack_options_t)(options | JackNoStartServer);
+    }
 
-	jack_varargs_init (&va);
-	va.load_name = (char *) so_name;
-	va.load_init = (char *) so_data;
+    jack_varargs_init (&va);
+    va.load_name = (char *) so_name;
+    va.load_init = (char *) so_data;
 
-	return jack_request_client (ClientInternal, client_name,
-				    options, &status, &va, &res, &req_fd);
+    return jack_request_client( ClientInternal, client_name,
+				options, &status, &va, &res, &req_fd);
 }
 
 char * jack_default_server_name (void)
@@ -2547,7 +2534,6 @@ int jack_port_disconnect (jack_client_t *client, jack_port_t *port)
 
 	pthread_mutex_lock (&port->connection_lock);
 
-//	if (port->connections == NULL) {
 	if( port->connections_vector.size() == 0 ) {
 	    pthread_mutex_unlock (&port->connection_lock);
 		return 0;

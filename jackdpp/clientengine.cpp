@@ -65,24 +65,19 @@ const char * client_state_names[] = {
 static void jack_engine_client_disconnect_ports( jack_engine_t & engine,
 						 jack_client_internal_t *client )
 {
-    JSList *node;
-    jack_port_internal_t *port;
-
     /* call tree **** MUST HOLD *** engine->client_lock */
 
-    for (node = client->ports; node; node = jack_slist_next (node)) {
-	port = (jack_port_internal_t *) node->data;
+    for( jack_port_internal_t * port : client->ports_vector ) {
 	jack_engine_port_clear_connections( engine, port);
 	jack_engine_port_registration_notify( engine, port->shared->id, FALSE);
 	jack_engine_port_release( engine, port );
     }
 
-    jack_slist_free(client->ports);
     jack_slist_free(client->truefeeds);
     jack_slist_free(client->sortfeeds);
     client->truefeeds = 0;
     client->sortfeeds = 0;
-    client->ports = 0;
+    client->ports_vector.clear();
 }			
 
 int jack_engine_client_do_deactivate( jack_engine_t &engine,
@@ -552,11 +547,11 @@ static jack_client_internal_t * jack_engine_setup_client_control(
 {
     jack_client_internal_t *client;
 
-    client = (jack_client_internal_t *)malloc (sizeof (jack_client_internal_t));
+    client = new jack_client_internal_t();
 
     client->request_fd = fd;
     client->event_fd = -1;
-    client->ports = 0;
+    client->ports_vector.clear();
     client->truefeeds = 0;
     client->sortfeeds = 0;
     client->execution_order = UINT_MAX;
@@ -568,7 +563,6 @@ static jack_client_internal_t * jack_engine_setup_client_control(
 
     if (type != ClientExternal) {
 	client->control = (jack_client_control_t *)malloc (sizeof (jack_client_control_t));		
-
     } else {
 	if (jack_shmalloc (sizeof (jack_client_control_t), 
 			   &client->control_shm)) {
@@ -946,7 +940,6 @@ int jack_engine_client_create( jack_engine_t & engine, int client_fd )
 int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
 {
     jack_client_internal_t *client;
-    JSList *node;
     int ret = -1;
     int i;
     jack_event_t event;
@@ -982,8 +975,7 @@ int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
 	jack_engine_deliver_event( engine, client, &event);
 
 	// send delayed notifications for ports.
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-	    jack_port_internal_t *port = (jack_port_internal_t *) node->data;
+	for( jack_port_internal_t * port : client->ports_vector ) {
 	    jack_engine_port_registration_notify( engine, port->shared->id, TRUE);
 	}
 
@@ -1003,12 +995,7 @@ int jack_engine_client_deactivate( jack_engine_t & engine, jack_uuid_t id )
 
     for( jack_client_internal_t * client : engine.clients ) {
 	if( jack_uuid_compare( client->control->uuid, id) == 0 ) {
-	    JSList *portnode;
-	    jack_port_internal_t *port;
-
-	    for (portnode = client->ports; portnode;
-		 portnode = jack_slist_next (portnode)) {
-		port = (jack_port_internal_t *) portnode->data;
+	    for( jack_port_internal_t * port : client->ports_vector ) {
 		jack_engine_port_clear_connections( engine, port );
 	    }
 
