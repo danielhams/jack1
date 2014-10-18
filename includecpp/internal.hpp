@@ -500,9 +500,9 @@ typedef struct _jack_client_internal {
     int        event_fd;
     int        subgraph_start_fd;
     int        subgraph_wait_fd;
-    std::vector<jack_port_internal_t*> ports_vector; /* protected by engine->client_lock */
-    JSList    *truefeeds;    /* protected by engine->client_lock */
-    JSList    *sortfeeds;    /* protected by engine->client_lock */
+    std::vector<jack_port_internal_t*> ports_vector;      /* protected by engine->client_lock */
+    std::vector<_jack_client_internal*> truefeeds_vector; /* protected by engine->client_lock */
+    std::vector<_jack_client_internal*> sortfeeds_vector; /* protected by engine->client_lock */
     int	       fedcount;
     int	       tfedcount;
     jack_shm_info_t control_shm;

@@ -144,6 +144,22 @@ void jack_engine_reset_rolling_usecs( jack_engine_t & engine )
     engine.spare_usecs = 0;
 }
 
+static void jack_engine_buffer_list_remove_buffer(
+    std::vector<jack_port_buffer_info_t*> & buffer_list_free, jack_port_buffer_info_t * bi )
+{
+    auto bi_finder = std::find( buffer_list_free.begin(),
+				buffer_list_free.end(),
+				bi );
+
+    if( bi_finder != buffer_list_free.end() ) {
+	buffer_list_free.erase( bi_finder );
+    }
+    else {
+	jack_error("Failed to find buffer info to remove from buffer free list");
+    }
+}
+
+
 void jack_engine_place_port_buffers( jack_engine_t & engine, 
 				     jack_port_type_id_t ptid,
 				     jack_shmsize_t one_buffer,
@@ -200,7 +216,7 @@ void jack_engine_place_port_buffers( jack_engine_t & engine,
 
 	while (offset < size) {
 	    bi->offset = offset;
-	    pti->freelist = jack_slist_append (pti->freelist, bi);
+	    pti->freelist_vector.push_back( bi );
 	    offset += one_buffer;
 	    ++bi;
 	}
@@ -209,9 +225,8 @@ void jack_engine_place_port_buffers( jack_engine_t & engine,
 	 * for an empy buffer area.
 	 * NOTE: audio buffer is zeroed in its buffer_init function.
 	 */
-	bi = (jack_port_buffer_info_t *) pti->freelist->data;
-	pti->freelist = jack_slist_remove_link (pti->freelist,
-						pti->freelist);
+	bi = pti->freelist_vector[0];
+	jack_engine_buffer_list_remove_buffer( pti->freelist_vector, bi );
 	port_type->zero_buffer_offset = bi->offset;
 	if (ptid == JACK_AUDIO_PORT_TYPE) {
 	    engine.silent_buffer = bi;
@@ -1542,7 +1557,7 @@ int jack_engine_port_assign_buffer( jack_engine_t & engine, jack_port_internal_t
 	
     pthread_mutex_lock (&blist->lock);
 
-    if (blist->freelist == NULL) {
+    if( blist->freelist_vector.size() == 0 ) {
 	jack_port_type_info_t *port_type = jack_engine_port_type_info( engine, port);
 	jack_error ("all %s port buffers in use!",
 		    port_type->type_name);
@@ -1550,8 +1565,8 @@ int jack_engine_port_assign_buffer( jack_engine_t & engine, jack_port_internal_t
 	return -1;
     }
 
-    bi = (jack_port_buffer_info_t *) blist->freelist->data;
-    blist->freelist = jack_slist_remove (blist->freelist, bi);
+    bi = blist->freelist_vector[0];
+    jack_engine_buffer_list_remove_buffer( blist->freelist_vector, bi );
 
     port->shared->offset = bi->offset;
     port->buffer_info = bi;
@@ -1604,7 +1619,7 @@ void jack_engine_port_release( jack_engine_t & engine, jack_port_internal_t *por
     if (port->buffer_info) {
 	jack_port_buffer_list_t *blist = jack_engine_port_buffer_list( engine, port);
 	pthread_mutex_lock (&blist->lock);
-	blist->freelist = jack_slist_prepend (blist->freelist, port->buffer_info);
+	blist->freelist_vector.push_back( port->buffer_info );
 	port->buffer_info = NULL;
 	pthread_mutex_unlock (&blist->lock);
     }
@@ -2060,7 +2075,37 @@ static void jack_engine_port_connection_remove( jack_engine_t & engine,
 	connections.erase( cFinder );
     }
 }
-						
+
+static void jack_engine_client_truefeed_remove(
+    vector<jack_client_internal_t*> & truefeeds,
+    jack_client_internal_t * client_to_remove )
+{
+    auto tf_finder = std::find( truefeeds.begin(),
+				truefeeds.end(),
+				client_to_remove );
+    if( tf_finder != truefeeds.end() ) {
+	truefeeds.erase( tf_finder );
+    }
+    else {
+	jack_error("Failed to find client to remove from truefeeds");
+    }
+}
+
+static void jack_engine_client_sortfeed_remove(
+    vector<jack_client_internal_t*> & sortfeeds,
+    jack_client_internal_t * client_to_remove )
+{
+    auto sf_finder = std::find( sortfeeds.begin(),
+				sortfeeds.end(),
+				client_to_remove );
+    if( sf_finder != sortfeeds.end() ) {
+	sortfeeds.erase( sf_finder );
+    }
+    else {
+	jack_error("Failed to find client to remove from sortfeeds");
+    }
+}
+
 static int jack_engine_port_disconnect_internal(
     jack_engine_t & engine, 
     jack_port_internal_t *srcport, 
@@ -2121,21 +2166,18 @@ static int jack_engine_port_disconnect_internal(
 		dst =  jack_engine_client_internal_by_id
 		    (engine, dstport->shared->client_id);
 
-		src->truefeeds = jack_slist_remove
-		    (src->truefeeds, dst);
+		jack_engine_client_truefeed_remove( src->truefeeds_vector, dst );
 
 		dst->fedcount--;
 
 		if (connection->dir == 1) {
 		    // normal connection: remove dest from
 		    // source's sortfeeds list
-		    src->sortfeeds = jack_slist_remove
-			(src->sortfeeds, dst);
+		    jack_engine_client_sortfeed_remove( src->sortfeeds_vector, dst );
 		} else {
 		    // feedback connection: remove source
 		    // from dest's sortfeeds list
-		    dst->sortfeeds = jack_slist_remove
-			(dst->sortfeeds, src);
+		    jack_engine_client_sortfeed_remove( dst->sortfeeds_vector, src );
 		    engine.feedbackcount--;
 		    VERBOSE( &engine,
 			     "feedback count down to %d",
@@ -2240,15 +2282,20 @@ static int jack_client_feeds_transitive (jack_client_internal_t *source,
 					 jack_client_internal_t *dest )
 {
     jack_client_internal_t *med;
-    JSList *node;
-	
-    if (jack_slist_find (source->sortfeeds, dest)) {
+
+    auto sf_iter = source->sortfeeds_vector.begin();
+    auto sf_end = source->sortfeeds_vector.end();
+
+    auto d_finder = std::find( sf_iter,
+			       sf_end,
+			       dest );
+
+    if( d_finder != sf_end ) {
 	return 1;
     }
 
-    for (node = source->sortfeeds; node; node = jack_slist_next (node)) {
-
-	med = (jack_client_internal_t *) node->data;
+    for( ; sf_iter != sf_end ; ++sf_iter ) {
+	med = *sf_iter;
 
 	if (jack_client_feeds_transitive (med, dest)) {
 	    return 1;
@@ -2486,7 +2533,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	}
 	else if (srcclient != dstclient) {
 		
-	    srcclient->truefeeds = jack_slist_prepend( srcclient->truefeeds, dstclient );
+	    srcclient->truefeeds_vector.push_back( dstclient );
 
 	    dstclient->fedcount++;				
 
@@ -2503,7 +2550,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 			 srcport->shared->name,
 			 dstport->shared->name);
 				 
-		dstclient->sortfeeds = jack_slist_prepend( dstclient->sortfeeds, srcclient );
+		dstclient->sortfeeds_vector.push_back( srcclient );
 
 		connection->dir = -1;
 		engine.feedbackcount++;
@@ -2519,7 +2566,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 			 srcport->shared->name,
 			 dstport->shared->name);
 
-		srcclient->sortfeeds = jack_slist_prepend( srcclient->sortfeeds, dstclient );
+		srcclient->sortfeeds_vector.push_back( dstclient );
 
 		connection->dir = 1;
 	    }
@@ -2591,7 +2638,7 @@ static int jack_engine_port_do_disconnect_all( jack_engine_t & engine,
  */
 static void jack_engine_check_acyclic( jack_engine_t & engine )
 {
-    JSList *dstnode;
+
     jack_client_internal_t *src, *dst;
     jack_port_internal_t *port;
     jack_connection_internal_t *conn;
@@ -2624,9 +2671,11 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 		unsortedclients--;
 		src->tfedcount = -1;
 				
-		for( dstnode = src->truefeeds; dstnode;
-		     dstnode = jack_slist_next (dstnode)) {
-		    dst = (jack_client_internal_t *)dstnode->data;
+		for( auto tf_iter = src->truefeeds_vector.begin(),
+			 tf_end = src->truefeeds_vector.end() ;
+		     tf_iter != tf_end ;
+		     ++tf_iter ) {
+		    dst = *tf_iter;
 		    dst->tfedcount--;
 		}
 	    }
@@ -2661,13 +2710,11 @@ static void jack_engine_check_acyclic( jack_engine_t & engine )
 				 conn->srcclient->control->name,
 				 conn->dstclient->control->name);
 			conn->dir = 1;
-			conn->dstclient->sortfeeds = jack_slist_remove(
-			    conn->dstclient->sortfeeds,
-			    conn->srcclient );
+			jack_engine_client_sortfeed_remove( conn->dstclient->sortfeeds_vector,
+							    conn->srcclient );
 					     
-			conn->srcclient->sortfeeds = jack_slist_prepend(
-			    conn->srcclient->sortfeeds,
-			    conn->dstclient );
+			jack_engine_client_sortfeed_remove( conn->srcclient->sortfeeds_vector,
+							    conn->dstclient );
 		    }
 		}
 	    }
@@ -4057,7 +4104,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
 	pthread_mutex_init (&engine->port_buffers[i].lock, NULL);
 
 	/* set buffer list info correctly */
-	engine->port_buffers[i].freelist = NULL;
+	engine->port_buffers[i].freelist_vector.clear();
 	engine->port_buffers[i].info = NULL;
 
 	/* mark each port segment as not allocated */

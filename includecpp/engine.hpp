@@ -42,8 +42,7 @@ struct _jack_port_internal;
 /* The engine's internal port type structure. */
 typedef struct _jack_port_buffer_list {
     pthread_mutex_t          lock;	/* only lock within server */
-    JSList	            *freelist;	/* list of free buffers */
-    std::vector<jack_port_buffer_info_t*> freelist_vector;
+    std::vector<jack_port_buffer_info_t*> freelist_vector; /* list of free buffers */
     jack_port_buffer_info_t *info;	/* jack_buffer_info_t array */
 } jack_port_buffer_list_t;
 

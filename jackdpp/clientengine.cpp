@@ -73,10 +73,8 @@ static void jack_engine_client_disconnect_ports( jack_engine_t & engine,
 	jack_engine_port_release( engine, port );
     }
 
-    jack_slist_free(client->truefeeds);
-    jack_slist_free(client->sortfeeds);
-    client->truefeeds = 0;
-    client->sortfeeds = 0;
+    client->truefeeds_vector.clear();
+    client->sortfeeds_vector.clear();
     client->ports_vector.clear();
 }			
 
@@ -552,8 +550,8 @@ static jack_client_internal_t * jack_engine_setup_client_control(
     client->request_fd = fd;
     client->event_fd = -1;
     client->ports_vector.clear();
-    client->truefeeds = 0;
-    client->sortfeeds = 0;
+    client->truefeeds_vector.clear();
+    client->sortfeeds_vector.clear();
     client->execution_order = UINT_MAX;
     client->next_client = NULL;
     client->handle = NULL;
