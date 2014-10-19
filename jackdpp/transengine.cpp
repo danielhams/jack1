@@ -19,6 +19,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
+#define __STDC_FORMAT_MACROS
+
 #include <vector>
 #include <string>
 

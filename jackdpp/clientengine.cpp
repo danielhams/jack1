@@ -20,6 +20,8 @@
  *
  */
 
+#define __STDC_FORMAT_MACROS
+
 #include <config.h>
 
 #include <vector>
