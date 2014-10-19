@@ -347,8 +347,8 @@ static int
 usx2y_driver_stop (alsa_driver_t *driver)
 {
 	int err;
-	JSList* node;
-	int chn;
+//	JSList* node;
+//	int chn;
 
 	usx2y_t *h = (usx2y_t *) driver->hw->priv;
 
@@ -356,16 +356,16 @@ usx2y_driver_stop (alsa_driver_t *driver)
 	   be entering offline mode.
 	*/
 
-	for (chn = 0, node = driver->capture_ports; node;
-		node = jack_slist_next (node), chn++) {
+//	for (chn = 0, node = driver->capture_ports; node;
+//		node = jack_slist_next (node), chn++) {
+//		jack_port_t* port;
+//	    port = (jack_port_t *) node->data;
+	for( jack_port_t * port : driver->capture_ports_vector ) {
+	    char* buf;
+	    jack_nframes_t nframes = driver->engine->control->buffer_size;
 
-		jack_port_t* port;
-		char* buf;
-		jack_nframes_t nframes = driver->engine->control->buffer_size;
-
-		port = (jack_port_t *) node->data;
-		buf = (char*)jack_port_get_buffer (port, nframes);
-		memset (buf, 0, sizeof (jack_default_audio_sample_t) * nframes);
+	    buf = (char*)jack_port_get_buffer (port, nframes);
+	    memset (buf, 0, sizeof (jack_default_audio_sample_t) * nframes);
 	}
 
 	if (driver->playback_handle) {
@@ -475,8 +475,8 @@ usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	snd_pcm_uframes_t offset;
 	jack_default_audio_sample_t* buf[4];
 	channel_t chn;
-	JSList *node;
-	jack_port_t* port;
+//	JSList *node;
+//	jack_port_t* port;
 	int err;
 	snd_pcm_uframes_t nframes_ = nframes;
 
@@ -494,13 +494,14 @@ usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 		return -1;
 	}
 
-	for (chn = 0, node = driver->capture_ports;
-	     node; node = jack_slist_next (node), chn++) {
-		port = (jack_port_t *) node->data;
-		if (!jack_port_connected (port)) {
-			continue;
-		}
-		buf[chn] = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes_);
+//	for (chn = 0, node = driver->capture_ports;
+//	     node; node = jack_slist_next (node), chn++) {
+//		port = (jack_port_t *) node->data;
+	for( jack_port_t * port : driver->capture_ports_vector ) {
+	    if (!jack_port_connected (port)) {
+		continue;
+	    }
+	    buf[chn] = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes_);
 	}
 
 	while (nframes) {
@@ -510,16 +511,22 @@ usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 			    driver, &contiguous) < 0) {
 			return -1;
 		}
-		for (chn = 0, node = driver->capture_ports;
-		     node; node = jack_slist_next (node), chn++) {
-			port = (jack_port_t *) node->data;
-			if (!jack_port_connected (port)) {
-				/* no-copy optimization */
-				continue;
-			}
-			alsa_driver_read_from_channel (driver, chn,
-						       buf[chn] + nread,
-						       contiguous);
+//		for (chn = 0, node = driver->capture_ports;
+//		     node; node = jack_slist_next (node), chn++) {
+//			port = (jack_port_t *) node->data;
+		chn = 0;
+		for( auto cp_iter = driver->capture_ports_vector.begin(),
+			 cp_end = driver->capture_ports_vector.end() ;
+		     cp_iter != cp_end ;
+		     ++cp_iter, ++chn ) {
+		    jack_port_t * port = *cp_iter;
+		    if (!jack_port_connected (port)) {
+			/* no-copy optimization */
+			continue;
+		    }
+		    alsa_driver_read_from_channel (driver, chn,
+						   buf[chn] + nread,
+						   contiguous);
 /* 			sample_move_dS_s24(buf[chn] + nread, */
 /* 					   driver->capture_addr[chn], */
 /* 					   contiguous, */
@@ -548,7 +555,7 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	snd_pcm_sframes_t nwritten;
 	snd_pcm_uframes_t contiguous;
 	snd_pcm_uframes_t offset;
-	jack_port_t *port;
+//	jack_port_t *port;
 	int err;
 	snd_pcm_uframes_t nframes_ = nframes;
 
@@ -564,11 +571,18 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 
 	driver->input_monitor_mask = 0;
 
-	for (chn = 0, node = driver->capture_ports; node;
-		node = jack_slist_next (node), chn++) {
-		if (((jack_port_t *) node->data)->shared->monitor_requests) {
-			driver->input_monitor_mask |= (1<<chn);
-		}
+//	for (chn = 0, node = driver->capture_ports; node;
+//		node = jack_slist_next (node), chn++) {
+//		if (((jack_port_t *) node->data)->shared->monitor_requests) {
+	chn = 0;
+	for( auto cp_iter = driver->capture_ports_vector.begin(),
+		 cp_end = driver->capture_ports_vector.end() ;
+	     cp_iter != cp_end ;
+	     ++cp_iter, ++chn ) {
+	    jack_port_t * port = *cp_iter;
+	    if( port->shared->monitor_requests ) {
+		driver->input_monitor_mask |= (1<<chn);
+	    }
 	}
 
 	if (driver->hw_monitoring) {
@@ -588,10 +602,16 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 		return -1;
 	}
 
-	for (chn = 0, node = driver->playback_ports;
-	     node; node = jack_slist_next (node), chn++) {
-		port = (jack_port_t *) node->data;
-		buf[chn] = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes_);
+//	for (chn = 0, node = driver->playback_ports;
+//	     node; node = jack_slist_next (node), chn++) {
+//		port = (jack_port_t *) node->data;
+	chn = 0;
+	for( auto pp_iter = driver->playback_ports_vector.begin(),
+		 pp_end = driver->playback_ports_vector.end() ;
+	     pp_iter != pp_end ;
+	     ++pp_iter, ++chn ) {
+	    jack_port_t * port = *pp_iter;
+	    buf[chn] = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes_);
 	}
 
 	while (nframes) {
@@ -601,12 +621,17 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			    driver, &contiguous) < 0) {
 			return -1;
 		}
-		for (chn = 0, node = driver->playback_ports;
-		     node; node = jack_slist_next (node), chn++) {
-			port = (jack_port_t *) node->data;
-			alsa_driver_write_to_channel (driver, chn,
-						      buf[chn] + nwritten,
-						      contiguous);
+//		for (chn = 0, node = driver->playback_ports;
+//		     node; node = jack_slist_next (node), chn++) {
+//			port = (jack_port_t *) node->data;
+		chn = 0;
+		for( auto pp_iter = driver->playback_ports_vector.begin(),
+			 pp_end = driver->playback_ports_vector.end() ;
+		     pp_iter != pp_end ;
+		     ++pp_iter, ++chn ) {
+		    alsa_driver_write_to_channel (driver, chn,
+						  buf[chn] + nwritten,
+						  contiguous);
 		}
 		nwritten += contiguous;
 		nframes -= contiguous;

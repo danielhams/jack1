@@ -304,7 +304,10 @@ jack_client_t * jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	client = new jack_client_t();
+
+//	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	if( client == NULL ) {
 		return NULL;
 	}
 
@@ -318,8 +321,10 @@ jack_client_t * jack_client_alloc ()
 	client->event_fd = -1;
 	client->upstream_is_jackd = 0;
 	client->graph_next_fd = -1;
-	client->ports = NULL;
-	client->ports_ext = NULL;
+//	client->ports = NULL;
+	client->ports_vector.clear();
+//	client->ports_ext = NULL;
+	client->ports_ext_vector.clear();
 	client->engine = NULL;
 	client->control = NULL;
 	client->thread_ok = FALSE;
@@ -343,9 +348,13 @@ jack_client_t * jack_client_alloc ()
 {
 	jack_client_t *client;
 
-	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	client = new jack_client_t();
+
+//	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
+	if( client == NULL ) {
 		return NULL;
 	}
+
 	if ((client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 2)) == NULL) {
 		free (client);
 		return NULL;
@@ -357,8 +366,10 @@ jack_client_t * jack_client_alloc ()
 	client->upstream_is_jackd = 0;
 	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
-	client->ports = NULL;
-	client->ports_ext = NULL;
+//	client->ports = NULL;
+	client->ports_vector.clear();
+//	client->ports_ext = NULL;
+	client->ports_ext_vector.clear();
 	client->engine = NULL;
 	client->control = NULL;
 	client->thread_ok = FALSE;
@@ -401,13 +412,14 @@ static void jack_client_free (jack_client_t *client)
 		free (client->pollfd);
 	}
 
-	free (client);
+//	free (client);
+	delete client;
 }
 
 void jack_client_fix_port_buffers (jack_client_t *client)
 {
-    JSList *node;
-    jack_port_t *port;
+//    JSList *node;
+//    jack_port_t *port;
 
     /* This releases all local memory owned by input ports
        and sets the buffer pointer to NULL. This will cause
@@ -415,14 +427,13 @@ void jack_client_fix_port_buffers (jack_client_t *client)
        buffer on the next call (if there is one).
     */
 
-    for (node = client->ports; node; node = jack_slist_next (node)) {
-	port = (jack_port_t *) node->data;
-
+//    for (node = client->ports; node; node = jack_slist_next (node)) {
+//	port = (jack_port_t *) node->data;
+    for( jack_port_t * port : client->ports_vector ) {
 	if (port->shared->flags & JackPortIsInput) {
 	    if (port->mix_buffer) {
-		size_t buffer_size =
-		    jack_port_type_buffer_size( port->type_info,
-						client->engine->buffer_size );
+		size_t buffer_size = jack_port_type_buffer_size( port->type_info,
+								 client->engine->buffer_size );
 		jack_pool_release (port->mix_buffer);
 		port->mix_buffer = NULL;
 		pthread_mutex_lock (&port->connection_lock);
@@ -585,14 +596,15 @@ static void jack_port_recalculate_latency (jack_port_t *port, jack_latency_callb
 int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event, int is_driver)
 {
     jack_latency_callback_mode_t mode = (event->x.n==0) ? JackCaptureLatency : JackPlaybackLatency;
-    JSList *node;
+//    JSList *node;
     jack_latency_range_t latency = { UINT32_MAX, 0 };
 
     /* first setup all latency values of the ports.
      * this is based on the connections of the ports.
      */
-    for (node = client->ports; node; node = jack_slist_next (node)) {
-	jack_port_t *port = (jack_port_t*)node->data;
+//    for (node = client->ports; node; node = jack_slist_next (node)) {
+//	jack_port_t *port = (jack_port_t*)node->data;
+    for( jack_port_t * port : client->ports_vector ) {
 
 	if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
 	    jack_port_recalculate_latency (port, mode);
@@ -618,8 +630,9 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 	if (mode == JackPlaybackLatency) {
 	    /* iterate over all OutputPorts, to find maximum playback latency
 	     */
-	    for (node = client->ports; node; node = jack_slist_next (node)) {
-		jack_port_t *port = (jack_port_t*)node->data;
+//	    for (node = client->ports; node; node = jack_slist_next (node)) {
+//		jack_port_t *port = (jack_port_t*)node->data;
+	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsOutput) {
 		    jack_latency_range_t other_latency;
@@ -637,8 +650,9 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 
 	    /* now set the found latency on all input ports
 	     */
-	    for (node = client->ports; node; node = jack_slist_next (node)) {
-		jack_port_t *port = (jack_port_t*)node->data;
+//	    for (node = client->ports; node; node = jack_slist_next (node)) {
+//		jack_port_t *port = (jack_port_t*)node->data;
+	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsInput) {
 		    jack_port_set_latency_range (port, mode, &latency);
@@ -648,8 +662,9 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 	if (mode == JackCaptureLatency) {
 	    /* iterate over all InputPorts, to find maximum playback latency
 	     */
-	    for (node = client->ports; node; node = jack_slist_next (node)) {
-		jack_port_t *port = (jack_port_t*)node->data;
+//	    for (node = client->ports; node; node = jack_slist_next (node)) {
+//		jack_port_t *port = (jack_port_t*)node->data;
+	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsInput) {
 		    jack_latency_range_t other_latency;
@@ -667,8 +682,9 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 
 	    /* now set the found latency on all output ports
 	     */
-	    for (node = client->ports; node; node = jack_slist_next (node)) {
-		jack_port_t *port = (jack_port_t*)node->data;
+//	    for (node = client->ports; node; node = jack_slist_next (node)) {
+//		jack_port_t *port = (jack_port_t*)node->data;
+	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsOutput) {
 		    jack_port_set_latency_range (port, mode, &latency);
@@ -1707,8 +1723,8 @@ static int jack_client_process_events (jack_client_t* client)
 	jack_event_t event;
 	char status = 0;
 	jack_client_control_t *control = client->control;
-	JSList *node;
-	jack_port_t* port;
+//	JSList *node;
+//	jack_port_t* port;
         char* key = 0;
 
 	DEBUG ("process events");
@@ -1742,8 +1758,9 @@ static int jack_client_process_events (jack_client_t* client)
 		
 		switch (event.type) {
 		case PortRegistered:
-			for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-			    port = (jack_port_t*)node->data;
+//			for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+//			    port = (jack_port_t*)node->data;
+		    for( jack_port_t * port : client->ports_ext_vector ) {
 			    if (port->shared->id == event.x.port_id) { // Found port, update port type
 				port->type_info = &client->engine->port_types[port->shared->ptype_id];
 			    }
@@ -2392,7 +2409,7 @@ int jack_deactivate (jack_client_t *client)
 
 static int jack_client_close_aux (jack_client_t *client)
 {
-	JSList *node;
+//	JSList *node;
 	void *status;
 	int rc;
 
@@ -2460,14 +2477,18 @@ static int jack_client_close_aux (jack_client_t *client)
 
 	}
 
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-		free (node->data);
+//	for (node = client->ports; node; node = jack_slist_next (node)) {
+	for( jack_port_t * port : client->ports_vector ) {
+		free (port);
 	}
-	jack_slist_free (client->ports);
-	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-		free (node->data);
+//	jack_slist_free (client->ports);
+	client->ports_vector.clear();
+//	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+	for( jack_port_t * port : client->ports_ext_vector ) {
+		free (port);
 	}
-	jack_slist_free (client->ports_ext);
+//	jack_slist_free (client->ports_ext);
+	client->ports_ext_vector.clear();
 	jack_client_free (client);
 	jack_messagebuffer_exit ();
 

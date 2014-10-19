@@ -20,6 +20,9 @@
 #ifndef __jack_alsa_driver_h__
 #define __jack_alsa_driver_h__
 
+#include <string>
+#include <vector>
+
 #include <alsa/asoundlib.h>
 #include <alsa/pcm.h>
 #include "bitset.hpp"
@@ -101,9 +104,12 @@ typedef struct _alsa_driver {
     jack_hardware_t              *hw;  
     ClockSyncStatus              *clock_sync_data;
     jack_client_t                *client;
-    JSList                       *capture_ports;
-    JSList                       *playback_ports;
-    JSList                       *monitor_ports;
+//    JSList                       *capture_ports;
+    std::vector<jack_port_t*> capture_ports_vector;
+//    JSList                       *playback_ports;
+    std::vector<jack_port_t*> playback_ports_vector;
+//    JSList                       *monitor_ports;
+    std::vector<jack_port_t*> monitor_ports_vector;
 
     unsigned long input_monitor_mask;
 

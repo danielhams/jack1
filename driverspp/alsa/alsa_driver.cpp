@@ -1082,21 +1082,20 @@ static int
 alsa_driver_stop (alsa_driver_t *driver)
 {
 	int err;
-	JSList* node;
-	int chn;
+//	JSList* node;
+//	int chn;
 
 	/* silence all capture port buffers, because we might
 	   be entering offline mode.
 	*/
 
-	for (chn = 0, node = driver->capture_ports; node;
-	     node = jack_slist_next (node), chn++) {
-
-		jack_port_t* port;
+//	for (chn = 0, node = driver->capture_ports; node;
+//	     node = jack_slist_next (node), chn++) {
+//		jack_port_t* port;
+//		port = (jack_port_t *) node->data;
+	for( jack_port_t * port : driver->capture_ports_vector ) {
 		char* buf;
 		jack_nframes_t nframes = driver->engine->control->buffer_size;
-
-		port = (jack_port_t *) node->data;
 		buf = (char*)jack_port_get_buffer (port, nframes);
 		memset (buf, 0, sizeof (jack_default_audio_sample_t) * nframes);
 	}
@@ -1474,61 +1473,61 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 static int
 alsa_driver_null_cycle (alsa_driver_t* driver, jack_nframes_t nframes)
 {
-	jack_nframes_t nf;
-	snd_pcm_uframes_t offset;
-	snd_pcm_uframes_t contiguous;
-	int chn;
+    jack_nframes_t nf;
+    snd_pcm_uframes_t offset;
+    snd_pcm_uframes_t contiguous;
+    int chn;
 
-	if (nframes > driver->frames_per_cycle) {
+    if (nframes > driver->frames_per_cycle) {
+	return -1;
+    }
+
+    if (driver->capture_handle) {
+	nf = nframes;
+	offset = 0;
+	while (nf) {
+	    contiguous = nf;
+			
+	    if (alsa_driver_get_channel_addresses (driver,
+						   &contiguous, 0, &offset, 0)) {
 		return -1;
+	    }
+
+	    if (snd_pcm_mmap_commit (driver->capture_handle,
+				     offset, contiguous) < 0) {
+		return -1;
+	    }
+
+	    nf -= contiguous;
 	}
+    }
 
-        if (driver->capture_handle) {
-		nf = nframes;
-		offset = 0;
-		while (nf) {
-			contiguous = nf;
+    if (driver->playback_handle) {
+	nf = nframes;
+	offset = 0;
+	while (nf) {
+	    contiguous = nf;
 			
-                        if (alsa_driver_get_channel_addresses (driver,
-                                                               &contiguous, 0, &offset, 0)) {
-                                return -1;
-                        }
+	    if (alsa_driver_get_channel_addresses (driver,
+						   0, &contiguous, 0, &offset)) {
+		return -1;
+	    }
 
-			if (snd_pcm_mmap_commit (driver->capture_handle,
-						 offset, contiguous) < 0) {
-				return -1;
-			}
-
-			nf -= contiguous;
-		}
-	}
-
-	if (driver->playback_handle) {
-		nf = nframes;
-		offset = 0;
-		while (nf) {
-			contiguous = nf;
-			
-                        if (alsa_driver_get_channel_addresses (driver,
-                                                               0, &contiguous, 0, &offset)) {
-                                return -1;
-                        }
-
-			for (chn = 0; chn < driver->playback_nchannels; chn++) {
-				alsa_driver_silence_on_channel (driver, chn,
-								contiguous);
-			}
+	    for (chn = 0; chn < driver->playback_nchannels; chn++) {
+		alsa_driver_silence_on_channel (driver, chn,
+						contiguous);
+	    }
 		
-			if (snd_pcm_mmap_commit (driver->playback_handle,
-						 offset, contiguous) < 0) {
-				return -1;
-			}
+	    if (snd_pcm_mmap_commit (driver->playback_handle,
+				     offset, contiguous) < 0) {
+		return -1;
+	    }
 
-			nf -= contiguous;
-		}
+	    nf -= contiguous;
 	}
+    }
 
-	return 0;
+    return 0;
 }
 
 static int
@@ -1548,8 +1547,8 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 	jack_nframes_t  orig_nframes;
 	jack_default_audio_sample_t* buf;
 	channel_t chn;
-	JSList *node;
-	jack_port_t* port;
+//	JSList *node;
+//	jack_port_t* port;
 	int err;
 
 	if (nframes > driver->frames_per_cycle) {
@@ -1580,10 +1579,15 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 			return -1;
 		}
 			
-		for (chn = 0, node = driver->capture_ports; node;
-		     node = jack_slist_next (node), chn++) {
-			
-			port = (jack_port_t *) node->data;
+//		for (chn = 0, node = driver->capture_ports; node;
+//		     node = jack_slist_next (node), chn++) {
+//		    port = (jack_port_t *) node->data;
+		chn = 0;
+		for( auto cp_iter = driver->capture_ports_vector.begin(),
+			 cp_end = driver->capture_ports_vector.end() ;
+		     cp_iter != cp_end ;
+		     ++cp_iter, ++chn ) {
+		    jack_port_t * port = *cp_iter;
 			
 			if (!jack_port_connected (port)) {
 				/* no-copy optimization */
@@ -1612,15 +1616,15 @@ static int
 alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 {
 	channel_t chn;
-	JSList *node;
-	JSList *mon_node;
+//	JSList *node;
+//	JSList *mon_node;
 	jack_default_audio_sample_t* buf;
 	jack_default_audio_sample_t* monbuf;
 	jack_nframes_t orig_nframes;
 	snd_pcm_sframes_t nwritten;
 	snd_pcm_sframes_t contiguous;
 	snd_pcm_uframes_t offset;
-	jack_port_t *port;
+//	jack_port_t *port;
 	int err;
 
 	driver->process_count++;
@@ -1640,10 +1644,17 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 	
 	driver->input_monitor_mask = 0;
 	
-	for (chn = 0, node = driver->capture_ports; node;
-	     node = jack_slist_next (node), chn++) {
-		if (((jack_port_t *) node->data)->shared->monitor_requests) {
-			driver->input_monitor_mask |= (1<<chn);
+//	for (chn = 0, node = driver->capture_ports; node;
+//	     node = jack_slist_next (node), chn++) {
+//		if (((jack_port_t *) node->data)->shared->monitor_requests) {
+	chn = 0;
+	for( auto cp_iter = driver->capture_ports_vector.begin(),
+		 cp_end = driver->capture_ports_vector.end() ;
+	     cp_iter != cp_end ;
+	     ++cp_iter, ++chn ) {
+	    jack_port_t * port = *cp_iter;
+		if( port->shared->monitor_requests) {
+		    driver->input_monitor_mask |= (1<<chn);
 		}
 	}
 
@@ -1668,11 +1679,18 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			return -1;
 		}
 		
-		for (chn = 0, node = driver->playback_ports, mon_node=driver->monitor_ports;
-		     node;
-		     node = jack_slist_next (node), chn++) {
-
-			port = (jack_port_t *) node->data;
+//		for (chn = 0, node = driver->playback_ports, mon_node=driver->monitor_ports;
+//		     node;
+//		     node = jack_slist_next (node), chn++) {
+//			port = (jack_port_t *) node->data;
+		chn = 0;
+		for( auto pp_iter = driver->playback_ports_vector.begin(),
+			 pp_end = driver->playback_ports_vector.end(),
+			 mp_iter = driver->monitor_ports_vector.begin(),
+			 mp_end = driver->monitor_ports_vector.end() ;
+		     pp_iter != pp_end ;
+		     ++pp_iter, ++chn ) {
+		    jack_port_t * port = *pp_iter;
 
 			if (!jack_port_connected (port)) {
 				continue;
@@ -1681,14 +1699,17 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			alsa_driver_write_to_channel (driver, chn,
 				buf + nwritten, contiguous);
 
-			if (mon_node) {
-				port = (jack_port_t *) mon_node->data;
-				if (!jack_port_connected (port)) {
-					continue;
-				}
-				monbuf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, orig_nframes);
-				memcpy (monbuf + nwritten, buf + nwritten, contiguous * sizeof(jack_default_audio_sample_t));
-				mon_node = jack_slist_next (mon_node);				
+//			if (mon_node) {
+//				port = (jack_port_t *) mon_node->data;
+			if( mp_iter != mp_end ) {
+			    jack_port_t * port = *mp_iter;
+			    if (!jack_port_connected (port)) {
+				continue;
+			    }
+			    monbuf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, orig_nframes);
+			    memcpy (monbuf + nwritten, buf + nwritten, contiguous * sizeof(jack_default_audio_sample_t));
+//			    mon_node = jack_slist_next (mon_node);
+			    ++mp_iter;
 			}
 		}
 
@@ -1745,20 +1766,22 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 static void
 alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 {
-        alsa_driver_t* driver = (alsa_driver_t*) arg;
-        jack_client_t* client = driver->client;
-        jack_latency_range_t range;
-        JSList* node;
+    alsa_driver_t* driver = (alsa_driver_t*) arg;
+    jack_client_t* client = driver->client;
+    jack_latency_range_t range;
+//    JSList* node;
 
-        if (mode == JackPlaybackLatency) {
-                range.min = range.max = driver->frames_per_cycle + driver->playback_frame_latency;
-        } else {
-                range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
-        }
+    if (mode == JackPlaybackLatency) {
+	range.min = range.max = driver->frames_per_cycle + driver->playback_frame_latency;
+    } else {
+	range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
+    }
 
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-                jack_port_set_latency_range ((jack_port_t*) node->data, mode, &range);
-	}
+//    for (node = client->ports; node; node = jack_slist_next (node)) {
+//	jack_port_set_latency_range ((jack_port_t*) node->data, mode, &range);
+    for( jack_port_t * port : client->ports_vector ) {
+	jack_port_set_latency_range( port, mode, &range );
+    }
 }
 
 static int
@@ -1796,8 +1819,8 @@ alsa_driver_attach (alsa_driver_t *driver)
 		range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
 		jack_port_set_latency_range (port, JackCaptureLatency, &range);
 
-		driver->capture_ports =
-			jack_slist_append (driver->capture_ports, port);
+//		driver->capture_ports = jack_slist_append (driver->capture_ports, port);
+		driver->capture_ports_vector.push_back( port );
 	}
 	
 	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
@@ -1817,8 +1840,8 @@ alsa_driver_attach (alsa_driver_t *driver)
 		range.min = range.max = (driver->frames_per_cycle * (driver->user_nperiods - 1)) + driver->playback_frame_latency;
 		jack_port_set_latency_range (port, JackPlaybackLatency, &range);
 
-		driver->playback_ports =
-			jack_slist_append (driver->playback_ports, port);
+//		driver->playback_ports = jack_slist_append (driver->playback_ports, port);
+		driver->playback_ports_vector.push_back( port );
 
 		if (driver->with_monitor_ports) {
 			snprintf (buf, sizeof(buf) - 1, "monitor_%lu", chn+1);
@@ -1834,8 +1857,9 @@ alsa_driver_attach (alsa_driver_t *driver)
 				range.min = range.max = driver->frames_per_cycle;
 				jack_port_set_latency_range (port, JackCaptureLatency, &range);
 				
-				driver->monitor_ports =
-					jack_slist_append (driver->monitor_ports, monitor_port);
+//				driver->monitor_ports = jack_slist_append (driver->monitor_ports, monitor_port);
+				driver->monitor_ports_vector.push_back( monitor_port );
+
 			}
 			
 		}
@@ -1847,42 +1871,48 @@ alsa_driver_attach (alsa_driver_t *driver)
 static int
 alsa_driver_detach (alsa_driver_t *driver)
 {
-	JSList *node;
+//	JSList *node;
 
 	if (driver->engine == NULL) {
 		return 0;
 	}
 
-        for (node = driver->capture_ports; node;
-             node = jack_slist_next (node)) {
-                jack_port_unregister (driver->client,
-                                      ((jack_port_t *) node->data));
+//        for (node = driver->capture_ports; node;
+//             node = jack_slist_next (node)) {
+//                jack_port_unregister (driver->client, ((jack_port_t *) node->data));
+	for( jack_port_t * port : driver->capture_ports_vector ) {
+	    jack_port_unregister( driver->client, port );
         }
 
-         jack_slist_free (driver->capture_ports);
-         driver->capture_ports = 0;
+//         jack_slist_free (driver->capture_ports);
+//         driver->capture_ports = 0;
+	driver->capture_ports_vector.clear();
 
-         for (node = driver->playback_ports; node;
-              node = jack_slist_next (node)) {
-                 jack_port_unregister (driver->client,
-                                       ((jack_port_t *) node->data));
+//         for (node = driver->playback_ports; node;
+//              node = jack_slist_next (node)) {
+//                 jack_port_unregister( driver->client, ((jack_port_t *) node->data));
+	for( jack_port_t * port : driver->playback_ports_vector ) {
+	    jack_port_unregister( driver->client, port );
          }
 
-         jack_slist_free (driver->playback_ports);
-         driver->playback_ports = 0;
+//         jack_slist_free (driver->playback_ports);
+//         driver->playback_ports = 0;
+	driver->playback_ports_vector.clear();
 
-         if (driver->monitor_ports) {
-                 for (node = driver->monitor_ports; node;
-                      node = jack_slist_next (node)) {
-                         jack_port_unregister (driver->client,
-                                               ((jack_port_t *) node->data));
-                 }
+	if( driver->monitor_ports_vector.size() > 0 ) {
+//                 for (node = driver->monitor_ports; node;
+//                      node = jack_slist_next (node)) {
+//                         jack_port_unregister(driver->client, ((jack_port_t *) node->data));
+	     for( jack_port_t * port : driver->monitor_ports_vector ) {
+		 jack_port_unregister( driver->client, port );
+	     }
 
-                 jack_slist_free (driver->monitor_ports);
-                 driver->monitor_ports = 0;
-         }
+//	     jack_slist_free (driver->monitor_ports);
+//	     driver->monitor_ports = 0;
+	     driver->monitor_ports_vector.clear();
+	}
 
-         return 0;
+	return 0;
  }
 
  #if 0
@@ -1999,7 +2029,8 @@ alsa_driver_detach (alsa_driver_t *driver)
 
          alsa_driver_release_channel_dependent_memory (driver);
          jack_driver_nt_finish ((jack_driver_nt_t *) driver);
-         free (driver);
+//         free (driver);
+	 delete driver;
  }
 
  static char*
@@ -2140,7 +2171,8 @@ alsa_driver_detach (alsa_driver_t *driver)
 		soft_mode ? "soft-mode":"-",
 		shorts_first ? "16bit":"32bit");
 
-	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
+//	driver = (alsa_driver_t *) calloc (1, sizeof (alsa_driver_t));
+	driver = new alsa_driver_t();
 
 	jack_driver_nt_init ((jack_driver_nt_t *) driver);
 
@@ -2182,9 +2214,12 @@ alsa_driver_detach (alsa_driver_t *driver)
 	driver->clock_mode = ClockMaster; /* XXX is it? */
 	driver->input_monitor_mask = 0;   /* XXX is it? */
 
-	driver->capture_ports = 0;
-	driver->playback_ports = 0;
-	driver->monitor_ports = 0;
+//	driver->capture_ports = 0;
+	driver->capture_ports_vector.clear();
+//	driver->playback_ports = 0;
+	driver->playback_ports_vector.clear();
+//	driver->monitor_ports = 0;
+	driver->monitor_ports_vector.clear();
 	
 	driver->pfd = 0;
 	driver->playback_nfds = 0;

@@ -1,6 +1,9 @@
 #ifndef __jack_libjack_local_h__
 #define __jack_libjack_local_h__
 
+#include <string>
+#include <vector>
+
 #include "internal.hpp"
 
 /* Client data structure, in the client address space. */
@@ -24,8 +27,10 @@ struct _jack_client {
     jack_port_type_id_t n_port_types;
     jack_shm_info_t*    port_segment;
 
-    JSList *ports;
-    JSList *ports_ext;
+//    JSList *ports;
+    std::vector<jack_port_t*> ports_vector;
+//    JSList *ports_ext;
+    std::vector<jack_port_t*> ports_ext_vector;
 
     pthread_t thread;
     char fifo_prefix[PATH_MAX+1];

@@ -286,7 +286,8 @@ jack_port_register (jack_client_t *client,
 		return NULL;
 	}
 
-	client->ports = jack_slist_prepend (client->ports, port);
+//	client->ports = jack_slist_prepend (client->ports, port);
+	client->ports_vector.push_back( port );
 
 	return port;
 }
@@ -443,14 +444,15 @@ jack_port_get_all_connections (const jack_client_t *client,
 jack_port_t *
 jack_port_by_id_int (const jack_client_t *client, jack_port_id_t id, int* free)
 {
-	JSList *node;
+//	JSList *node;
 
-	for (node = client->ports; node; node = jack_slist_next (node)) {
-		if (((jack_port_t *) node->data)->shared->id == id) {
-			*free = FALSE;
-			return (jack_port_t *) node->data;
-		}
+//	for (node = client->ports; node; node = jack_slist_next (node)) {
+    for( jack_port_t * port : client->ports_vector ) {
+	if( port->shared->id == id) {
+	    *free = FALSE;
+	    return port;
 	}
+    }
 
 	if (id >= client->engine->port_max)
 		return NULL;
@@ -466,22 +468,24 @@ jack_port_by_id_int (const jack_client_t *client, jack_port_id_t id, int* free)
 jack_port_t *
 jack_port_by_id (jack_client_t *client, jack_port_id_t id)
 {
-	JSList *node;
-	jack_port_t* port;
-	int need_free = FALSE;
-	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-	    port = (jack_port_t*)node->data;
-		if (port->shared->id == id) { // Found port, return the cached structure
-			return port;
-		}
+//    JSList *node;
+//    jack_port_t* port;
+    int need_free = FALSE;
+//    for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+//	port = (jack_port_t*)node->data;
+    for( jack_port_t * port : client->ports_ext_vector ) {
+	if (port->shared->id == id) { // Found port, return the cached structure
+	    return port;
 	}
+    }
 	
-	// Otherwise possibly allocate a new port structure, keep it in the ports_ext list for later use
-	port = jack_port_by_id_int (client,id,&need_free);
-	if (port != NULL && need_free)
-		client->ports_ext =
-			jack_slist_prepend (client->ports_ext, port);
-	return port;
+    // Otherwise possibly allocate a new port structure, keep it in the ports_ext list for later use
+    jack_port_t * port = jack_port_by_id_int (client,id,&need_free);
+    if (port != NULL && need_free) {
+//	client->ports_ext = jack_slist_prepend (client->ports_ext, port);
+	client->ports_ext_vector.push_back( port );
+    }
+    return port;
 }
 
 jack_port_t *
@@ -506,23 +510,25 @@ jack_port_by_name_int (jack_client_t *client, const char *port_name)
 jack_port_t *
 jack_port_by_name (jack_client_t *client,  const char *port_name)
 {
-	JSList *node;
-	jack_port_t* port;
-	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-	    port = (jack_port_t*)node->data;
-		if (jack_port_name_equals (port->shared, port_name)) {
-			/* Found port, return the cached structure. */
-			return port;
-		}
+//    JSList *node;
+//    jack_port_t* port;
+//    for (node = client->ports_ext; node; node = jack_slist_next (node)) {
+//	port = (jack_port_t*)node->data;
+    for( jack_port_t * port : client->ports_ext_vector ) {
+	if (jack_port_name_equals (port->shared, port_name)) {
+	    /* Found port, return the cached structure. */
+	    return port;
 	}
+    }
 	
-	/* Otherwise allocate a new port structure, keep it in the
-	 * ports_ext list for later use. */
-	port = jack_port_by_name_int (client, port_name);
-	if (port != NULL)
-		client->ports_ext =
-			jack_slist_prepend (client->ports_ext, port);
-	return port;
+    /* Otherwise allocate a new port structure, keep it in the
+     * ports_ext list for later use. */
+    jack_port_t * port = jack_port_by_name_int (client, port_name);
+    if (port != NULL) {
+//	client->ports_ext = jack_slist_prepend (client->ports_ext, port);
+	client->ports_ext_vector.push_back( port );
+    }
+    return port;
 }
 
 jack_nframes_t
