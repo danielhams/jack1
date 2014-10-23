@@ -296,6 +296,7 @@ int jack_engine_deliver_event( jack_engine_t & engine, jack_client_internal_t *c
     /* caller must hold the graph lock */
 
     DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
+    cout << "jack_engine_deliver_event of type " << jack_event_type_name(event->type) << endl;
 
     /* we are not RT-constrained here, so use kill(2) to beef up
        our check on a client's continued well-being
@@ -2162,11 +2163,13 @@ static int jack_engine_port_disconnect_internal(
 		jack_client_internal_t *src;
 		jack_client_internal_t *dst;
 
-		src = jack_engine_client_internal_by_id
-		    (engine, srcport->shared->client_id);
+		src = jack_engine_client_internal_by_id( engine, srcport->shared->client_id );
 
-		dst =  jack_engine_client_internal_by_id
-		    (engine, dstport->shared->client_id);
+		dst = jack_engine_client_internal_by_id( engine, dstport->shared->client_id );
+
+		jack_info( "Attempting to remove from %d to %d",
+			   srcport->shared->client_id,
+			   dstport->shared->client_id );
 
 		jack_engine_client_truefeed_remove( src->truefeeds_vector, dst );
 

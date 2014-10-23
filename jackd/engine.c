@@ -67,6 +67,46 @@
 
 #include "libjack/local.h"
 
+static __inline__
+JSList*
+jack_slist_remove_with_error (JSList   *list,
+			      void     *data,
+			      const char * source)
+{
+  JSList *tmp;
+  JSList *prev;
+  int found = 0;
+
+  prev = NULL;
+  tmp = list;
+
+  while (tmp)
+    {
+      if (tmp->data == data)
+	{
+	  if (prev)
+	    prev->next = tmp->next;
+	  if (list == tmp)
+	    list = list->next;
+
+	  tmp->next = NULL;
+	  jack_slist_free (tmp);
+	  found = 1;
+
+	  break;
+	}
+
+      prev = tmp;
+      tmp = tmp->next;
+    }
+
+  if( found == 0 ) {
+      jack_error("Failed to find for removal in %s", source );
+  }
+
+  return list;
+}
+
 typedef struct {
 
     jack_port_internal_t *source;
@@ -4046,16 +4086,18 @@ jack_port_disconnect_internal (jack_engine_t *engine,
 				dst =  jack_client_internal_by_id
 					(engine, dstport->shared->client_id);
 								    
-				src->truefeeds = jack_slist_remove
-					(src->truefeeds, dst);
+				src->truefeeds = jack_slist_remove_with_error
+					(src->truefeeds, dst,
+						"jack_engine_client_sortfeed_remove");
 
 				dst->fedcount--;					
 				
 				if (connect->dir == 1) {
 					/* normal connection: remove dest from
 					   source's sortfeeds list */ 
-					src->sortfeeds = jack_slist_remove
-						(src->sortfeeds, dst);
+					src->sortfeeds = jack_slist_remove_with_error
+						(src->sortfeeds, dst,
+							"jack_engine_client_sortfeed_remove");
 				} else {
 					/* feedback connection: remove source
 					   from dest's sortfeeds list */
