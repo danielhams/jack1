@@ -26,29 +26,7 @@
 #include <iostream>
 #include <sstream>
 #include <vector>
-
-#include "internal.hpp"
-#include "driver.hpp"
-#include "jack/uuid.h"
-#include "shm.hpp"
-#include "engine.hpp"
-#include "transengine.hpp"
-#include "clientengine.hpp"
-#include "jack/types.h"
-#include "messagebuffer.hpp"
-#include "engine.hpp"
-
-#include "libjackpp/local.hpp"
-
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/stat.h>
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <signal.h>
-#include <poll.h>
-#include <stdarg.h>
+#include <thread>
 
 using std::cout;
 using std::endl;
@@ -57,3 +35,4 @@ using std::vector;
 using std::stringstream;
 using std::unique_ptr;
 using std::make_unique;
+

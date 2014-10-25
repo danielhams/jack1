@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINCLEANFILES = Makefile.in
 
 AM_CFLAGS = $(JACK_CFLAGS) 
@@ -8,8 +10,18 @@ plugindir = $(ADDONPP_DIR)
 plugin_LTLIBRARIES = jack_net.la
 
 jack_net_la_LDFLAGS = -module -avoid-version @NETJACK_LIBS@
-jack_net_la_CFLAGS = @NETJACK_CFLAGS@
-jack_net_la_SOURCES = net_driver.c netjack_packet.c netjack.c
-jack_net_la_LIBADD = $(top_builddir)/libjackpp/libjackpp.la $(top_builddir)/jackdpp/libjackserverpp.la
 
-noinst_HEADERS = netjack.h net_driver.h netjack_packet.h
+jack_net_la_CXXFLAGS = @NETJACK_CFLAGS@
+jack_net_la_SOURCES = \
+	net_driver.cpp \
+	netjack_packet.cpp \
+	netjack.cpp \
+	$(NULL)
+
+jack_net_la_LIBADD = $(top_builddir)/libjackpp/libjackpp.la
+
+noinst_HEADERS = \
+	netjack.hpp \
+	net_driver.hpp \
+	netjack_packet.hpp \
+	$(NULL)

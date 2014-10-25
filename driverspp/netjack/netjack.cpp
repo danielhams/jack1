@@ -1,5 +1,3 @@
-
-/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
 NetJack Abstraction.
 
@@ -52,7 +50,7 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 
 #include "config.h"
 
-#include "netjack.h"
+#include "netjack.hpp"
 
 
 #if HAVE_SAMPLERATE
@@ -63,8 +61,8 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <celt/celt.h>
 #endif
 
-#include "netjack.h"
-#include "netjack_packet.h"
+#include "netjack.hpp"
+#include "netjack_packet.hpp"
 
 // JACK2
 //#include "jack/control.h"
@@ -329,7 +327,7 @@ void netjack_send_silence( netjack_driver_state_t *netj, int syncstate )
     int tx_size = get_sample_size(netj->bitdepth) * netj->playback_channels * netj->net_period_up + sizeof(jacknet_packet_header);
     unsigned int *packet_buf, *packet_bufX;
 
-    packet_buf = alloca( tx_size);
+    packet_buf = (unsigned int *)alloca( tx_size);
     jacknet_packet_header *tx_pkthdr = (jacknet_packet_header *)packet_buf;
     jacknet_packet_header *rx_pkthdr = (jacknet_packet_header *)netj->rx_buf;
 
@@ -509,7 +507,7 @@ void netjack_detach( netjack_driver_state_t *netj )
 #endif
         {
 #if HAVE_SAMPLERATE
-            SRC_STATE * src = node->data;
+            SRC_STATE * src = (SRC_STATE*)node->data;
             src_delete(src);
 #endif
         }
@@ -536,7 +534,7 @@ void netjack_detach( netjack_driver_state_t *netj )
 #endif
         {
 #if HAVE_SAMPLERATE
-            SRC_STATE * src = node->data;
+            SRC_STATE * src = (SRC_STATE*)node->data;
             src_delete(src);
 #endif
         }
@@ -671,7 +669,7 @@ netjack_startup( netjack_driver_state_t *netj )
     netj->srcaddress_valid = 0;
     if (netj->use_autoconfig)
     {
-	jacknet_packet_header *first_packet = alloca (sizeof (jacknet_packet_header));
+	jacknet_packet_header *first_packet = (jacknet_packet_header*)alloca (sizeof (jacknet_packet_header));
 #ifdef WIN32
     int address_size = sizeof( struct sockaddr_in );
 #else

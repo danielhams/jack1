@@ -71,7 +71,7 @@
 #include <celt/celt.h>
 #endif
 
-#include "netjack_packet.h"
+#include "netjack_packet.hpp"
 
 // JACK2 specific.
 //#include "jack/control.h"
@@ -157,7 +157,7 @@ packet_cache
     else
 	    fragment_number = (pkt_size - sizeof (jacknet_packet_header) - 1) / fragment_payload_size + 1;
 
-    packet_cache *pcache = malloc (sizeof (packet_cache));
+    packet_cache *pcache = (packet_cache*)malloc (sizeof (packet_cache));
     if (pcache == NULL)
     {
         jack_error ("could not allocate packet cache (1)");
@@ -165,7 +165,7 @@ packet_cache
     }
 
     pcache->size = num_packets;
-    pcache->packets = malloc (sizeof (cache_packet) * num_packets);
+    pcache->packets = (cache_packet*)malloc (sizeof (cache_packet) * num_packets);
     pcache->master_address_valid = 0;
     pcache->last_framecnt_retreived = 0;
     pcache->last_framecnt_retreived_valid = 0;
@@ -183,8 +183,8 @@ packet_cache
         pcache->packets[i].packet_size = pkt_size;
         pcache->packets[i].mtu = mtu;
         pcache->packets[i].framecnt = 0;
-        pcache->packets[i].fragment_array = malloc (sizeof (char) * fragment_number);
-        pcache->packets[i].packet_buf = malloc (pkt_size);
+        pcache->packets[i].fragment_array = (char*)malloc (sizeof (char) * fragment_number);
+        pcache->packets[i].packet_buf = (char*)malloc (pkt_size);
         if ((pcache->packets[i].fragment_array == NULL) || (pcache->packets[i].packet_buf == NULL))
         {
             jack_error ("could not allocate packet cache (3)");
@@ -522,7 +522,7 @@ netjack_poll_deadline (int sockfd, jack_time_t deadline, jack_time_t (*get_micro
 void
 packet_cache_drain_socket( packet_cache *pcache, int sockfd, jack_time_t (*get_microseconds)(void) )
 {
-    char *rx_packet = alloca (pcache->mtu);
+    char *rx_packet = (char*)alloca (pcache->mtu);
     jacknet_packet_header *pkthdr = (jacknet_packet_header *) rx_packet;
     int rcv_len;
     jack_nframes_t framecnt;
@@ -778,7 +778,7 @@ netjack_sendto (int sockfd, char *packet_buf, int pkt_size, int flags, struct so
     char *tx_packet, *dataX;
     jacknet_packet_header *pkthdr;
 
-    tx_packet = alloca (mtu + 10);
+    tx_packet = (char*)alloca (mtu + 10);
     dataX = tx_packet + sizeof (jacknet_packet_header);
     pkthdr = (jacknet_packet_header *) tx_packet;
 
@@ -918,7 +918,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
 #endif
 
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
 
         const char *porttype = jack_port_type (port);
 
@@ -928,7 +928,7 @@ render_payload_to_jack_ports_float ( void *packet_payload, jack_nframes_t net_pe
             // audio port, resample if necessary
             if (net_period_down != nframes)
             {
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
                 for (i = 0; i < net_period_down; i++)
                 {
                     packet_bufX[i] = ntohl (packet_bufX[i]);
@@ -998,7 +998,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
         int i;
         int_float_t val;
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
 
         const char *porttype = jack_port_type (port);
 
@@ -1008,7 +1008,7 @@ render_jack_ports_to_payload_float (JSList *playback_ports, JSList *playback_src
 
 #if HAVE_SAMPLERATE
             if (net_period_up != nframes) {
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
                 src.data_in = buf;
                 src.input_frames = nframes;
 
@@ -1083,10 +1083,10 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
 #endif
 
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
 
 #if HAVE_SAMPLERATE
-        float *floatbuf = alloca (sizeof(float) * net_period_down);
+        float *floatbuf = (float*)alloca (sizeof(float) * net_period_down);
 #endif
         const char *porttype = jack_port_type (port);
 
@@ -1097,7 +1097,7 @@ render_payload_to_jack_ports_16bit (void *packet_payload, jack_nframes_t net_per
 #if HAVE_SAMPLERATE
             if (net_period_down != nframes)
             {
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
                 for (i = 0; i < net_period_down; i++)
                 {
                     floatbuf[i] = ((float) ntohs(packet_bufX[i])) / 32767.0 - 1.0;
@@ -1153,7 +1153,7 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 #endif
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
         const char *porttype = jack_port_type (port);
 
         if (jack_port_is_audio (porttype))
@@ -1163,9 +1163,9 @@ render_jack_ports_to_payload_16bit (JSList *playback_ports, JSList *playback_src
 #if HAVE_SAMPLERATE
             if (net_period_up != nframes)
             {
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
 
-                float *floatbuf = alloca (sizeof(float) * net_period_up);
+                float *floatbuf = (float*)alloca (sizeof(float) * net_period_up);
 
                 src.data_in = buf;
                 src.input_frames = nframes;
@@ -1229,10 +1229,10 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
 #endif
 
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
 
 #if HAVE_SAMPLERATE
-        float *floatbuf = alloca (sizeof (float) * net_period_down);
+        float *floatbuf = (float*)alloca (sizeof (float) * net_period_down);
 #endif
         const char *porttype = jack_port_type (port);
 
@@ -1242,7 +1242,7 @@ render_payload_to_jack_ports_8bit (void *packet_payload, jack_nframes_t net_peri
             // audio port, resample if necessary
             if (net_period_down != nframes)
             {
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
                 for (i = 0; i < net_period_down; i++)
                     floatbuf[i] = ((float) packet_bufX[i]) / 127.0;
 
@@ -1297,7 +1297,7 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
         int i;
         jack_port_t *port = (jack_port_t *) node->data;
 
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
         const char *porttype = jack_port_type (port);
 
         if (jack_port_is_audio (porttype))
@@ -1307,9 +1307,9 @@ render_jack_ports_to_payload_8bit (JSList *playback_ports, JSList *playback_srcs
             if (net_period_up != nframes)
             {
 
-                SRC_STATE *src_state = src_node->data;
+                SRC_STATE *src_state = (SRC_STATE*)src_node->data;
 
-                float *floatbuf = alloca (sizeof (float) * net_period_up);
+                float *floatbuf = (float*)alloca (sizeof (float) * net_period_up);
 
                 src.data_in = buf;
                 src.input_frames = nframes;
@@ -1360,7 +1360,7 @@ render_payload_to_jack_ports_celt (void *packet_payload, jack_nframes_t net_peri
     while (node != NULL)
     {
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
 
         const char *porttype = jack_port_type (port);
 
@@ -1410,7 +1410,7 @@ render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs
     while (node != NULL)
     {
         jack_port_t *port = (jack_port_t *) node->data;
-        jack_default_audio_sample_t* buf = jack_port_get_buffer (port, nframes);
+        jack_default_audio_sample_t* buf = (jack_default_audio_sample_t*)jack_port_get_buffer (port, nframes);
         const char *porttype = jack_port_type (port);
 
         if (jack_port_is_audio (porttype))
@@ -1418,7 +1418,7 @@ render_jack_ports_to_payload_celt (JSList *playback_ports, JSList *playback_srcs
             // audio port, encode celt data.
 
 	    int encoded_bytes;
-	    float *floatbuf = alloca (sizeof(float) * nframes );
+	    float *floatbuf = (float*)alloca (sizeof(float) * nframes );
 	    memcpy( floatbuf, buf, nframes*sizeof(float) );
 	    CELTEncoder *encoder = src_node->data;
 #if HAVE_CELT_API_0_8

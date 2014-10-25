@@ -31,7 +31,7 @@
 
 #include <netinet/in.h>
 
-#include "netjack.h"
+#include "netjack.hpp"
 
 typedef struct _net_driver net_driver_t;
 

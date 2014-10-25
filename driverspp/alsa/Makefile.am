@@ -29,4 +29,5 @@ noinst_HEADERS = \
 	usx2y.hpp		\
 	$(NULL)
 
+#jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackdpp/libjackserverpp.la $(top_builddir)/libjackpp/libjackpp.la
 jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackdpp/libjackserverpp.la

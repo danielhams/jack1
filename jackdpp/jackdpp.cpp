@@ -105,7 +105,10 @@ using jack::jack_drivers_load;
 using jack::jack_drivers_find_descriptor;
 using jack::jack_drivers_find_so_descriptor;
 
-static void jack_load_internal_clients( jack_engine_t * engine, const vector<string> & internal_clients )
+namespace jack
+{
+
+static void load_internal_clients( jack_engine_t * engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
 	jack_request_t req;
@@ -194,7 +197,7 @@ static void jack_load_internal_clients( jack_engine_t * engine, const vector<str
     }
 }
 
-static int jack_main( const jack_options & parsed_options,
+static int main_loop( const jack_options & parsed_options,
 		      const vector<jack_driver_desc_t*> & loaded_drivers,
 		      jack_driver_desc_t * driver_desc,
 		      JSList * driver_params_jsl )
@@ -227,13 +230,12 @@ static int jack_main( const jack_options & parsed_options,
 	}
     }
 
-
     if (jack_engine_drivers_start( *engine ) != 0) {
 	jack_error ("cannot start driver");
 	goto error;
     }
 
-    jack_load_internal_clients( engine.get(), parsed_options.internal_clients );
+    load_internal_clients( engine.get(), parsed_options.internal_clients );
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -272,7 +274,7 @@ static void copyright( ostream & os)
 }
 
 
-static void jack_cleanup_files (const char *server_name)
+static void cleanup_files (const char *server_name)
 {
     DIR *dir;
     struct dirent *dirent;
@@ -377,6 +379,10 @@ static void display_version( ostream & os )
     os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
 	" protocol " << PROTOCOL_VERSION << endl;
 }
+
+};
+
+using namespace jack;
 
 int main (int argc, char *argv[])
 {
@@ -485,10 +491,10 @@ int main (int argc, char *argv[])
     /* clean up shared memory and files from any previous
      * instance of this server name */
     jack_cleanup_shm();
-    jack_cleanup_files( parsed_options.server_name.c_str() );
+    cleanup_files( parsed_options.server_name.c_str() );
 
     /* run the server engine until it terminates */
-    jack_main( parsed_options,
+    main_loop( parsed_options,
 	       loaded_drivers,
 	       desc,
 	       driver_params_jsl );
@@ -499,7 +505,7 @@ int main (int argc, char *argv[])
     jack_cleanup_shm ();
     if( parsed_options.verbose )
 	cerr << "cleaning up files" << endl;
-    jack_cleanup_files( parsed_options.server_name.c_str() );
+    cleanup_files( parsed_options.server_name.c_str() );
     if( parsed_options.verbose )
 	cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
     jack_unregister_server( parsed_options.server_name.c_str() );

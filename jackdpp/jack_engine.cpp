@@ -24,7 +24,6 @@
 
 #include "jack_engine.hpp"
 #include "jack_signals.hpp"
-#include "jack_pp_debug.hpp"
 
 #include <string>
 #include <iostream>
@@ -296,7 +295,6 @@ int jack_engine_deliver_event( jack_engine_t & engine, jack_client_internal_t *c
     /* caller must hold the graph lock */
 
     DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
-    cout << "jack_engine_deliver_event of type " << jack_event_type_name(event->type) << endl;
 
     /* we are not RT-constrained here, so use kill(2) to beef up
        our check on a client's continued well-being

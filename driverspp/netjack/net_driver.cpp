@@ -24,6 +24,10 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 */
 
+#include <string>
+#include <iostream>
+#include <vector>
+
 #include <math.h>
 #include <stdio.h>
 #include <memory.h>
@@ -42,12 +46,16 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include "config.h"
 
 
-#include "netjack.h"
-#include "netjack_packet.h"
-#include "net_driver.h"
+#include "netjack.hpp"
+#include "netjack_packet.hpp"
+#include "net_driver.hpp"
+
+#include "libjackpp/jack_pp_debug.hpp"
 
 #undef DEBUG_WAKEUP
 
+using std::cout;
+using std::endl;
 
 #define MIN(x,y) ((x)<(y) ? (x) : (y))
 
@@ -223,7 +231,7 @@ net_driver_write (net_driver_t* driver, jack_nframes_t nframes)
     int packet_size = get_sample_size(netj->bitdepth) * netj->playback_channels * netj->net_period_up + sizeof(jacknet_packet_header);
     jacknet_packet_header *pkthdr; 
 
-    packet_buf = alloca(packet_size);
+    packet_buf = (uint32_t*)alloca(packet_size);
     pkthdr = (jacknet_packet_header *)packet_buf;
 
     if( netj->running_free ) {
@@ -378,6 +386,9 @@ net_driver_new (jack_client_t * client,
 
 /* DRIVER "PLUGIN" INTERFACE */
 
+extern "C"
+{
+
 jack_driver_desc_t *
 driver_get_descriptor ()
 {
@@ -385,11 +396,11 @@ driver_get_descriptor ()
     jack_driver_param_desc_t * params;
     unsigned int i;
 
-    desc = calloc (1, sizeof (jack_driver_desc_t));
+    desc = (jack_driver_desc_t*)calloc (1, sizeof (jack_driver_desc_t));
     strcpy (desc->name, "net");
     desc->nparams = 18;
 
-    params = calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
+    params = (jack_driver_param_desc_t*)calloc (desc->nparams, sizeof (jack_driver_param_desc_t));
 
     i = 0;
     strcpy (params[i].name, "audio-ins");
@@ -548,6 +559,8 @@ driver_get_descriptor ()
     desc->params = params;
 
     return desc;
+}
+
 }
 
 const char driver_client_name[] = "net_pcm";

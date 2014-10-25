@@ -76,7 +76,6 @@ static int dummy_nt_run_cycle (jack_driver_nt_t *drv) { return 0; }
 static int dummy_nt_attach    (jack_driver_nt_t *drv) { return 0; }
 static int dummy_nt_detach    (jack_driver_nt_t *drv) { return 0; }
 
-
 /*
  * These are used in driver->nt_run for controlling whether or not
  * driver->engine->driver_exit() gets called (EXIT = call it, PAUSE = don't)
@@ -115,7 +114,6 @@ jack_driver_nt_thread (void * arg)
 	 * actually stores the driver->nt_thread value.  It's safer to
 	 * store it here as well. 
 	 */
-
 	driver->nt_thread = pthread_self();
 
 	pthread_mutex_lock (&driver->nt_run_lock);

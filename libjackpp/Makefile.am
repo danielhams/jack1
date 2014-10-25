@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINERCLEANFILES    = Makefile.in
 
 if USE_POSIX_SHM
@@ -11,6 +13,7 @@ endif
 
 SOURCE_FILES = \
 	client.cpp \
+	driver.cpp \
 	intclient.cpp \
 	messagebuffer.cpp \
 	pool.cpp \
@@ -18,12 +21,16 @@ SOURCE_FILES = \
 	metadata.cpp \
 	midiport.cpp \
 	ringbuffer.cpp \
+	sanitycheck.cpp \
+	systemtest.cpp \
 	shm.cpp \
 	thread.cpp \
 	time.cpp \
 	transclient.cpp \
 	unlock.cpp \
-	uuid.cpp
+	uuid.cpp \
+	jack_pp_debug.cpp \
+	$(NULL)
 
 simd.lo: $(srcdir)/simd.cpp
 	$(LIBTOOL) --mode=compile $(CXX) -I$(top_builddir) $(JACK_CORE_CPPFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.cpp

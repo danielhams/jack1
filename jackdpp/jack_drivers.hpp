@@ -42,6 +42,20 @@ jack_driver_desc_t * jack_drivers_find_so_descriptor(
     const std::string & so_name,
     bool verbose );
 
+class jack_drivers
+{
+public:
+    jack_drivers( bool verbose );
+
+    inline const std::vector<jack_driver_desc_t*> get_loaded_drivers() { return loaded_drivers_; };
+
+    jack_driver_desc_t * find_descriptor_by_name( const std::string & name );
+    jack_driver_desc_t * find_descriptor_by_so_name( const std::string & so_name );
+
+private:
+    std::vector<jack_driver_desc_t*> loaded_drivers_;
+};
+
 }
 
 #endif
