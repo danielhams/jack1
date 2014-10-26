@@ -1,3 +1,5 @@
+NULL=
+
 MAINTAINERCLEANFILES = Makefile.in jackd.1 jack_md5.h 
 
 if USE_CAPABILITIES
@@ -24,7 +26,7 @@ bin_PROGRAMS = jackd $(CAP_PROGS)
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
 jackd_SOURCES = jackd.c
-jackd_LDADD = libjackserver.la $(CAP_LIBS) @OS_LDFLAGS@
+jackd_LDADD = libjackserver.la $(CAP_LIBS) @OS_LDFLAGS@ $(top_builddir)/libjack/libjack.la
 
 noinst_HEADERS = jack_md5.h md5.h md5_loc.h \
 		 clientengine.h transengine.h
@@ -44,14 +46,12 @@ lib_LTLIBRARIES	= libjackserver.la
 
 libjackserver_la_CFLAGS = $(AM_CFLAGS)
 
-libjackserver_la_SOURCES = engine.c clientengine.c transengine.c controlapi.c \
-	../libjack/systemtest.c ../libjack/sanitycheck.c \
-	../libjack/client.c ../libjack/consdes.c ../libjack/driver.c ../libjack/intclient.c \
-        ../libjack/messagebuffer.c ../libjack/pool.c ../libjack/port.c \
-        ../libjack/midiport.c ../libjack/ringbuffer.c ../libjack/shm.c \
-        ../libjack/thread.c ../libjack/time.c  ../libjack/transclient.c \
-        ../libjack/unlock.c ../libjack/uuid.c ../libjack/metadata.c
-libjackserver_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@ 
+libjackserver_la_SOURCES = engine.c \
+	clientengine.c \
+	transengine.c \
+	controlapi.c \
+	$(NULL)
+libjackserver_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@ $(top_builddir)/libjack/libjack.la
 libjackserver_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
 
 simd.lo: $(srcdir)/../libjack/simd.c
