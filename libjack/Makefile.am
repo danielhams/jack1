@@ -21,6 +21,7 @@ SOURCE_FILES = \
 	     shm.c \
 	     thread.c \
              time.c \
+             consdes.c \
 	     transclient.c \
 	     unlock.c \
 	     uuid.c

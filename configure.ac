@@ -45,7 +45,7 @@ if test $not_overwriting -gt 0 ; then
     echo "INSTALL. Please contact the distribution packager for JACK and"
     echo "ask them to fix their packaging."
     echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
-    exit 1
+#    exit 1
 fi
 
 AC_CONFIG_AUX_DIR(config)
