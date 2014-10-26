@@ -29,7 +29,7 @@ AM_CXXFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\" $(BOOST_CPPFLAGS) $
 jackdpp_SOURCES = jackdpp.cpp \
 	$(NULL)
 
-jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS) -L../libjackpp
+jackdpp_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
 
 jackdpp_LDADD = $(top_builddir)/libjackpp/libjackpp.la libjackserverpp.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
