@@ -391,7 +391,7 @@ jack_options_parser::jack_options_parser( int argc, char ** argv, bool debug ) :
 	}
 
 	if( vm.count("name") > 0 ) {
-	    string server_name_str = vm["server_name"].as<string>();
+	    string server_name_str = vm["name"].as<string>();
 	    options_.server_name = server_name_str;
 	}
 

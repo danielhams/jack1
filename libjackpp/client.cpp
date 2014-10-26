@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <string>
+#include <iostream>
 
 #include <pthread.h>
 #include <errno.h>
@@ -75,6 +76,8 @@
 
 using std::string;
 using std::vector;
+using std::cout;
+using std::endl;
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
