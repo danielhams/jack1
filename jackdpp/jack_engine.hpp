@@ -47,6 +47,9 @@ int jack_engine_load_slave_driver( jack_engine_t & engine,
 				   jack_driver_desc_t * driver_desc,
 				   JSList * driver_params_jsl );
 
+int jack_engine_unload_slave_driver( jack_engine_t & engine,
+				     jack_driver_t * driver_desc );
+
 int jack_engine_drivers_start( jack_engine_t & engine );
 
 int jack_engine_use_driver( jack_engine_t & engine, struct _jack_driver *driver );

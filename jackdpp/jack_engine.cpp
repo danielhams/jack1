@@ -4268,6 +4268,14 @@ void jack_engine_cleanup( jack_engine_t & engine )
 	engine.driver = NULL;
     }
 
+    if( engine.slave_drivers.size() > 0 ) {
+	VERBOSE( &engine, "unloading slave drivers");
+	for( jack_driver_t * slave_driver : engine.slave_drivers ) {
+	    jack_engine_unload_slave_driver( engine, slave_driver );
+	    free( slave_driver );
+	}
+    }
+
     VERBOSE( &engine, "freeing shared port segments");
     for ( ssize_t i = 0; i < engine.control->n_port_types; ++i) {
 	jack_release_shm( &engine.port_segment[i] );
@@ -4300,6 +4308,11 @@ void jack_engine_cleanup( jack_engine_t & engine )
     VERBOSE( &engine, "max usecs: %.3f, engine deleted", engine.max_usecs);
 
     jack_messagebuffer_exit();
+
+    if( engine.fifo ) {
+	free( engine.fifo );
+	engine.fifo = NULL;
+    }
 }
 
 static jack_driver_info_t * jack_engine_load_driver_so( jack_engine_t & engine, jack_driver_desc_t * driver_desc )
@@ -4376,7 +4389,7 @@ int jack_engine_load_driver( jack_engine_t & engine,
 	return -1;
     }
 
-    if ((client = jack_engine_create_driver_client( engine, info->client_name )
+    if ((client = jack_engine_create_driver_client_internal( engine, info->client_name )
 	    ) == NULL) {
 	return -1;
     }
@@ -4393,7 +4406,7 @@ int jack_engine_load_driver( jack_engine_t & engine,
     free (info);
 
     if (jack_engine_use_driver( engine, driver ) < 0) {
-	jack_engine_remove_client( engine, client );
+	jack_engine_remove_client_internal( engine, client );
 	return -1;
     }
 
@@ -4430,8 +4443,7 @@ int jack_engine_load_slave_driver (jack_engine_t & engine,
 	return -1;
     }
 
-    if ((client = jack_engine_create_driver_client( engine, info->client_name )
-	    ) == NULL) {
+    if ((client = jack_engine_create_driver_client_internal( engine, info->client_name ) ) == NULL) {
 	jack_info ("Creating slave failed\n");
 	return -1;
     }
@@ -4450,7 +4462,7 @@ int jack_engine_load_slave_driver (jack_engine_t & engine,
 
     if( jack_engine_add_slave_driver( engine, driver ) < 0 ) {
 	jack_info ("Adding slave failed\n");
-	jack_engine_client_delete( engine, client);
+	jack_engine_client_internal_delete( engine, client);
 	return -1;
     }
 
@@ -4469,6 +4481,14 @@ static void jack_engine_slave_driver_remove( jack_engine_t & engine, jack_driver
     }
 
     jack_driver_unload(sdriver);
+}
+
+int jack_engine_unload_slave_driver( jack_engine_t & engine,
+				     jack_driver_t * driver_desc )
+{
+    jack_engine_slave_driver_remove( engine, driver_desc );
+    jack_engine_client_internal_delete( engine, driver_desc->internal_client );
+    return 0;
 }
 
 int jack_engine_drivers_start( jack_engine_t & engine )

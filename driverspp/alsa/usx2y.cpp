@@ -492,7 +492,7 @@ usx2y_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 				&driver->capture_areas,
 				&offset, &nframes_) < 0) {
 		jack_error ("ALSA/USX2Y: %s: mmap areas info error",
-			    driver->alsa_name_capture);
+			    driver->alsa_name_capture.c_str());
 		return -1;
 	}
 
@@ -600,7 +600,7 @@ usx2y_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 			       &driver->playback_areas,
 			       &offset, &nframes_) < 0) {
 		jack_error ("ALSA/USX2Y: %s: mmap areas info error",
-			    driver->alsa_name_capture);
+			    driver->alsa_name_capture.c_str());
 		return -1;
 	}
 
@@ -691,7 +691,7 @@ jack_alsa_usx2y_hw_new (alsa_driver_t *driver)
 	 */
 	hwdep_handle = NULL;
 	hwdep_cardno = hwdep_devno = 0;
-	if ((hwdep_colon = strrchr(driver->alsa_name_playback, ':')) != NULL)
+	if ((hwdep_colon = strrchr((char*)driver->alsa_name_playback.c_str(), ':')) != NULL)
 		sscanf(hwdep_colon, ":%d,%d", &hwdep_cardno, &hwdep_devno);
 	if (hwdep_devno == 2) {
 		snprintf(hwdep_name, sizeof(hwdep_name), "hw:%d,1", hwdep_cardno);
@@ -706,7 +706,7 @@ jack_alsa_usx2y_hw_new (alsa_driver_t *driver)
 			/* Set our own operational function pointers. */
 			usx2y_driver_setup(driver);
 			jack_info("ALSA/USX2Y: EXPERIMENTAL hwdep pcm device %s"
-				" (aka \"rawusb\")", driver->alsa_name_playback);
+				  " (aka \"rawusb\")", driver->alsa_name_playback.c_str());
 		}
 	}
 

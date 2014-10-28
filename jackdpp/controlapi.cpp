@@ -1175,7 +1175,7 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
 
 	pthread_mutex_lock (&server_ptr->engine->request_lock);
 	jack_lock_graph (server_ptr->engine.get());
-	jack_engine_remove_client( *(server_ptr->engine), old_driver->internal_client);
+	jack_engine_remove_client_internal( *(server_ptr->engine), old_driver->internal_client);
 	jack_unlock_graph (server_ptr->engine.get());
 	pthread_mutex_unlock (&server_ptr->engine->request_lock);
 

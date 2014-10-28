@@ -404,12 +404,12 @@ int main (int argc, char *argv[])
 
     if( parsed_options.show_temporary ) {
 	cout << jack_tmpdir << endl;
-	exit (0);
+	return 0;
     }
 
     if( parsed_options.show_version ) {
 	display_version( cout );
-	exit (0);
+	return 0;
     }
 
     if( parsed_options.show_help ) {
@@ -418,14 +418,14 @@ int main (int argc, char *argv[])
 	if( parsed_options.error_message.length() > 0 ) {
 	    cerr << "Error: " << parsed_options.error_message << endl;
 	}
-	exit(1);
+	return 1;
     }
 
     copyright( cout );
 
     if( parsed_options.sanity_checks && (0 < sanitycheck( parsed_options.realtime, FALSE))) {
 	cerr << "Failed sanity checks" << endl;
-	exit(1);
+	return 1;
     }
 
     if( !parsed_options.success ) {
@@ -433,14 +433,14 @@ int main (int argc, char *argv[])
 	if( parsed_options.error_message.length() > 0 ) {
 	    cerr << "Error: " << parsed_options.error_message << endl;
 	}
-	exit(1);
+	return 1;
     }
 
     vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load( parsed_options.verbose );
 
     if (loaded_drivers.size() == 0) {
 	cerr << "jackd: no drivers found; exiting" << endl;
-	exit (1);
+	return 1;
     }
 	
     if( parsed_options.midi_buffer_size != 0 ) {
@@ -455,7 +455,7 @@ int main (int argc, char *argv[])
     desc = jack_drivers_find_descriptor( loaded_drivers, parsed_options.driver );
     if (!desc) {
 	cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
-	exit (1);
+	return 1;
     }
 
     int driver_nargs = options_parser.get_driver_argc();
@@ -465,7 +465,7 @@ int main (int argc, char *argv[])
 
     if (jack_parse_driver_params( desc, driver_nargs,
 				  driver_args, &driver_params_jsl)) {
-	exit (0);
+	return 0;
     }
 
     if( parsed_options.server_name.length() == 0 ) {
@@ -476,13 +476,13 @@ int main (int argc, char *argv[])
     switch (rc) {
 	case EEXIST:
 	    cerr << "'" << parsed_options.server_name << "' server already active" << endl;
-	    exit (1);
+	    return 1;
 	case ENOSPC:
 	    cerr << "too many servers already active" << endl;
-	    exit (2);
+	    return 2;
 	case ENOMEM:
 	    cerr << "no access to shm registry" << endl;
-	    exit (3);
+	    return 3;
 	default:
 	    if( parsed_options.verbose )
 		cerr << "server '" << parsed_options.server_name << "' registered" << endl;
@@ -510,5 +510,5 @@ int main (int argc, char *argv[])
 	cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
     jack_unregister_server( parsed_options.server_name.c_str() );
 
-    exit (0);
+    return 0;
 }

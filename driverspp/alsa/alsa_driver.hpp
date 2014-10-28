@@ -82,9 +82,9 @@ typedef struct _alsa_driver {
     jack_nframes_t                playback_frame_latency;
 
     unsigned long                *silent;
-    char                         *alsa_name_playback;
-    char                         *alsa_name_capture;
-    char                         *alsa_driver;
+    std::string                   alsa_name_playback;
+    std::string                   alsa_name_capture;
+    std::string                   alsa_driver;
     bitset_t			  channels_not_done;
     bitset_t			  channels_done;
     snd_pcm_format_t              playback_sample_format;
@@ -104,11 +104,8 @@ typedef struct _alsa_driver {
     jack_hardware_t              *hw;  
     ClockSyncStatus              *clock_sync_data;
     jack_client_t                *client;
-//    JSList                       *capture_ports;
     std::vector<jack_port_t*> capture_ports_vector;
-//    JSList                       *playback_ports;
     std::vector<jack_port_t*> playback_ports_vector;
-//    JSList                       *monitor_ports;
     std::vector<jack_port_t*> monitor_ports_vector;
 
     unsigned long input_monitor_mask;

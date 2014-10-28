@@ -183,7 +183,7 @@ static void jack_engine_zombify_client( jack_engine_t & engine, jack_client_inte
     jack_engine_client_do_deactivate( engine, client, FALSE );
 }
 
-void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *client )
+void jack_engine_remove_client_internal( jack_engine_t & engine, jack_client_internal_t *client )
 {
     jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
 
@@ -241,7 +241,7 @@ void jack_engine_remove_client( jack_engine_t & engine, jack_client_internal_t *
 
     VERBOSE( &engine, "after: client vector contains %d", engine.clients.size() );
 
-    jack_engine_client_delete( engine, client );
+    jack_engine_client_internal_delete( engine, client );
 
     if( engine.temporary ) {
 	int external_clients = 0;
@@ -378,7 +378,7 @@ void jack_engine_remove_clients( jack_engine_t & engine, int* exit_freewheeling_
 			 client->control->name,
 			 jack_client_state_name (client),
 			 client->error);
-		jack_engine_remove_client( engine, client );
+		jack_engine_remove_client_internal( engine, client );
 	    } else {
 		VERBOSE( &engine, "client failure: "
 			 "client %s state = %s errors"
@@ -567,7 +567,7 @@ static jack_client_internal_t * jack_engine_setup_client_control(
 			   &client->control_shm)) {
 	    jack_error ("cannot create client control block for %s",
 			name);
-	    free (client);
+	    delete client;
 	    return 0;
 	}
 
@@ -575,7 +575,7 @@ static jack_client_internal_t * jack_engine_setup_client_control(
 	    jack_error ("cannot attach to client control block "
 			"for %s (%s)", name, strerror (errno));
 	    jack_destroy_shm(&client->control_shm);
-	    free (client);
+	    delete client;
 	    return 0;
 	}
 
@@ -691,7 +691,7 @@ static jack_client_internal_t * jack_engine_setup_client(
 	if (jack_engine_load_client( engine, client, object_path) ) {
 	    jack_error ("cannot dynamically load client from"
 			" \"%s\"", object_path);
-	    jack_engine_client_delete( engine, client );
+	    jack_engine_client_internal_delete( engine, client );
 	    *status = (jack_status_t)(*status | (JackFailure|JackLoadFailure));
 	    return NULL;
 	}
@@ -746,7 +746,7 @@ static jack_client_internal_t * jack_engine_setup_client(
 		/* failed: clean up client data */
 		VERBOSE( &engine, "%s jack_initialize() failed!", client->control->name);
 		jack_lock_graph( (&engine) );
-		jack_engine_remove_client( engine, client );
+		jack_engine_remove_client_internal( engine, client );
 		jack_unlock_graph( (&engine) );
 		*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
 		client = NULL;
@@ -763,7 +763,7 @@ static jack_client_internal_t * jack_engine_setup_client(
     return client;
 }
 
-jack_client_internal_t * jack_engine_create_driver_client( jack_engine_t & engine, char *name )
+jack_client_internal_t * jack_engine_create_driver_client_internal( jack_engine_t & engine, char *name )
 {
     jack_client_connect_request_t req;
     jack_status_t status;
@@ -798,7 +798,7 @@ static jack_status_t jack_engine_handle_unload_client( jack_engine_t & engine, j
 	if (client->control->type != ClientInternal) {
 	    status = (jack_status_t)(JackFailure|JackInvalidOption);
 	} else {
-	    jack_engine_remove_client( engine, client );
+	    jack_engine_remove_client_internal( engine, client );
 	    status = (jack_status_t)0;
 	}
     }
@@ -922,7 +922,7 @@ int jack_engine_client_create( jack_engine_t & engine, int client_fd )
 	jack_error ("cannot write connection response to client");
 	jack_lock_graph( (&engine) );
 	client->control->dead = 1;
-	jack_engine_remove_client( engine, client );
+	jack_engine_remove_client_internal( engine, client );
 	jack_unlock_graph( (&engine) );
 	return -1;
     }
@@ -1036,7 +1036,7 @@ int jack_engine_mark_client_socket_error( jack_engine_t & engine, int fd )
     return 0;
 }
 
-void jack_engine_client_delete( jack_engine_t & engine, jack_client_internal_t *client )
+void jack_engine_client_internal_delete( jack_engine_t & engine, jack_client_internal_t *client )
 {
     jack_uuid_t uuid = JACK_UUID_EMPTY_INITIALIZER;
     jack_uuid_copy (&uuid, client->control->uuid);
@@ -1049,10 +1049,18 @@ void jack_engine_client_delete( jack_engine_t & engine, jack_client_internal_t *
     */
     jack_engine_property_change_notify( engine, PropertyDeleted, uuid, NULL);
 
+    if( client->private_client ) {
+	delete client->private_client;
+    }
+
     if (jack_client_is_internal(client)) {
 
-	free (client->private_client);
-	free ((void *) client->control);
+//	delete client->private_client;
+//	free ((void *) client->control);
+
+	if( client->control ) {
+	    free( (void*)client->control);
+	}
 
     } else {
 
@@ -1065,7 +1073,7 @@ void jack_engine_client_delete( jack_engine_t & engine, jack_client_internal_t *
 	jack_destroy_shm (&client->control_shm);
     }
 
-    free (client);
+    delete client;
 }
 
 void jack_engine_intclient_handle_request( jack_engine_t & engine, jack_request_t *req )
