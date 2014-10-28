@@ -4091,10 +4091,11 @@ unique_ptr<jack_engine_t> jack_engine_create(
     /* Setup port type information from builtins. buffer space is
      * allocated when the driver calls jack_driver_buffer_size().
      */
-    for (i = 0; jack_builtin_port_types[i].type_name[0]; ++i) {
+    for( i = 0 ; i < jack_builtin_port_types.size() ; ++i ) {
+	jack_port_type_info_t & bipt = jack_builtin_port_types[i];
 
 	memcpy (&engine->control->port_types[i],
-		&jack_builtin_port_types[i],
+		&bipt,
 		sizeof (jack_port_type_info_t));
 
 	VERBOSE (engine, "registered builtin port type %s",

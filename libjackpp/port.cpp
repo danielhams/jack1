@@ -69,10 +69,9 @@ jack_port_functions_t jack_builtin_NULL_functions = {
 };
 
 /* Only the Audio and MIDI port types are currently built in. */
-jack_port_type_info_t jack_builtin_port_types[] = {
+std::array<jack_port_type_info_t,2> jack_builtin_port_types = {
     jack_port_type_info_t( 0, JACK_DEFAULT_AUDIO_TYPE, 1, 0 ),
-    jack_port_type_info_t( 1, JACK_DEFAULT_MIDI_TYPE, -1, 2048 ),
-    jack_port_type_info_t( 2, "", 0, 0 )
+    jack_port_type_info_t( 1, JACK_DEFAULT_MIDI_TYPE, -1, 2048 )
 };
 
 /* these functions have been taken from libDSP X86.c  -jl */

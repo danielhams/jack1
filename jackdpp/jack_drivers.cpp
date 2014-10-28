@@ -47,80 +47,8 @@ using std::stringstream;
 
 using jack::addon_dir;
 
-vector<jack_driver_desc_t*> jack_drivers_load( bool verbose )
-{
-    vector<jack_driver_desc_t*> loaded_drivers;
-
-    struct dirent * dir_entry;
-    DIR * dir_stream;
-    const char * ptr;
-    int err;
-    jack_driver_desc_t * desc;
-    const char* driver_dir;
-
-    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
-	driver_dir = addon_dir;
-    }
-
-    /* search through the driver_dir and add get descriptors
-       from the .so files in it */
-    dir_stream = opendir (driver_dir);
-    if (!dir_stream) {
-	jack_error ("could not open driver directory %s: %s\n",
-		    driver_dir, strerror (errno));
-	return loaded_drivers;
-    }
-  
-    while ( (dir_entry = readdir (dir_stream)) ) {
-	/* check the filename is of the right format */
-	if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
-	    continue;
-	}
-
-	ptr = strrchr (dir_entry->d_name, '.');
-	if (!ptr) {
-	    continue;
-	}
-	ptr++;
-	if( strncmp("so", ptr, 2) != 0) {
-	    continue;
-	}
-
-	desc = jack_drivers_find_so_descriptor( loaded_drivers, dir_entry->d_name, verbose );
-
-	if (desc) {
-	    loaded_drivers.push_back( desc );
-	}
-    }
-
-    err = closedir( dir_stream );
-    if (err) {
-	jack_error("error closing driver directory %s: %s\n",
-		    driver_dir, strerror (errno));
-    }
-
-    if (loaded_drivers.size() == 0) {
-	jack_error("could not find any drivers in %s!\n", driver_dir);
-    }
-
-    return loaded_drivers;
-}
-
-jack_driver_desc_t * jack_drivers_find_descriptor(
-    const vector<jack_driver_desc_t*> & loaded_drivers,
-    const string & name )
-{
-    for( jack_driver_desc_t * desc : loaded_drivers ) {
-	if( desc->name == name ) {
-	    return desc;
-	}
-    }
-
-    return NULL;
-}
-
-jack_driver_desc_t * jack_drivers_find_so_descriptor(
-    const std::vector<jack_driver_desc_t*> & loaded_drivers,
+static jack_driver_desc_t * jack_drivers_find_so_descriptor_by_name(
+    const std::vector<jack_driver_desc_t*> & already_loaded_drivers,
     const std::string & so_name,
     bool verbose )
 {
@@ -167,7 +95,7 @@ jack_driver_desc_t * jack_drivers_find_so_descriptor(
     }
 
     /* check it doesn't exist already */
-    for( jack_driver_desc_t * other_descriptor : loaded_drivers ) {
+    for( jack_driver_desc_t * other_descriptor : already_loaded_drivers ) {
 	if( descriptor->name == other_descriptor->name ) {
 	    jack_error ("the drivers in '%s' and '%s' both have the name '%s'; using the first\n",
 			other_descriptor->file, filename.c_str(), other_descriptor->name);
@@ -179,6 +107,78 @@ jack_driver_desc_t * jack_drivers_find_so_descriptor(
     snprintf (descriptor->file, sizeof(descriptor->file), "%s", filename.c_str());
 
     return descriptor;
+}
+
+vector<jack_driver_desc_t*> jack_drivers_load( bool verbose )
+{
+    vector<jack_driver_desc_t*> loaded_drivers;
+
+    struct dirent * dir_entry;
+    DIR * dir_stream;
+    const char * ptr;
+    int err;
+    jack_driver_desc_t * desc;
+    const char* driver_dir;
+
+    if ((driver_dir = getenv("JACK_DRIVER_DIR")) == 0) {
+	driver_dir = addon_dir;
+    }
+
+    /* search through the driver_dir and add get descriptors
+       from the .so files in it */
+    dir_stream = opendir (driver_dir);
+    if (!dir_stream) {
+	jack_error ("could not open driver directory %s: %s\n",
+		    driver_dir, strerror (errno));
+	return loaded_drivers;
+    }
+  
+    while ( (dir_entry = readdir (dir_stream)) ) {
+	/* check the filename is of the right format */
+	if (strncmp ("jack_", dir_entry->d_name, 5) != 0) {
+	    continue;
+	}
+
+	ptr = strrchr (dir_entry->d_name, '.');
+	if (!ptr) {
+	    continue;
+	}
+	ptr++;
+	if( strncmp("so", ptr, 2) != 0) {
+	    continue;
+	}
+
+	desc = jack_drivers_find_so_descriptor_by_name( loaded_drivers, dir_entry->d_name, verbose );
+
+	if (desc) {
+	    loaded_drivers.push_back( desc );
+	}
+    }
+
+    err = closedir( dir_stream );
+    if (err) {
+	jack_error("error closing driver directory %s: %s\n",
+		    driver_dir, strerror (errno));
+    }
+
+    if (loaded_drivers.size() == 0) {
+	jack_error("could not find any drivers in %s!\n", driver_dir);
+    }
+
+    return loaded_drivers;
+}
+
+jack_driver_desc_t * jack_drivers_find_descriptor_by_name(
+    const vector<jack_driver_desc_t*> & loaded_drivers,
+    const string & name )
+{
+    for( jack_driver_desc_t * desc : loaded_drivers ) {
+	if( desc->name == name ) {
+	    return desc;
+	}
+    }
+
+    return NULL;
 }
 
 }

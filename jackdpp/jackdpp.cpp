@@ -102,8 +102,7 @@ using jack::jack_signals_unblock;
 using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
 using jack::jack_drivers_load;
-using jack::jack_drivers_find_descriptor;
-using jack::jack_drivers_find_so_descriptor;
+using jack::jack_drivers_find_descriptor_by_name;
 
 namespace jack
 {
@@ -224,7 +223,7 @@ static int main_loop( const jack_options & parsed_options,
     }
 
     for( const string & slave_driver_name : parsed_options.slave_drivers ) {
-	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor( loaded_drivers, slave_driver_name );
+	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor_by_name( loaded_drivers, slave_driver_name );
 	if (sl_desc) {
 	    jack_engine_load_slave_driver( *engine, sl_desc, NULL );
 	}
@@ -386,8 +385,6 @@ using namespace jack;
 
 int main (int argc, char *argv[])
 {
-    jack_driver_desc_t * desc;
-
     setvbuf (stdout, NULL, _IOLBF, 0);
 
     cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
@@ -444,15 +441,15 @@ int main (int argc, char *argv[])
     }
 	
     if( parsed_options.midi_buffer_size != 0 ) {
-	jack_port_type_info_t* port_type = &jack_builtin_port_types[JACK_MIDI_PORT_TYPE];
-	port_type->buffer_size = parsed_options.midi_buffer_size * jack_midi_internal_event_size ();
-	port_type->buffer_scale_factor = -1;
+	jack_port_type_info_t & port_type = jack_builtin_port_types[JACK_MIDI_PORT_TYPE];
+	port_type.buffer_size = parsed_options.midi_buffer_size * jack_midi_internal_event_size ();
+	port_type.buffer_scale_factor = -1;
 	if( parsed_options.verbose ) {
-	    cerr << "Set MIDI buffer size to " << port_type->buffer_size << " bytes" << endl;
+	    cerr << "Set MIDI buffer size to " << port_type.buffer_size << " bytes" << endl;
 	}
     }
 
-    desc = jack_drivers_find_descriptor( loaded_drivers, parsed_options.driver );
+    jack_driver_desc_t * desc = jack_drivers_find_descriptor_by_name( loaded_drivers, parsed_options.driver );
     if (!desc) {
 	cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 	return 1;

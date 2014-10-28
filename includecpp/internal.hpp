@@ -35,6 +35,7 @@
 #include <stdarg.h>
 
 #include <string>
+#include <array>
 #include <vector>
 #include <atomic>
 
@@ -555,7 +556,7 @@ extern void *jack_zero_filled_buffer;
 
 extern jack_port_functions_t jack_builtin_audio_functions;
 
-extern jack_port_type_info_t jack_builtin_port_types[];
+extern std::array<jack_port_type_info_t,2> jack_builtin_port_types;
 
 extern void jack_client_fix_port_buffers (jack_client_t *client);
 
