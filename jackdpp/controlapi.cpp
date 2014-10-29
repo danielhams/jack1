@@ -23,6 +23,7 @@
 // C++
 #include <vector>
 #include <string>
+#include <memory>
 
 #ifndef WIN32
 #include <stdint.h>
@@ -66,6 +67,7 @@
 using std::vector;
 using std::string;
 using std::unique_ptr;
+using std::make_unique;
 
 using jack::jack_signals_create;
 using jack::jack_signals_block;
@@ -74,12 +76,12 @@ using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
 using jack::jack_options;
 
-using jack::jack_drivers_load;
+using jack::drivers;
 
 /*
  * XXX: dont like statics here.
  */
-static vector<jack_driver_desc_t*> static_drivers;
+static unique_ptr<drivers> static_drivers;
 
 struct jackctl_driver
 {
@@ -389,13 +391,16 @@ static void jack_cleanup_files( const char *server_name )
 static int jackctl_drivers_load( struct jackctl_server * server_ptr )
 {
     struct jackctl_driver * driver_ptr;
-    static_drivers = jack_drivers_load( server_ptr->verbose.b );
-    if( static_drivers.size() == 0 ) {
+    static_drivers = make_unique<drivers>( server_ptr->verbose.b );
+
+    const vector<jack_driver_desc_t*> & loaded_descs = static_drivers->get_loaded_descs();
+
+    if( loaded_descs.size() == 0 ) {
 	// Should already have warned from the drivers_load call
 	return false;
     }
 
-    for( jack_driver_desc_t * jdd : static_drivers ) {
+    for( jack_driver_desc_t * jdd : loaded_descs ) {
         driver_ptr = (struct jackctl_driver *)malloc(sizeof(struct jackctl_driver));
         if (driver_ptr == NULL)
         {
@@ -865,7 +870,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
     if ((server_ptr->engine = jack_engine_create(
 	     server_options,
 	     getpid(),
-	     static_drivers)) == 0 ) {
+	     static_drivers->get_loaded_descs())) == 0 ) {
 	jack_error ("cannot create engine");
 	goto fail_unregister;
     }

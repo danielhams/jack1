@@ -101,8 +101,8 @@ using jack::jack_signals_create;
 using jack::jack_signals_unblock;
 using jack::jack_signals_install_do_nothing_action;
 using jack::jack_signals_wait;
-using jack::jack_drivers_load;
-using jack::jack_drivers_find_descriptor_by_name;
+
+using jack::drivers;
 
 namespace jack
 {
@@ -197,7 +197,7 @@ static void load_internal_clients( jack_engine_t * engine, const vector<string> 
 }
 
 static int main_loop( const jack_options & parsed_options,
-		      const vector<jack_driver_desc_t*> & loaded_drivers,
+		      const drivers & loaded_drivers,
 		      jack_driver_desc_t * driver_desc,
 		      JSList * driver_params_jsl )
 {
@@ -209,7 +209,7 @@ static int main_loop( const jack_options & parsed_options,
     if( (engine = jack_engine_create(
 	     parsed_options,
 	     getpid(),
-	     loaded_drivers )) == 0 ) {
+	     loaded_drivers.get_loaded_descs() )) == 0 ) {
 	jack_error ("cannot create engine");
 	return -1;
     }
@@ -223,7 +223,7 @@ static int main_loop( const jack_options & parsed_options,
     }
 
     for( const string & slave_driver_name : parsed_options.slave_drivers ) {
-	jack_driver_desc_t *sl_desc = jack_drivers_find_descriptor_by_name( loaded_drivers, slave_driver_name );
+	jack_driver_desc_t *sl_desc = loaded_drivers.find_desc_by_name( slave_driver_name );
 	if (sl_desc) {
 	    jack_engine_load_slave_driver( *engine, sl_desc, NULL );
 	}
@@ -433,9 +433,11 @@ int main (int argc, char *argv[])
 	return 1;
     }
 
-    vector<jack_driver_desc_t*> loaded_drivers = jack_drivers_load( parsed_options.verbose );
+    drivers drivers( parsed_options.verbose );
 
-    if (loaded_drivers.size() == 0) {
+    const vector<jack_driver_desc_t*> & descs = drivers.get_loaded_descs();
+
+    if (descs.size() == 0) {
 	cerr << "jackd: no drivers found; exiting" << endl;
 	return 1;
     }
@@ -449,7 +451,7 @@ int main (int argc, char *argv[])
 	}
     }
 
-    jack_driver_desc_t * desc = jack_drivers_find_descriptor_by_name( loaded_drivers, parsed_options.driver );
+    jack_driver_desc_t * desc = drivers.find_desc_by_name( parsed_options.driver );
     if (!desc) {
 	cerr << "jackd: unknown driver '" << parsed_options.driver << "'" << endl;
 	return 1;
@@ -492,7 +494,7 @@ int main (int argc, char *argv[])
 
     /* run the server engine until it terminates */
     main_loop( parsed_options,
-	       loaded_drivers,
+	       drivers,
 	       desc,
 	       driver_params_jsl );
 

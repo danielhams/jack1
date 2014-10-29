@@ -30,24 +30,18 @@
 namespace jack
 {
 
-std::vector<jack_driver_desc_t*> jack_drivers_load( bool verbose );
-
-jack_driver_desc_t * jack_drivers_find_descriptor_by_name(
-    const std::vector<jack_driver_desc_t*> & loaded_drivers,
-    const std::string & name );
-
-class jack_drivers
+class drivers
 {
 public:
-    jack_drivers( bool verbose );
+    drivers( const bool verbose );
 
-    inline const std::vector<jack_driver_desc_t*> get_loaded_drivers() { return loaded_drivers_; };
+    inline const std::vector<jack_driver_desc_t*> & get_loaded_descs() const { return loaded_descs; };
 
-    jack_driver_desc_t * find_descriptor_by_name( const std::string & name );
-    jack_driver_desc_t * find_descriptor_by_so_name( const std::string & so_name );
+    jack_driver_desc_t * find_desc_by_name( const std::string & name ) const;
 
 private:
-    std::vector<jack_driver_desc_t*> loaded_drivers_;
+    std::vector<jack_driver_desc_t*> loaded_descs;
+    bool verbose_;
 };
 
 }

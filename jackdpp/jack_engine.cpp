@@ -1043,9 +1043,9 @@ static void jack_engine_calc_cpu_load( jack_engine_t & engine )
 		     engine.driver->period_usecs)) * 50.0f
 	    + (engine.control->cpu_load * 0.5f);
 
-//	VERBOSE( &engine, "load = %.4f max usecs: %.3f, "
-//		 "spare = %.3f", engine.control->cpu_load,
-//		 max_usecs, engine.spare_usecs);
+	VERBOSE( &engine, "load = %.4f max usecs: %.3f, "
+		 "spare = %.3f", engine.control->cpu_load,
+		 max_usecs, engine.spare_usecs);
     }
 
 }
