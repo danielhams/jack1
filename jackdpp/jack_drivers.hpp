@@ -39,6 +39,11 @@ public:
 
     jack_driver_desc_t * find_desc_by_name( const std::string & name ) const;
 
+    bool driver_params_parse( jack_driver_desc_t * desc,
+			      int driver_nargs,
+			      char ** driver_args,
+			      JSList ** params_jsl );
+
 private:
     std::vector<jack_driver_desc_t*> loaded_descs;
     bool verbose_;

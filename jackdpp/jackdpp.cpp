@@ -61,7 +61,6 @@
 
 #include "driver.hpp"
 #include "shm.hpp"
-#include "driver_parse.hpp"
 #include "messagebuffer.hpp"
 #include "engine.hpp"
 #include "clientengine.hpp"
@@ -462,8 +461,10 @@ int main (int argc, char *argv[])
 
     JSList * driver_params_jsl = NULL;
 
-    if (jack_parse_driver_params( desc, driver_nargs,
-				  driver_args, &driver_params_jsl)) {
+    if( !drivers.driver_params_parse( desc,
+				      driver_nargs,
+				      driver_args,
+				      &driver_params_jsl ) ) {
 	return 0;
     }
 
