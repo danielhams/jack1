@@ -59,11 +59,6 @@ log_result( const char *msg, int res )
 }
 
 static void
-maybe_get_capabilities (jack_client_t* client)
-{
-}	
-
-static void
 jack_thread_touch_stack()
 {
 	char buf[JACK_THREAD_STACK_TOUCH];
@@ -88,7 +83,6 @@ jack_thread_proxy (void* varg)
 
 	if (arg->realtime) {
 		ptr_jack_thread_touch_stack();
-		maybe_get_capabilities (client);
 		jack_acquire_real_time_scheduling (pthread_self(), arg->priority);
 	}
 

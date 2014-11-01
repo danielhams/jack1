@@ -323,10 +323,6 @@ static void cleanup_files (const char *server_name)
     }
 }
 
-static void maybe_use_capabilities ()
-{
-}
-
 static void display_version( ostream & os )
 {
     os << "jackd version " << VERSION << " tmpdir " DEFAULT_TMP_DIR <<
@@ -342,8 +338,6 @@ int main (int argc, char *argv[])
     setvbuf (stdout, NULL, _IOLBF, 0);
 
     cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
-
-    maybe_use_capabilities ();
 
 #ifdef DEBUG_ENABLED
     jack_options_parser options_parser( argc, argv, true );
