@@ -36,10 +36,6 @@
 
 #include "local.hpp"
 
-#ifdef JACK_USE_MACH_THREADS
-#include <sysdeps/pThreadUtilities.h>
-#endif
-
 jack_thread_creator_t jack_thread_creator = pthread_create;
 
 void
@@ -102,10 +98,8 @@ jack_client_create_thread (jack_client_t* client,
 			   void*(*start_routine)(void*),
 			   void* arg)
 {
-#ifndef JACK_USE_MACH_THREADS
 	pthread_attr_t attr;
 	jack_thread_arg_t* thread_args;
-#endif /* !JACK_USE_MACH_THREADS */
 
 	int result = 0;
 
@@ -122,8 +116,6 @@ jack_client_create_thread (jack_client_t* client,
 	 * the 2nd-class nature of RT programming under POSIX in
 	 * general and Linux in particular.
 	 */
-
-#ifndef JACK_USE_MACH_THREADS
 
 	pthread_attr_init(&attr);
 	result = pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
@@ -168,19 +160,6 @@ jack_client_create_thread (jack_client_t* client,
 		return result;
 	}
 
-#else /* JACK_USE_MACH_THREADS */
-
-	result = jack_thread_creator (thread, 0, start_routine, arg);
-	if (result) {
-		log_result ("creating realtime thread", result);
-		return result;
-	}
-
-	/* time constraint thread */
-	setThreadToPriority (*thread, 96, TRUE, 10000000);
-	
-#endif /* JACK_USE_MACH_THREADS */
-
 	return 0;
 }
 
@@ -203,25 +182,6 @@ jack_client_max_real_time_priority (jack_client_t* client)
 
 	return client->engine->max_client_priority;
 }
-
-#if JACK_USE_MACH_THREADS 
-
-int
-jack_drop_real_time_scheduling (pthread_t thread)
-{
-	setThreadToPriority(thread, 31, FALSE, 10000000);
-	return 0;       
-}
-
-int
-jack_acquire_real_time_scheduling (pthread_t thread, int priority)
-	//priority is unused
-{
-	setThreadToPriority(thread, 96, TRUE, 10000000);
-	return 0;
-}
-
-#else /* !JACK_USE_MACH_THREADS */
 
 int
 jack_drop_real_time_scheduling (pthread_t thread)
@@ -260,6 +220,3 @@ jack_acquire_real_time_scheduling (pthread_t thread, int priority)
 
         return 0;
 }
-
-#endif /* JACK_USE_MACH_THREADS */
-

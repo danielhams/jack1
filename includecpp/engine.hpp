@@ -155,12 +155,6 @@ struct _jack_engine {
 
     int first_wakeup;
 
-#ifdef JACK_USE_MACH_THREADS
-    /* specific resources for server/client real-time thread communication */
-    mach_port_t servertask, bp;
-    int portnum;
-#endif
-
     /* used for port names munging */
     int audio_out_cnt;
     int audio_in_cnt;

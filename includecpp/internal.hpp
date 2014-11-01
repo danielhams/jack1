@@ -73,10 +73,6 @@ const char* jack_clock_source_name (jack_timer_type_t);
 #include <sysdeps/time.h>
 #include <sysdeps/atomicity.h>
 
-#ifdef JACK_USE_MACH_THREADS
-#include <sysdeps/mach_port.h>
-#endif
-
 #include "messagebuffer.hpp"
 
 #ifndef PATH_MAX
@@ -350,11 +346,6 @@ typedef struct {
     uint64_t client_control;
     uint64_t engine_control;
 
-#ifdef JACK_USE_MACH_THREADS
-    /* specific resources for server/client real-time thread communication */
-    int32_t	portnum;
-#endif
-
 } POST_PACKED_STRUCTURE jack_client_connect_result_t;
 
 typedef struct {
@@ -516,14 +507,6 @@ typedef struct _jack_client_internal {
 
     int		session_reply_pending;
     
-#ifdef JACK_USE_MACH_THREADS
-    /* specific resources for server/client real-time thread communication */
-    mach_port_t serverport;
-    trivial_message message;
-    int running;
-    int portnum;
-#endif /* JACK_USE_MACH_THREADS */
-   
     jack_client_t *private_client;
 } jack_client_internal_t;
 

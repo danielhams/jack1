@@ -68,10 +68,6 @@
 #include <sysdeps/ipc.h>
 #include <sysdeps/cycles.h>
 
-#ifdef JACK_USE_MACH_THREADS
-#include <sysdeps/pThreadUtilities.h>
-#endif
-
 using std::vector;
 
 static pthread_mutex_t client_lock;
@@ -298,52 +294,6 @@ int jack_client_deliver_request (const jack_client_t *client, jack_request_t *re
 	return client->deliver_request (client->deliver_arg, req);
 }
 
-#if JACK_USE_MACH_THREADS 
-
-jack_client_t * jack_client_alloc ()
-{
-	jack_client_t *client;
-
-	client = new jack_client_t();
-
-//	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
-	if( client == NULL ) {
-		return NULL;
-	}
-
-	if ((client->pollfd = (struct pollfd *) malloc (sizeof (struct pollfd) * 1)) == NULL) {
-		free (client);
-		return NULL;
-	}
-
-	client->pollmax = 1;
-	client->request_fd = -1;
-	client->event_fd = -1;
-	client->upstream_is_jackd = 0;
-	client->graph_next_fd = -1;
-//	client->ports = NULL;
-	client->ports_vector.clear();
-//	client->ports_ext = NULL;
-	client->ports_ext_vector.clear();
-	client->engine = NULL;
-	client->control = NULL;
-	client->thread_ok = FALSE;
-	client->rt_thread_ok = FALSE;
-	client->first_active = TRUE;
-	client->on_shutdown = NULL;
-	client->on_info_shutdown = NULL;
-	client->n_port_types = 0;
-	client->port_segment = NULL;
-
-#ifdef USE_DYNSIMD
-	init_cpu();
-#endif /* USE_DYNSIMD */
-
-	return client;
-}
-
-#else
-
 jack_client_t * jack_client_alloc ()
 {
 	jack_client_t *client;
@@ -385,8 +335,6 @@ jack_client_t * jack_client_alloc ()
 
 	return client;
 }
-
-#endif
 
 /*
  * Build the jack_client_t structure for an internal client.
@@ -701,25 +649,6 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
     return 0;
 }
 
-#if JACK_USE_MACH_THREADS
-
-static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
-{	
-	client->pollmax = 1;
-
-	/* If the client registered its own callback for graph order events,
-	   execute it now.
-	*/
-
-	if (client->control->graph_order_cbset) {
-		client->graph_order (client->graph_order_arg);
-	}
-
-	return 0;
-}
-
-#else
-
 static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 {	
 	char path[PATH_MAX+1];
@@ -773,8 +702,6 @@ static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 	return 0;
 }
 
-#endif
-		
 static int server_connect (const char *server_name)
 {
 	int fd;
@@ -1250,10 +1177,8 @@ jack_client_t * jack_client_open_aux (const char *client_name,
 	client->request_fd = req_fd;
 	client->pollfd[EVENT_POLL_INDEX].events =
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
-#ifndef JACK_USE_MACH_THREADS
 	client->pollfd[WAIT_POLL_INDEX].events =
 		POLLIN|POLLERR|POLLHUP|POLLNVAL;
-#endif
 
 	/* Don't access shared memory until server connected. */
 	if (jack_initialize_shm (va.server_name)) {
@@ -1318,21 +1243,6 @@ jack_client_t * jack_client_open_aux (const char *client_name,
 
 	client->event_fd = ev_fd;
         
-#ifdef JACK_USE_MACH_THREADS
-        /* specific resources for server/client real-time thread
-	 * communication */
-	client->clienttask = mach_task_self();
-        
-	if (task_get_bootstrap_port(client->clienttask, &client->bp)){
-            jack_error ("Can't find bootstrap port");
-            goto fail;
-        }
-        
-        if (allocate_mach_clientport(client, res.portnum) < 0) {
-            jack_error("Can't allocate mach port");
-            goto fail; 
-        }; 
-#endif /* JACK_USE_MACH_THREADS */
  	return client;
 	
   fail:
@@ -1658,11 +1568,7 @@ void jack_start_freewheel (jack_client_t* client)
 	jack_client_control_t *control = client->control;
 
 	if (client->engine->real_time) {
-#if JACK_USE_MACH_THREADS 
-		jack_drop_real_time_scheduling (client->process_thread);
-#else
 		jack_drop_real_time_scheduling (client->thread);
-#endif
 	}
 
 	if (control->freewheel_cb_cbset) {
@@ -1675,13 +1581,8 @@ void jack_stop_freewheel (jack_client_t* client)
 	jack_client_control_t *control = client->control;
 
 	if (client->engine->real_time) {
-#if JACK_USE_MACH_THREADS 
-		jack_acquire_real_time_scheduling (client->process_thread,
-				client->engine->client_priority);
-#else
 		jack_acquire_real_time_scheduling (client->thread, 
 				client->engine->client_priority);
-#endif
 	}
 
 	if (control->freewheel_cb_cbset) {
@@ -1691,10 +1592,6 @@ void jack_stop_freewheel (jack_client_t* client)
 
 static void jack_client_thread_suicide (jack_client_t* client, const char* reason)
 {
-#ifdef JACK_USE_MACH_THREADS
-        client->rt_thread_ok = FALSE;
-#endif
-
 	if (client->on_info_shutdown) {
 		jack_error ("%s - calling shutdown handler", reason);
 		client->on_info_shutdown (JackClientZombie, reason, client->on_info_shutdown_arg);
@@ -1873,7 +1770,6 @@ static int jack_client_process_events (jack_client_t* client)
 
 static int jack_wake_next_client (jack_client_t* client)
 {
-#ifndef JACK_USE_MACH_THREADS
 	struct pollfd pfds[1];
 	int pret = 0;
 	char c = 0;
@@ -1916,70 +1812,9 @@ static int jack_wake_next_client (jack_client_t* client)
 		DEBUG("cleanup byte from pipe %d not available?\n",
 			client->graph_wait_fd);
 	}
-#endif	
+
 	return 0;
 }
-
-#ifdef JACK_USE_MACH_THREADS
-
-static void * jack_osx_event_thread_work (void* arg)
-{
-	/* this is OS X: this is NOT the process() thread, but instead
-	   just waits for events/callbacks from the server and processes them.
-
-	   All we do here is to poll() for callbacks from the server,
-	   and then process any callbacks that arrive.
-	*/
-
-
-	jack_client_t* client = (jack_client_t*) arg;
-	jack_client_control_t *control = client->control;
-
-	if (control->thread_init_cbset) {
-		DEBUG ("calling OSX event thread init callback");
-		client->thread_init (client->thread_init_arg);
-	}
-
-        while (1) {
-
-		/* this is OS X - we're only waiting on events */
-		
-		DEBUG ("client polling on %s", client->pollmax == 2 ?
-		       "event_fd and graph_wait_fd..." :
-		       "event_fd only");
-		
-		while (1) {
-			if (poll (client->pollfd, client->pollmax, 1000) < 0) {
-				if (errno == EINTR) {
-					continue;
-				}
-				jack_error ("poll failed in client (%s)",
-					    strerror (errno));
-				break;
-			}
-			
-			pthread_testcancel();
-			
-			if (jack_client_process_events (client)) {
-				DEBUG ("event processing failed\n");
-				break;
-			}
-		}
-		
-		if (control->dead || client->pollfd[EVENT_POLL_INDEX].revents & ~POLLIN) {
-			DEBUG ("client appears dead or event pollfd has error status\n");
-			break;
-		}
-
-		/* go back and wait for the next one */
-	}
-
-	jack_client_thread_suicide (client, "logic error");
-	/*NOTREACHED*/
-	return 0;
-}
-
-#else /* !JACK_USE_MACH_THREADS */
 
 static int jack_client_core_wait (jack_client_t* client)
 {
@@ -2069,8 +1904,6 @@ static int jack_client_core_wait (jack_client_t* client)
 	return 0;
 }
 
-#endif
-
 static void * jack_process_thread_work (void* arg)
 {
 	/* this is the RT process thread used to handle process()
@@ -2093,10 +1926,6 @@ static void * jack_process_thread_work (void* arg)
 
         control->pid = getpid();
         control->pgrp = getpgrp();
-
-#ifdef JACK_USE_MACH_THREADS
-	client->rt_thread_ok = TRUE;
-#endif        
 
 	if (control->thread_cb_cbset) {
 
@@ -2160,13 +1989,6 @@ jack_nframes_t jack_cycle_wait (jack_client_t* client)
 
 	/* SECTION TWO: WAIT FOR NEXT DATA PROCESSING TIME */
         
-#ifdef JACK_USE_MACH_THREADS
-        /* on OS X systems, this thread is running a callback provided
-           by the client that has called this function in order to wait
-           for the next process callback. This is how we do that ...
-        */
-        jack_client_suspend (client);
-#else
         /* on non-OSX systems, this thread is running a callback provided
            by the client that has called this function in order to wait
            for the next process() callback or the next event from the
@@ -2175,7 +1997,6 @@ jack_nframes_t jack_cycle_wait (jack_client_t* client)
 	if (jack_client_core_wait (client)) {
 		return 0;
 	}
-#endif
         
         /* SECTION THREE: START NEXT DATA PROCESSING TIME */
         
@@ -2255,18 +2076,6 @@ static int jack_start_thread (jack_client_t *client)
 	}
 #endif /* USE_MLOCK */
 
-#ifdef JACK_USE_MACH_THREADS
-/* Stephane Letz : letz@grame.fr
-   On MacOSX, the event/callback-handling thread does not need to be real-time.
-*/
-	if (jack_client_create_thread (client, 
-				       &client->thread,
-				       client->engine->client_priority,
-				       FALSE,
-				       jack_osx_event_thread_work, client)) {
-		return -1;
-	}
-#else
 	if (jack_client_create_thread (client,
                                        &client->thread,
                                        client->engine->client_priority,
@@ -2274,29 +2083,6 @@ static int jack_start_thread (jack_client_t *client)
                                        jack_process_thread_work, client)) {
 		return -1;
 	}
-
-#endif
-
-#ifdef JACK_USE_MACH_THREADS
-
-	/* a secondary thread that runs the process callback and uses
-	   ultra-fast Mach primitives for inter-thread signalling.
-
-	   XXX in a properly structured JACK, there would be no
-	   need for this, because we would have client wake up
-	   methods that encapsulated the underlying mechanism
-	   used.
-
-	*/
-
-	if (jack_client_create_thread(client,
-				      &client->process_thread,
-				      client->engine->client_priority,
-				      client->engine->real_time,
-				      jack_process_thread_work, client)) {
-		return -1;
-	}
-#endif /* JACK_USE_MACH_THREADS */
 
 	return 0;
 }
@@ -2381,16 +2167,6 @@ static int jack_client_close_aux (jack_client_t *client)
 
 	if (client->control->type == ClientExternal) {
 
-#if JACK_USE_MACH_THREADS 
-		if (client->rt_thread_ok) {
-			// MacOSX pthread_cancel not implemented in
-			// Darwin 5.5, 6.4
-			mach_port_t machThread =
-				pthread_mach_thread_np (client->process_thread);
-			thread_terminate (machThread);
-		}
-#endif
-	
 		/* stop the thread that communicates with the jack
 		 * server, only if it was actually running 
 		 */
@@ -2418,7 +2194,6 @@ static int jack_client_close_aux (jack_client_t *client)
 			client->port_segment = NULL;
 		}
 
-#ifndef JACK_USE_MACH_THREADS
 		if (client->graph_wait_fd >= 0) {
 			close (client->graph_wait_fd);
 		}
@@ -2426,7 +2201,6 @@ static int jack_client_close_aux (jack_client_t *client)
 		if (client->graph_next_fd >= 0) {
 			close (client->graph_next_fd);
 		}
-#endif		
 		
 		close (client->event_fd);
 

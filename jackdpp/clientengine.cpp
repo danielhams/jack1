@@ -638,13 +638,6 @@ static jack_client_internal_t * jack_engine_setup_client_control(
 #endif
     jack_transport_client_new(client);
         
-#ifdef JACK_USE_MACH_THREADS
-    /* specific resources for server/client real-time thread
-     * communication */
-    allocate_mach_serverport( &engine, client);
-    client->running = FALSE;
-#endif
-
     return client;
 }
 
@@ -899,11 +892,6 @@ int jack_engine_client_create( jack_engine_t & engine, int client_fd )
     res.realtime_priority = engine.rtpriority - 1;
     strncpy (res.name, req.name, sizeof(res.name));
 
-#ifdef JACK_USE_MACH_THREADS
-    /* Mach port number for server/client communication */
-    res.portnum = client->portnum;
-#endif
-	
     if (jack_client_is_internal(client)) {
 	/* the ->control pointers are for an internal client
 	   so we know they are the right sized pointers

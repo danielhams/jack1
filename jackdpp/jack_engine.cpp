@@ -753,29 +753,6 @@ static int jack_engine_check_client_status( jack_engine_t & engine )
     return err;
 }
 
-#ifdef JACK_USE_MACH_THREADS
-static vector<jack_client_internal_t*>::iterator
-jack_engine_process_external( jack_engine_t & engine,
-			      vector<jack_client_internal_t*>::iterator current_iterator,
-			      vector<jack_client_internal_t*>::iterator end_marker )
-{
-    jack_client_internal_t * client = *current_iterator;
-    jack_client_control_t *ctl = client->control;
-
-    engine.current_client = client;
-
-    // a race exists if we do this after the write(2)
-    ctl->state = Triggered;
-    ctl->signalled_at = jack_get_microseconds();
-
-    if (jack_client_resume(client) < 0) {
-	jack_error("Client will be removed\n");
-	ctl->state = Finished;
-    }
-
-    return ++current_iterator;
-}
-#else /* !JACK_USE_MACH_THREADS */
 static vector<jack_client_internal_t*>::iterator
 jack_engine_process_external( jack_engine_t & engine,
 			      vector<jack_client_internal_t*>::iterator current_iterator,
@@ -939,8 +916,6 @@ jack_engine_process_external( jack_engine_t & engine,
 
     return current_iterator;
 }
-
-#endif /* JACK_USE_MACH_THREADS */
 
 static int jack_engine_process( jack_engine_t & engine, jack_nframes_t nframes )
 {
@@ -3616,20 +3591,6 @@ static int handle_external_client_request( jack_engine_t * engine, int fd )
     if ((r = read (client->request_fd, &req, sizeof (req)))
 	< (ssize_t) sizeof (req)) {
 	if (r == 0) {
-#ifdef JACK_USE_MACH_THREADS
-	    /* poll is implemented using
-	       select (see the macosx/fakepoll
-	       code). When the socket is closed
-	       select does not return any error,
-	       POLLIN is true and the next read
-	       will return 0 bytes. This
-	       behaviour is diffrent from the
-	       Linux poll behaviour. Thus we use
-	       this condition as a socket error
-	       and remove the client.
-	    */
-	    jack_mark_client_socket_error (engine, fd);
-#endif /* JACK_USE_MACH_THREADS */
 	    return 1;
 	} else {
 	    jack_error ("cannot read request from client (%d/%d/%s)",
@@ -4172,17 +4133,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
 
     engine->control->has_capabilities = 0;
 
-#ifdef JACK_USE_MACH_THREADS
-    /* specific resources for server/client real-time thread
-     * communication */
-    engine->servertask = mach_task_self();
-    if (task_get_bootstrap_port(engine->servertask, &engine->bp)){
-	jack_error("Jackd: Can't find bootstrap mach port");
-	return NULL;
-    }
-    engine->portnum = 0;
-#endif /* JACK_USE_MACH_THREADS */
-		
     engine->control->engine_ok = 1;
 
     snprintf( engine->fifo_prefix, sizeof (engine->fifo_prefix),
@@ -4249,14 +4199,8 @@ void jack_engine_cleanup( jack_engine_t & engine )
     /* stop the other engine threads */
     VERBOSE( &engine, "stopping server thread");
 
-#if JACK_USE_MACH_THREADS 
-    // MacOSX pthread_cancel still not implemented correctly in Darwin
-    mach_port_t machThread = pthread_mach_thread_np( &engine.server_thread);
-    thread_terminate( machThread );
-#else
     pthread_cancel( engine.server_thread );
     pthread_join( engine.server_thread, NULL );
-#endif
 
     VERBOSE( &engine, "last xrun delay: %.3f usecs",
 	     engine.control->xrun_delayed_usecs);
