@@ -38,6 +38,7 @@ noinst_HEADERS = jackpp_md5.hpp \
 	jack_signals.hpp \
 	jack_drivers.hpp \
 	jack_engine.hpp \
+	jack_utils.hpp \
 	md5.hpp \
 	md5_loc.hpp \
 	clientengine.hpp \
@@ -65,6 +66,7 @@ libjackserverpp_la_SOURCES = \
 	jack_signals.cpp \
 	jack_drivers.cpp \
 	jack_engine.cpp \
+	jack_utils.cpp \
 	clientengine.cpp \
 	transengine.cpp \
 	controlapi.cpp \

@@ -71,6 +71,7 @@
 #include "jack_signals.hpp"
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
+#include "jack_utils.hpp"
 
 using std::cout;
 using std::cerr;
@@ -329,7 +330,7 @@ static void display_version( ostream & os )
 	" protocol " << PROTOCOL_VERSION << endl;
 }
 
-};
+}; // namespace jack
 
 using namespace jack;
 
