@@ -657,6 +657,24 @@ static void jack_engine_ensure_uuid_unique( jack_engine_t & engine, jack_uuid_t 
     jack_unlock_graph( (&engine) );
 }
 
+/*
+ * Build the jack_client_t structure for an internal client.
+ */
+jack_client_t * jack_engine_internal_client_alloc( jack_engine_t & engine, jack_client_control_t *cc )
+{
+	jack_client_t* client;
+
+	client = jack_client_alloc ();
+
+	client->control = cc;
+	client->engine = engine.control;
+
+	client->n_port_types = client->engine->n_port_types;
+	client->port_segment = &engine.port_segment[0];
+
+	return client;
+}
+
 /* set up all types of clients */
 static jack_client_internal_t * jack_engine_setup_client(
     jack_engine_t & engine, ClientType type, char *name, jack_uuid_t uuid, jack_options_t options,
@@ -707,7 +725,7 @@ static jack_client_internal_t * jack_engine_setup_client(
 	 * calls, which need a jack_client_t structure.
 	 * Create one here.
 	 */
-	client->private_client = jack_client_alloc_internal( client->control, &engine);
+	client->private_client = jack_engine_internal_client_alloc( engine, client->control );
 
 	/* Set up the pointers necessary for the request
 	 * system to work.  The client is in the same address

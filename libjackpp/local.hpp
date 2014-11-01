@@ -94,6 +94,8 @@ struct _jack_client {
 
 };
 
+extern jack_client_t * jack_client_alloc ();
+
 extern int jack_client_deliver_request (const jack_client_t *client,
 					jack_request_t *req);
 extern jack_port_t *jack_port_new (const jack_client_t *client,

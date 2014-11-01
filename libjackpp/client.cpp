@@ -260,24 +260,6 @@ jack_client_t * jack_client_alloc ()
 	return client;
 }
 
-/*
- * Build the jack_client_t structure for an internal client.
- */
-jack_client_t * jack_client_alloc_internal( jack_client_control_t *cc, jack_engine_t* engine )
-{
-	jack_client_t* client;
-
-	client = jack_client_alloc ();
-
-	client->control = cc;
-	client->engine = engine->control;
-	
-	client->n_port_types = client->engine->n_port_types;
-	client->port_segment = &engine->port_segment[0];
-
-	return client;
-}
-
 static void jack_client_free (jack_client_t *client)
 {
 	if (client->pollfd) {
