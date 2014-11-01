@@ -166,7 +166,17 @@ struct _jack_engine {
 namespace jack
 {
 
-struct jack_engine_cpp {
+struct engine;
+
+struct engine {
+    typedef int (*set_buffer_size_callback)(engine *, jack_nframes_t frames);
+    typedef int (*set_sample_rate_callback)(engine *, jack_nframes_t frames);
+    typedef int (*run_cycle_callback)      (engine *, jack_nframes_t nframes, float delayed_usecs);
+    typedef void (*delay_callback)         (engine *, float delayed_usecs);
+    typedef void (*transport_cycle_start_callback) (engine *, jack_time_t time);
+    typedef void (*driver_exit_callback)   (engine *);
+    typedef jack_time_t (*get_microseconds_callback)(void);
+
     jack_control_t        *control;
 
     std::vector<jack_driver_desc_t*> drivers;
@@ -177,13 +187,21 @@ struct jack_engine_cpp {
     std::vector<jack_driver_t*> slave_drivers;
 
     /* these are "callbacks" made by the driver backend */
-    int  (*set_buffer_size) (jack_engine_cpp *, jack_nframes_t frames);
-    int  (*set_sample_rate) (jack_engine_cpp *, jack_nframes_t frames);
-    int  (*run_cycle)	    (jack_engine_cpp *, jack_nframes_t nframes, float delayed_usecs);
-    void (*delay)	    (jack_engine_cpp *, float delayed_usecs);
-    void (*transport_cycle_start) (jack_engine_cpp *, jack_time_t time);
-    void (*driver_exit)     (jack_engine_cpp *);
-    jack_time_t (*get_microseconds)(void);
+//    int  (*set_buffer_size) (engine *, jack_nframes_t frames);
+//    int  (*set_sample_rate) (engine *, jack_nframes_t frames);
+//    int  (*run_cycle)	    (engine *, jack_nframes_t nframes, float delayed_usecs);
+//    void (*delay)	    (engine *, float delayed_usecs);
+//    void (*transport_cycle_start) (engine *, jack_time_t time);
+//    void (*driver_exit)     (engine *);
+//    jack_time_t (*get_microseconds)(void);
+    set_buffer_size_callback set_buffer_size;
+    set_sample_rate_callback set_sample_rate;
+    run_cycle_callback run_cycle;
+    delay_callback delay;
+    transport_cycle_start_callback transport_cycle_start;
+    driver_exit_callback driver_exit;
+    get_microseconds_callback get_microseconds;
+
     /* "private" sections starts here */
 
     /* engine serialization -- use precedence for deadlock avoidance */
@@ -232,7 +250,7 @@ struct jack_engine_cpp {
     pthread_t       freewheel_thread;
     char	    verbose;
     char	    do_munlock;
-    const char	   *server_name;
+    const std::string server_name;
     char	    temporary;
     int		    reordered;
     int		    feedbackcount;
@@ -269,7 +287,7 @@ struct jack_engine_cpp {
     int midi_out_cnt;
     int midi_in_cnt;
 
-    jack_engine_cpp(
+    engine(
 	int timeout_threshold,
 	int frame_time_offset,
 	bool memory_locked,
@@ -285,7 +303,7 @@ struct jack_engine_cpp {
 	pid_t waitpid,
 	const std::vector<jack_driver_desc_t*> & loaded_drivers );
 
-    ~jack_engine_cpp();
+    ~engine();
 };
 
 }

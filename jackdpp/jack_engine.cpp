@@ -4500,3 +4500,79 @@ jack_client_internal_t * jack_engine_client_internal_by_id( jack_engine_t & engi
 
     return client;
 }
+
+// New C++ jack_engine
+namespace jack
+{
+
+engine::engine(
+    int timeout_threshold,
+    int frame_time_offset,
+    bool memory_locked,
+    const std::string & server_name,
+    int port_max,
+    bool realtime,
+    int realtime_priority,
+    bool temporary,
+    int client_timeout,
+    bool unlock_gui_memory,
+    bool verbose,
+    bool no_zombies,
+    pid_t waitpid,
+    const std::vector<jack_driver_desc_t*> & loaded_drivers ) :
+    drivers( loaded_drivers ),
+    driver( NULL ),
+    driver_desc( NULL ),
+    driver_params( NULL ),
+    set_sample_rate( (set_sample_rate_callback)jack_engine_set_sample_rate ),
+    set_buffer_size( (set_buffer_size_callback)jack_engine_driver_buffer_size ),
+    run_cycle( (run_cycle_callback)jack_engine_run_cycle ),
+    delay( (delay_callback)jack_engine_delay ),
+    driver_exit( (driver_exit_callback)jack_engine_driver_exit ),
+    transport_cycle_start( (transport_cycle_start_callback)jack_transport_cycle_start ),
+    client_timeout_msecs( client_timeout ),
+    timeout_count( 0 ),
+    problems( 0 ),
+    port_max( port_max ),
+    server_thread( 0 ),
+    rtpriority( realtime_priority ),
+    silent_buffer( 0 ),
+    verbose( verbose ),
+    server_name( server_name ),
+    temporary( temporary ),
+    freewheeling( 0 ),
+    stop_freewheeling( 0 ),
+// jack_uuid_clear(fwclient),
+    feedbackcount( 0 ),
+    wait_pid( waitpid ),
+    nozombies( no_zombies ),
+    timeout_count_threshold( timeout_threshold ),
+    removing_clients( 0 ),
+    new_clients_allowed( 1 ),
+    session_reply_fd( -1 ),
+    session_pending_replies( 0 ),
+    audio_out_cnt( 0 ),
+    audio_in_cnt( 0 ),
+    midi_out_cnt( 0 ),
+    midi_in_cnt( 0 ),
+// jack_engine_reset_rolling_usecs( *engine ),
+// pthread_rwlock_init (&engine->client_lock, 0);
+// pthread_mutex_init (&engine->port_lock, 0);
+// pthread_mutex_init (&engine->request_lock, 0);
+// pthread_mutex_init (&engine->problem_lock, 0);
+    pfd_size( 0 ),
+    pfd_max( 0 ),
+    pfd( 0 ),
+    fifo_size( 16 ),
+// fifo malloc,
+    external_client_cnt( 0 ),
+    get_microseconds( (get_microseconds_callback)jack_get_microseconds_pointer() ),
+    first_wakeup( 1 )
+{
+}
+
+engine::~engine()
+{
+}
+
+}
