@@ -55,6 +55,7 @@
 
 using std::string;
 using std::stringstream;
+using std::vector;
 
 const char * client_state_names[] = {
     "Not triggered",
@@ -350,7 +351,7 @@ void jack_engine_remove_clients( jack_engine_t & engine, int* exit_freewheeling_
     VERBOSE( &engine, "++ Removing failed clients ...");
 
     // Take a copy of the clients vector so we don't get invalid iterators
-    std::vector<jack_client_internal_t*> clients_copy = engine.clients;
+    vector<jack_client_internal_t*> clients_copy = engine.clients;
 
     /* remove all dead clients */
     for( jack_client_internal_t * client : clients_copy ) {

@@ -21,11 +21,11 @@
 #ifndef JACK_DRIVERS_HPP
 #define JACK_DRIVERS_HPP
 
-#include <string>
-#include <vector>
-
 #include "internal.hpp"
 #include "jack_engine.hpp"
+
+#include <string>
+#include <vector>
 
 namespace jack
 {

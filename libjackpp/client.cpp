@@ -23,8 +23,6 @@
 #include <config.h>
 
 #include <vector>
-#include <string>
-#include <iostream>
 
 #include <pthread.h>
 #include <errno.h>
@@ -74,10 +72,7 @@
 #include <sysdeps/pThreadUtilities.h>
 #endif
 
-using std::string;
 using std::vector;
-using std::cout;
-using std::endl;
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
@@ -906,15 +901,9 @@ static void _start_server (const char *server_name)
 	}
 
 	if (!good) {
-#if defined(USE_CAPABILITIES)
-		command = JACK_LOCATION "/jackstart";
-		strncpy(arguments, JACK_LOCATION "/jackstart -T -R -d "
-			JACK_DEFAULT_DRIVER " -p 512", 255);
-#else /* !USE_CAPABILITIES */
 		command = JACK_LOCATION "/jackd";
 		strncpy(arguments, JACK_LOCATION "/jackd -T -d "
 			JACK_DEFAULT_DRIVER, 255);
-#endif /* USE_CAPABILITIES */
 	} else {
 		result = strcspn(arguments, " ");
 		if ((command = (char *) malloc(result+1)) == NULL) {
@@ -1020,6 +1009,7 @@ static int jack_request_client (
     jack_status_t *status, jack_varargs_t *va,
     jack_client_connect_result_t *res, int *req_fd)
 {
+    *status = (jack_status_t)0;
     jack_client_connect_request_t req;
 
     *req_fd = -1;
@@ -2324,40 +2314,6 @@ int jack_activate (jack_client_t *client)
 	/* get the pid of the client process to pass it to engine */
 
 	client->control->pid = getpid ();
-
-#ifdef USE_CAPABILITIES
-
-	if (client->engine->has_capabilities != 0 &&
-	    client->control->pid != 0 && client->engine->real_time != 0) {
-
-		/* we need to ask the engine for realtime capabilities
-		   before trying to start the realtime thread
-		*/
-
-                VALGRIND_MEMSET (&req, 0, sizeof (req));
-
-		req.type = SetClientCapabilities;
-		req.x.client_id = client->control->id;
-		req.x.cap_pid = client->control->pid;
-
-		jack_client_deliver_request (client, &req);
-
-		if (req.status) {
-
-			/* what to do? engine is running realtime, it
-			   is using capabilities and has them
-			   (otherwise we would not get an error
-			   return) but for some reason it could not
-			   give the client the required capabilities.
-			   For now, leave the client so that it
-			   still runs, albeit non-realtime.
-			*/
-			
-			jack_error ("could not receive realtime capabilities, "
-				    "client will run non-realtime");
-		} 
-	}
-#endif /* USE_CAPABILITIES */
 
 	if (client->first_active) {
 

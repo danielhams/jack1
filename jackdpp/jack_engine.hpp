@@ -21,7 +21,6 @@
 #ifndef JACK_ENGINE_HPP
 #define JACK_ENGINE_HPP
 
-#include <string>
 #include <vector>
 #include <memory>
 

@@ -36,15 +36,11 @@
 #include <dirent.h>
 #include <string.h>
 
-#include <cstdio>
-#include <iostream>
 #include <sstream>
 
 namespace jack
 {
 
-using std::cout;
-using std::endl;
 using std::string;
 using std::vector;
 using std::stringstream;

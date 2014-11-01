@@ -18,7 +18,6 @@
 
 */
 
-#include <string>
 #include <vector>
 
 #include <string.h>
@@ -43,7 +42,6 @@
 
 #include "local.hpp"
 
-using std::string;
 using std::vector;
 
 static void    jack_generic_buffer_init(void *port_buffer,

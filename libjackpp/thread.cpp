@@ -61,43 +61,6 @@ log_result( const char *msg, int res )
 static void
 maybe_get_capabilities (jack_client_t* client)
 {
-#ifdef USE_CAPABILITIES
-
-	if (client != 0) {
-		
-		jack_request_t req;
-
-		if (client->engine->has_capabilities != 0) {
-			
-			/* we need to ask the engine for realtime capabilities
-			   before trying to run the thread work function
-			*/
-			
-                        VALGRIND_MEMSET (&req, 0, sizeof (req));
-		
-			req.type = SetClientCapabilities;
-			req.x.cap_pid = getpid();
-			
-			jack_client_deliver_request (client, &req);
-			
-			if (req.status) {
-				
-				/* what to do? engine is running realtime, it
-				   is using capabilities and has them
-				   (otherwise we would not get an error
-				   return) but for some reason it could not
-				   give the client the required capabilities.
-				   for now, allow the client to run, albeit
-				   non-realtime.
-				*/
-				
-				jack_error ("could not receive realtime capabilities, "
-					    "client will run non-realtime");
-				
-			}
-		}
-	}
-#endif /* USE_CAPABILITIES */
 }	
 
 static void

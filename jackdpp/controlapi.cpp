@@ -20,24 +20,11 @@
 
 */
 
-// C++
-#include <vector>
-#include <string>
-#include <memory>
-
-#ifndef WIN32
-#include <stdint.h>
-#include <dirent.h>
-#include <pthread.h>
-#endif
-
 #include "config.h"
 
-#include <string.h>
-#include <errno.h>
-#include <stdio.h>
-#include <assert.h>
-#include <signal.h>
+// Needed as jack/control.h uses uint32_t without including any
+// definitions
+#include <cinttypes>
 
 #include "jack/jslist.h"
 #include "jack/control.h"
@@ -63,6 +50,22 @@
 #include "jack_signals.hpp"
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
+
+// C++
+#include <vector>
+#include <memory>
+
+#ifndef WIN32
+#include <stdint.h>
+#include <dirent.h>
+#include <pthread.h>
+#endif
+
+#include <string.h>
+#include <errno.h>
+#include <stdio.h>
+#include <assert.h>
+#include <signal.h>
 
 using std::vector;
 using std::string;

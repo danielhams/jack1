@@ -17,7 +17,6 @@
     Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 */
 
-#include <string>
 #include <vector>
 
 #include <assert.h>
@@ -30,7 +29,6 @@
 
 #include "port.hpp"
 
-using std::string;
 using std::vector;
 
 enum { MIDI_INLINE_MAX = 4 }; /* 4 bytes for default event size */

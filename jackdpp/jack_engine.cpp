@@ -26,7 +26,6 @@
 #include "jack_signals.hpp"
 
 #include <string>
-#include <iostream>
 #include <sstream>
 #include <vector>
 
@@ -53,7 +52,6 @@
 #include <poll.h>
 #include <stdarg.h>
 
-using std::cout;
 using std::endl;
 using std::string;
 using std::vector;
@@ -3480,13 +3478,6 @@ static void jack_engine_do_request( jack_engine_t & engine, jack_request_t *req,
 	    req->status = jack_transport_set_sync_timeout( engine, req->x.timeout);
 	    break;
 
-#ifdef USE_CAPABILITIES
-	case SetClientCapabilities:
-	    req->status = jack_set_client_capabilities( &engine,
-							req->x.cap_pid);
-	    break;
-#endif /* USE_CAPABILITIES */
-		
 	case GetPortConnections:
 	case GetPortNConnections:
 	    //JOQ bug: reply_fd may be NULL if internal request
@@ -3955,11 +3946,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
     unsigned int i;
     char server_dir[PATH_MAX+1] = "";
 
-#ifdef USE_CAPABILITIES
-    uid_t uid = getuid ();
-    uid_t euid = geteuid ();
-#endif /* USE_CAPABILITIES */
-
     /* before we start allocating resources, make sure that if realtime was requested that we can 
        actually do it.
     */
@@ -4197,29 +4183,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
     engine->portnum = 0;
 #endif /* JACK_USE_MACH_THREADS */
 		
-		
-#ifdef USE_CAPABILITIES
-    if (uid == 0 || euid == 0) {
-	VERBOSE( engine.get(), "running with uid=%d and euid=%d, "
-		 "will not try to use capabilites",
-		 uid, euid);
-    } else {
-	/* only try to use capabilities if not running as root */
-	engine->control->has_capabilities = check_capabilities (engine);
-	if (engine->control->has_capabilities == 0) {
-	    VERBOSE( engine.get(), "required capabilities not "
-		     "available");
-	}
-	if (engine->verbose) {
-	    size_t size;
-	    cap_t cap = cap_init();
-	    capgetp(0, cap);
-	    VERBOSE( engine.get(), "capabilities: %s",
-		     cap_to_text(cap, &size));
-	}
-    }
-#endif /* USE_CAPABILITIES */
-
     engine->control->engine_ok = 1;
 
     snprintf( engine->fifo_prefix, sizeof (engine->fifo_prefix),

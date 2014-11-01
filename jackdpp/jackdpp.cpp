@@ -72,18 +72,6 @@
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
 
-#ifdef USE_CAPABILITIES
-
-#include <sys/stat.h>
-/* capgetp and capsetp are linux only extensions, not posix */
-#undef _POSIX_SOURCE
-#include <sys/capability.h>
-#include "start.hpp"
-
-static struct stat pipe_stat;
-
-#endif /* USE_CAPABILITIES */
-
 using std::cout;
 using std::cerr;
 using std::ostream;
@@ -337,39 +325,6 @@ static void cleanup_files (const char *server_name)
 
 static void maybe_use_capabilities ()
 {
-#ifdef USE_CAPABILITIES
-    int status;
-
-    /* check to see if there is a pipe in the right descriptor */
-    if ((status = fstat (PIPE_WRITE_FD, &pipe_stat)) == 0 &&
-	S_ISFIFO(pipe_stat.st_mode)) {
-
-	/* tell jackstart we are up and running */
-	char c = 1;
-
-	if (write (PIPE_WRITE_FD, &c, 1) != 1) {
-	    jack_error ("cannot write to jackstart sync "
-			"pipe %d (%s)", PIPE_WRITE_FD,
-			strerror (errno));
-	}
-
-	if (close(PIPE_WRITE_FD) != 0) {
-	    jack_error("jackd: error on startup pipe close: %s",
-		       strerror (errno));
-	} else {
-	    /* wait for jackstart process to set our capabilities */
-	    if (wait (&status) == -1) {
-		jack_error ("jackd: wait for startup "
-			    "process exit failed");
-	    }
-	    if (!WIFEXITED (status) || WEXITSTATUS (status)) {
-		jack_error ("jackd: jackstart did not "
-			    "exit cleanly");
-		exit (1);
-	    }
-	}
-    }
-#endif /* USE_CAPABILITIES */
 }
 
 static void display_version( ostream & os )
