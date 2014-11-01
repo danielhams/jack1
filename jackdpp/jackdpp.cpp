@@ -275,7 +275,7 @@ using namespace jack;
 
 int main (int argc, char *argv[])
 {
-    setvbuf (stdout, NULL, _IOLBF, 0);
+    setvbuf( stdout, NULL, _IOLBF, 0 );
 
 #ifdef DEBUG_ENABLED
     jack_options_parser options_parser( argc, argv, true );

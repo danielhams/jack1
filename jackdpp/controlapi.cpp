@@ -339,7 +339,7 @@ static int jackctl_drivers_load( struct jackctl_server * server_ptr )
     const vector<jack_driver_desc_t*> & loaded_descs = static_drivers->get_loaded_descs();
 
     if( loaded_descs.size() == 0 ) {
-	// Should already have warned from the drivers_load call
+	// Should already have warned when creating the drivers
 	return false;
     }
 
@@ -421,7 +421,7 @@ static void jackctl_server_free_parameters( struct jackctl_server * server_ptr )
 {
     JSList * next_node_ptr;
 
-    while (server_ptr->parameters)
+    while( server_ptr->parameters )
     {
         next_node_ptr = server_ptr->parameters->next;
         free(server_ptr->parameters->data);
@@ -453,7 +453,6 @@ void jackctl_wait_signals( sigset_t signals )
 
 static jack_driver_param_constraint_desc_t * get_realtime_priority_constraint()
 {
-#ifndef __OpenBSD__
     jack_driver_param_constraint_desc_t * constraint_ptr;
 
     int max = sched_get_priority_max (SCHED_FIFO);
@@ -473,9 +472,6 @@ static jack_driver_param_constraint_desc_t * get_realtime_priority_constraint()
     constraint_ptr->constraint.range.max.i = max;
 
     return constraint_ptr;
-#else
-    return NULL
-#endif
 }
 
 jackctl_server_t * jackctl_server_create(
