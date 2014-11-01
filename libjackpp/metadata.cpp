@@ -26,6 +26,13 @@
 #include "internal.hpp"
 #include "local.hpp"
 
+#include "jack_utils.hpp"
+
+using std::string;
+
+using jack::server_default_name;
+using jack::server_dir;
+
 const char* JACK_METADATA_PRETTY_NAME = "http://jackaudio.org/metadata/pretty-name";
 const char* JACK_METADATA_HARDWARE    = "http://jackaudio.org/metadata/hardware";
 const char* JACK_METADATA_CONNECTED   = "http://jackaudio.org/metadata/connected";
@@ -36,11 +43,10 @@ const char* JACK_METADATA_ICON_LARGE  = "http://jackaudio.org/metadata/icon-larg
 static DB* db = NULL;
 static DB_ENV* db_env = NULL;
 
-static int jack_property_init (const char* server_name)
+static int jack_property_init( const string & server_name )
 {
     int ret;
     char dbpath[PATH_MAX+1];
-    char server_dir[PATH_MAX+1];
 
     /* idempotent */
 
@@ -52,8 +58,11 @@ static int jack_property_init (const char* server_name)
 	jack_error ("cannot initialize DB environment: %s\n", db_strerror(ret));
 	return -1;
     }
-        
-    if ((ret = db_env->open(db_env, jack_server_dir (server_name, server_dir), DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_THREAD, 0)) != 0) { 
+
+    const string & server_dir_str = server_dir( server_name );
+
+    if( (ret = db_env->open(db_env, server_dir_str.c_str(),
+			    DB_CREATE | DB_INIT_LOCK | DB_INIT_MPOOL | DB_THREAD, 0)) != 0) { 
 	jack_error ("cannot open DB environment: %s", db_strerror (ret));
 	return -1;
     }
@@ -63,7 +72,7 @@ static int jack_property_init (const char* server_name)
 	return -1;
     }
 
-    snprintf (dbpath, sizeof (dbpath), "%s/%s", jack_server_dir (server_name, server_dir), "metadata.db");
+    snprintf (dbpath, sizeof (dbpath), "%s/%s", server_dir_str.c_str(), "metadata.db");
 
     if ((ret = db->open (db, NULL, dbpath, NULL, DB_HASH, DB_CREATE|DB_THREAD, 0666)) != 0) {
 	jack_error ("Cannot open metadata DB at %s: %s", dbpath, db_strerror (ret));
@@ -166,7 +175,7 @@ int jack_set_property (jack_client_t* client,
 	return -1;
     }
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -225,7 +234,7 @@ int jack_get_property (jack_uuid_t subject,
 	return -1;
     }
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -296,7 +305,7 @@ int jack_get_properties (jack_uuid_t subject,
 
     jack_uuid_unparse (subject, ustr);
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -411,7 +420,7 @@ int jack_get_all_properties (jack_description_t** descriptions)
     jack_property_t* current_prop = NULL;
     size_t len1, len2;
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -556,7 +565,7 @@ int jack_remove_property (jack_client_t* client, jack_uuid_t subject, const char
     DBT d_key;
     int ret;
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -583,7 +592,7 @@ int jack_remove_properties (jack_client_t* client, jack_uuid_t subject)
 
     jack_uuid_unparse (subject, ustr);
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 
@@ -645,7 +654,7 @@ int jack_remove_all_properties (jack_client_t* client)
     int ret;
     jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
 
-    if (jack_property_init (NULL)) {
+    if (jack_property_init(server_default_name())) {
 	return -1;
     }
 

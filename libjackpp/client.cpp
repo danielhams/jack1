@@ -22,6 +22,7 @@
 
 #include <config.h>
 
+#include <string>
 #include <vector>
 
 #include <pthread.h>
@@ -56,7 +57,9 @@
 #include "varargs.hpp"
 #include "intsimd.hpp"
 #include "messagebuffer.hpp"
+
 #include "jack_constants.hpp"
+#include "jack_utils.hpp"
 
 #include <algorithm>
 
@@ -69,6 +72,11 @@
 #include <sysdeps/cycles.h>
 
 using std::vector;
+using std::string;
+
+using jack::client_tmp_dir;
+using jack::server_dir;
+using jack::server_default_name;
 
 static pthread_mutex_t client_lock;
 static pthread_cond_t  client_ready;
@@ -116,87 +124,6 @@ static void init_cpu ()
 #endif /* ARCH_X86 */
 
 #endif /* USE_DYNSIMD */
-
-char *jack_tmpdir = (char*)DEFAULT_TMP_DIR;
-
-static int jack_get_tmpdir ()
-{
-	FILE* in;
-	size_t len;
-	char buf[PATH_MAX+2]; /* allow tmpdir to live anywhere, plus newline, plus null */
-	char *pathenv;
-	char *pathcopy;
-	char *p;
-
-	/* some implementations of popen(3) close a security loophole by
-	   resetting PATH for the exec'd command. since we *want* to
-	   use the user's PATH setting to locate jackd, we have to
-	   do it ourselves.
-	*/
-
-	if ((pathenv = getenv ("PATH")) == 0) {
-		return -1;
-	}
-
-	/* don't let strtok(3) mess with the real environment variable */
-
-	if ((pathcopy = strdup (pathenv)) == NULL) {
-		return -1;
-	}
-	p = strtok (pathcopy, ":");
-
-	while (p) {
-		char jackd[PATH_MAX+1];
-		char command[PATH_MAX+4];
-
-		snprintf (jackd, sizeof (jackd), "%s/jackd", p);
-		
-		if (access (jackd, X_OK) == 0) {
-			
-			snprintf (command, sizeof (command), "%s -l", jackd);
-
-			if ((in = popen (command, "r")) != NULL) {
-				break;
-			}
-		}
-
-		p = strtok (NULL, ":");
-	}
-
-	if (p == NULL) {
-		/* no command successfully started */
-		free (pathcopy);
-		return -1;
-	}
-
-	if (fgets (buf, sizeof (buf), in) == NULL) {
-		pclose (in);
-		free (pathcopy);
-		return -1;
-	}
-
-	len = strlen (buf);
-
-	if (buf[len-1] != '\n') {
-		/* didn't get a whole line */
-		pclose (in);
-		free (pathcopy);
-		return -1;
-	}
-
-	if ((jack_tmpdir = (char *) malloc (len)) == NULL) {
-		free (pathcopy);
-		return -1;
-	}
-
-	memcpy (jack_tmpdir, buf, len-1);
-	jack_tmpdir[len-1] = '\0';
-	
-	pclose (in);
-	free (pathcopy);
-
-	return 0;
-}
 
 void jack_error (const char *fmt, ...)
 {
@@ -300,7 +227,6 @@ jack_client_t * jack_client_alloc ()
 
 	client = new jack_client_t();
 
-//	if ((client = (jack_client_t *) malloc (sizeof (jack_client_t))) == NULL) {
 	if( client == NULL ) {
 		return NULL;
 	}
@@ -316,9 +242,7 @@ jack_client_t * jack_client_alloc ()
 	client->upstream_is_jackd = 0;
 	client->graph_wait_fd = -1;
 	client->graph_next_fd = -1;
-//	client->ports = NULL;
 	client->ports_vector.clear();
-//	client->ports_ext = NULL;
 	client->ports_ext_vector.clear();
 	client->engine = NULL;
 	client->control = NULL;
@@ -360,23 +284,17 @@ static void jack_client_free (jack_client_t *client)
 		free (client->pollfd);
 	}
 
-//	free (client);
 	delete client;
 }
 
 void jack_client_fix_port_buffers (jack_client_t *client)
 {
-//    JSList *node;
-//    jack_port_t *port;
-
     /* This releases all local memory owned by input ports
        and sets the buffer pointer to NULL. This will cause
        jack_port_get_buffer() to reallocate space for the
        buffer on the next call (if there is one).
     */
 
-//    for (node = client->ports; node; node = jack_slist_next (node)) {
-//	port = (jack_port_t *) node->data;
     for( jack_port_t * port : client->ports_vector ) {
 	if (port->shared->flags & JackPortIsInput) {
 	    if (port->mix_buffer) {
@@ -544,14 +462,11 @@ static void jack_port_recalculate_latency (jack_port_t *port, jack_latency_callb
 int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *event, int is_driver)
 {
     jack_latency_callback_mode_t mode = (event->x.n==0) ? JackCaptureLatency : JackPlaybackLatency;
-//    JSList *node;
     jack_latency_range_t latency = { UINT32_MAX, 0 };
 
     /* first setup all latency values of the ports.
      * this is based on the connections of the ports.
      */
-//    for (node = client->ports; node; node = jack_slist_next (node)) {
-//	jack_port_t *port = (jack_port_t*)node->data;
     for( jack_port_t * port : client->ports_vector ) {
 
 	if ((jack_port_flags (port) & JackPortIsOutput) && (mode == JackPlaybackLatency)) {
@@ -578,8 +493,6 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 	if (mode == JackPlaybackLatency) {
 	    /* iterate over all OutputPorts, to find maximum playback latency
 	     */
-//	    for (node = client->ports; node; node = jack_slist_next (node)) {
-//		jack_port_t *port = (jack_port_t*)node->data;
 	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsOutput) {
@@ -598,8 +511,6 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 
 	    /* now set the found latency on all input ports
 	     */
-//	    for (node = client->ports; node; node = jack_slist_next (node)) {
-//		jack_port_t *port = (jack_port_t*)node->data;
 	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsInput) {
@@ -610,8 +521,6 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 	if (mode == JackCaptureLatency) {
 	    /* iterate over all InputPorts, to find maximum playback latency
 	     */
-//	    for (node = client->ports; node; node = jack_slist_next (node)) {
-//		jack_port_t *port = (jack_port_t*)node->data;
 	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsInput) {
@@ -630,8 +539,6 @@ int jack_client_handle_latency_callback (jack_client_t *client, jack_event_t *ev
 
 	    /* now set the found latency on all output ports
 	     */
-//	    for (node = client->ports; node; node = jack_slist_next (node)) {
-//		jack_port_t *port = (jack_port_t*)node->data;
 	    for( jack_port_t * port : client->ports_vector ) {
 
 		if (port->shared->flags & JackPortIsOutput) {
@@ -704,31 +611,30 @@ static int jack_handle_reorder (jack_client_t *client, jack_event_t *event)
 
 static int server_connect (const char *server_name)
 {
-	int fd;
-	struct sockaddr_un addr;
-	int which = 0;
+    int fd;
+    struct sockaddr_un addr;
+    int which = 0;
 
-        char server_dir[PATH_MAX+1] = "";
+    if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
+	jack_error ("cannot create client socket (%s)",
+		    strerror (errno));
+	return -1;
+    }
 
-	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
-		jack_error ("cannot create client socket (%s)",
-			    strerror (errno));
-		return -1;
-	}
+    //JOQ: temporary debug message
+    //jack_info ("DEBUG: connecting to `%s' server", server_name);
 
-	//JOQ: temporary debug message
-	//jack_info ("DEBUG: connecting to `%s' server", server_name);
+    addr.sun_family = AF_UNIX;
+    const string & server_dir_str = server_dir( server_name );
+    snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
+	      server_dir_str.c_str() , which);
 
-	addr.sun_family = AF_UNIX;
-	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_%d",
-                  jack_server_dir (server_name, server_dir) , which);
-
-	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
-		close (fd);
-                jack_error ("connect(2) call to %s failed (err=%s)", addr.sun_path, strerror (errno));
-		return -1;
-	}
-	return fd;
+    if( connect( fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
+	close (fd);
+	jack_error ("connect(2) call to %s failed (err=%s)", addr.sun_path, strerror (errno));
+	return -1;
+    }
+    return fd;
 }
 
 static int server_event_connect (jack_client_t *client, const char *server_name)
@@ -738,8 +644,6 @@ static int server_event_connect (jack_client_t *client, const char *server_name)
 	jack_client_connect_ack_request_t req;
 	jack_client_connect_ack_result_t res;
 
-        char server_dir[PATH_MAX+1] = "";
-
 	if ((fd = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
 		jack_error ("cannot create client event socket (%s)",
 			    strerror (errno));
@@ -747,8 +651,9 @@ static int server_event_connect (jack_client_t *client, const char *server_name)
 	}
 
 	addr.sun_family = AF_UNIX;
+	const string & server_dir_str = server_dir( server_name );
 	snprintf (addr.sun_path, sizeof (addr.sun_path) - 1, "%s/jack_ack_0",
-		  jack_server_dir (server_name,server_dir));
+		  server_dir_str.c_str());
 
 	if (connect (fd, (struct sockaddr *) &addr, sizeof (addr)) < 0) {
 		jack_error ("cannot connect to jack server for events",
@@ -1152,7 +1057,7 @@ jack_client_t * jack_client_open_aux (const char *client_name,
 	/* External clients need to know where the tmpdir used for
 	   communication with the server lives
 	*/
-	if (jack_get_tmpdir ()) {
+	if( client_tmp_dir().length() == 0 ) {
 		*status = (jack_status_t)(*status | (JackFailure));
 		jack_messagebuffer_exit ();
 		return NULL;
@@ -1311,72 +1216,28 @@ int jack_internal_client_new( const char *client_name,
 				options, &status, &va, &res, &req_fd);
 }
 
-char * jack_default_server_name (void)
-{
-	char *server_name;
-	if ((server_name = getenv("JACK_DEFAULT_SERVER")) == NULL)
-		server_name = "default";
-	return server_name;
-}
-
-/* returns the name of the per-user subdirectory of jack_tmpdir */
-char * jack_user_dir (void)
-{
-	static char user_dir[PATH_MAX+1] = "";
-
-	/* format the path name on the first call */
-	if (user_dir[0] == '\0') {
-		if (getenv ("JACK_PROMISCUOUS_SERVER")) {
-			snprintf (user_dir, sizeof (user_dir), "%s/jack",
-				  jack_tmpdir);
-		} else {
-			snprintf (user_dir, sizeof (user_dir), "%s/jack-%d",
-				  jack_tmpdir, getuid ());
-		}
-	}
-
-	return user_dir;
-}
-
-/* returns the name of the per-server subdirectory of jack_user_dir() */
-char * jack_server_dir (const char *server_name, char *server_dir)
-{
-	/* format the path name into the suppled server_dir char array,
-	 * assuming that server_dir is at least as large as PATH_MAX+1 */
-
-        if (server_name == NULL || server_name[0] == '\0') {
-                snprintf (server_dir, PATH_MAX+1, "%s/%s",
-                          jack_user_dir (), jack_default_server_name());
-        } else {
-                snprintf (server_dir, PATH_MAX+1, "%s/%s",
-                          jack_user_dir (), server_name);
-        }
-
-	return server_dir;
-}
-
 void jack_internal_client_close (const char *client_name)
 {
-	jack_client_connect_request_t req;
-	int fd;
-	char *server_name = jack_default_server_name ();
+    jack_client_connect_request_t req;
+    int fd;
+    const string & server_name_str = server_default_name();
 
-	req.load = FALSE;
-	snprintf (req.name, sizeof (req.name), "%s", client_name);
+    req.load = FALSE;
+    snprintf( req.name, sizeof(req.name), "%s", client_name);
 	
-	if ((fd = server_connect (server_name)) < 0) {
-		return;
-	}
-
-	if (write (fd, &req, sizeof (req)) != sizeof(req)) {
-		jack_error ("cannot deliver ClientUnload request to JACK "
-			    "server.");
-	}
-
-	/* no response to this request */
-	
-	close (fd);
+    if ((fd = server_connect( server_name_str.c_str() ) ) < 0) {
 	return;
+    }
+
+    if (write (fd, &req, sizeof (req)) != sizeof(req)) {
+	jack_error ("cannot deliver ClientUnload request to JACK "
+		    "server.");
+    }
+
+    /* no response to this request */
+	
+    close (fd);
+    return;
 }
 
 int jack_recompute_total_latencies (jack_client_t* client)
@@ -1615,8 +1476,6 @@ static int jack_client_process_events (jack_client_t* client)
 	jack_event_t event;
 	char status = 0;
 	jack_client_control_t *control = client->control;
-//	JSList *node;
-//	jack_port_t* port;
         char* key = 0;
 
 	DEBUG ("process events");
@@ -1650,8 +1509,6 @@ static int jack_client_process_events (jack_client_t* client)
 		
 		switch (event.type) {
 		case PortRegistered:
-//			for (node = client->ports_ext; node; node = jack_slist_next (node)) {
-//			    port = (jack_port_t*)node->data;
 		    for( jack_port_t * port : client->ports_ext_vector ) {
 			    if (port->shared->id == event.x.port_id) { // Found port, update port type
 				port->type_info = &client->engine->port_types[port->shared->ptype_id];
@@ -2156,7 +2013,6 @@ int jack_deactivate (jack_client_t *client)
 
 static int jack_client_close_aux (jack_client_t *client)
 {
-//	JSList *node;
 	void *status;
 	int rc;
 
@@ -2212,17 +2068,13 @@ static int jack_client_close_aux (jack_client_t *client)
 
 	}
 
-//	for (node = client->ports; node; node = jack_slist_next (node)) {
 	for( jack_port_t * port : client->ports_vector ) {
 		free (port);
 	}
-//	jack_slist_free (client->ports);
 	client->ports_vector.clear();
-//	for (node = client->ports_ext; node; node = jack_slist_next (node)) {
 	for( jack_port_t * port : client->ports_ext_vector ) {
 		free (port);
 	}
-//	jack_slist_free (client->ports_ext);
 	client->ports_ext_vector.clear();
 	jack_client_free (client);
 	jack_messagebuffer_exit ();

@@ -24,4 +24,5 @@ noinst_HEADERS =		\
 	varargs.hpp		\
 	version.hpp		\
 	jack_constants.hpp	\
+	jack_utils.hpp          \
 	$(NULL)

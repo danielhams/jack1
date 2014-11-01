@@ -24,6 +24,7 @@
 
 #include "jack_engine.hpp"
 #include "jack_signals.hpp"
+#include "jack_utils.hpp"
 
 #include <string>
 #include <sstream>
@@ -58,6 +59,10 @@ using std::vector;
 using std::stringstream;
 using std::unique_ptr;
 using std::make_unique;
+
+using jack::server_tmp_dir;
+using jack::server_user_dir;
+using jack::server_dir;
 
 typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, const JSList *);
 typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
@@ -1301,59 +1306,61 @@ static int make_directory (const char *path)
     return 0;
 }
 
-static int make_socket_subdirectories (const char *server_name)
+static int make_socket_subdirectories( const string & server_name )
 {
     struct stat statbuf;
-    char server_dir[PATH_MAX+1] = "";
+
+    string server_tmp_dir_str = server_tmp_dir();
 
     /* check tmpdir directory */
-    if (stat (jack_tmpdir, &statbuf)) {
+    if( stat( server_tmp_dir_str.c_str(), &statbuf )) {
 	jack_error ("cannot stat() %s (%s)\n",
-		    jack_tmpdir, strerror (errno));
+		    server_tmp_dir_str.c_str(), strerror (errno));
 	return -1;
     } else {
 	if (!S_ISDIR(statbuf.st_mode)) {
 	    jack_error ("%s exists, but is not a directory!\n",
-			jack_tmpdir);
+			server_tmp_dir_str.c_str());
 	    return -1;
 	}
     }
 
     /* create user subdirectory */
-    if (make_directory (jack_user_dir ()) < 0) {
+    const string & user_dir_str = server_user_dir();
+    if( make_directory( user_dir_str.c_str() ) < 0 ) {
 	return -1;
     }
 
     /* create server_name subdirectory */
-    if (make_directory (jack_server_dir (server_name, server_dir)) < 0) {
+    const string & server_dir_str = server_dir( server_name );
+    if( make_directory( server_dir_str.c_str() ) < 0) {
 	return -1;
     }
 
     return 0;
 }
 
-static int make_sockets (const char *server_name, int fd[2])
+static int make_sockets( const string & server_name, int fd[2] )
 {
     struct sockaddr_un addr;
     int i;
-    char server_dir[PATH_MAX+1] = "";
 
-    if (make_socket_subdirectories (server_name) < 0) {
+    if( make_socket_subdirectories( server_name ) < 0) {
 	return -1;
     }
 
     /* First, the master server socket */
 
-    if ((fd[0] = socket (AF_UNIX, SOCK_STREAM, 0)) < 0) {
-	jack_error ("cannot create server socket (%s)",
-		    strerror (errno));
+    if( (fd[0] = socket( AF_UNIX, SOCK_STREAM, 0 ) ) < 0) {
+	jack_error( "cannot create server socket (%s)",
+		    strerror (errno) );
 	return -1;
     }
 
     addr.sun_family = AF_UNIX;
-    for (i = 0; i < 999; i++) {
+    for( i = 0; i < 999; i++ ) {
 	stringstream ss( stringstream::out );
-	ss << jack_server_dir( server_name, server_dir ) << "/jack_" << i;
+	ss << server_dir( server_name ) << "/jack_" << i;
 
 	string path_to_check( ss.str() );
 
@@ -1395,7 +1402,7 @@ static int make_sockets (const char *server_name, int fd[2])
     addr.sun_family = AF_UNIX;
     for (i = 0; i < 999; i++) {
 	stringstream ss( stringstream::out );
-	ss << jack_server_dir( server_name, server_dir ) << "/jack_ack_" << i;
+	ss << server_dir( server_name ) << "/jack_ack_" << i;
 
 	string path_to_check( ss.str() );
 
@@ -3905,7 +3912,6 @@ unique_ptr<jack_engine_t> jack_engine_create(
 {
     std::unique_ptr<jack_engine_t> engine = make_unique<jack_engine_t>();
     unsigned int i;
-    char server_dir[PATH_MAX+1] = "";
 
     /* before we start allocating resources, make sure that if realtime was requested that we can 
        actually do it.
@@ -4083,7 +4089,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
 	engine->internal_ports[i].connections_vector.clear();
     }
 
-    if (make_sockets (engine->server_name, engine->fds) < 0) {
+    if (make_sockets( engine->server_name, engine->fds ) < 0) {
 	jack_error ("cannot create server sockets");
 	return NULL;
     }
@@ -4135,9 +4141,11 @@ unique_ptr<jack_engine_t> jack_engine_create(
 
     engine->control->engine_ok = 1;
 
+    const string & server_dir_str = server_dir( engine->server_name );
+
     snprintf( engine->fifo_prefix, sizeof (engine->fifo_prefix),
 	      "%s/jack-ack-fifo-%d",
-	      jack_server_dir (engine->server_name, server_dir), getpid ());
+	      server_dir_str.c_str(), getpid ());
 
     (void) jack_engine_get_fifo_fd( *engine, 0);
 
@@ -4177,7 +4185,6 @@ void jack_engine_cleanup( jack_engine_t & engine )
 	driver->stop( driver );
 	// VERBOSE (engine, "detaching driver");
 	// driver->detach (driver, engine);
-	VERBOSE( &engine, "unloading driver");
 	jack_driver_unload( driver );
 	engine.driver = NULL;
     }

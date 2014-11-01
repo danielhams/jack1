@@ -38,10 +38,14 @@ using std::make_unique;
 
 int __attribute__((constructor)) some_constructor(void)
 {
+#ifdef DEBUG
     printf("some_constructor was called\n");
+#endif
 }
 
 int __attribute__((destructor)) some_destructor(void)
 {
+#ifdef DEBUG
     printf("some_destructor was called\n");
+#endif
 }

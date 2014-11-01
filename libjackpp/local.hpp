@@ -27,9 +27,7 @@ struct _jack_client {
     jack_port_type_id_t n_port_types;
     jack_shm_info_t*    port_segment;
 
-//    JSList *ports;
     std::vector<jack_port_t*> ports_vector;
-//    JSList *ports_ext;
     std::vector<jack_port_t*> ports_ext_vector;
 
     pthread_t thread;
@@ -105,6 +103,5 @@ extern jack_port_t *jack_port_new (const jack_client_t *client,
 extern void *jack_zero_filled_buffer;
 
 extern void jack_set_clock_source (jack_timer_type_t);
-extern char* jack_server_dir (const char* server_name, char* server_dir);
 
 #endif /* __jack_libjack_local_h__ */

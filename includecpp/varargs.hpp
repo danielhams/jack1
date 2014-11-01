@@ -20,9 +20,11 @@
 #ifndef __jack_varargs_h__
 #define __jack_varargs_h__
 
+#include "jack_utils.hpp"
+
 /* variable argument structure */
 typedef struct {
-	char *server_name;		/* server name */
+	const char *server_name;	/* server name */
 	char *load_name;		/* load module name */
 	char *load_init;		/* initialization string */
 	char *sess_uuid;
@@ -32,7 +34,8 @@ static inline void
 jack_varargs_init (jack_varargs_t *va)
 {
 	memset (va, 0, sizeof(jack_varargs_t));
-	va->server_name = jack_default_server_name ();
+	const std::string & default_server_name_str = jack::server_default_name();
+	va->server_name = default_server_name_str.c_str();
 }
 
 static inline void

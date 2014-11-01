@@ -244,6 +244,7 @@ static int main_loop( const jack_options & parsed_options,
     }
 
     jack_engine_cleanup( *engine );
+
     return 1;
 	
   error:
@@ -253,75 +254,13 @@ static int main_loop( const jack_options & parsed_options,
 
 static void copyright( ostream & os)
 {
+    os << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
+
     os << "jackd " << VERSION << endl;
     os << "Copyright 2001-2009 Paul Davis, Stephane Letz, Jack O'Quinn, Torben Hohn and others." << endl;
     os << "jackd comes with ABSOLUTELY NO WARRANTY" << endl;
     os << "This is free software, and you are welcome to redistribute it" << endl;
     os << "under certain conditions; see the file COPYING for details" << endl << endl;
-}
-
-
-static void cleanup_files (const char *server_name)
-{
-    DIR *dir;
-    struct dirent *dirent;
-    char dir_name[PATH_MAX+1] = "";
-    jack_server_dir (server_name, dir_name);
-
-    /* On termination, we remove all files that jackd creates so
-     * subsequent attempts to start jackd will not believe that an
-     * instance is already running.  If the server crashes or is
-     * terminated with SIGKILL, this is not possible.  So, cleanup
-     * is also attempted when jackd starts.
-     *
-     * There are several tricky issues. First, the previous JACK
-     * server may have run for a different user ID, so its files
-     * may be inaccessible.  This is handled by using a separate
-     * JACK_TMP_DIR subdirectory for each user.	 Second, there may
-     * be other servers running with different names.  Each gets
-     * its own subdirectory within the per-user directory.  The
-     * current process has already registered as `server_name', so
-     * we know there is no other server actively using that name.
-     */
-
-    /* nothing to do if the server directory does not exist */
-    if ((dir = opendir (dir_name)) == NULL) {
-	return;
-    }
-
-    /* unlink all the files in this directory, they are mine */
-    while ((dirent = readdir (dir)) != NULL) {
-	if ((strcmp (dirent->d_name, ".") == 0)
-	    || (strcmp (dirent->d_name, "..") == 0)) {
-	    continue;
-	}
-
-	stringstream ss( stringstream::out );
-	ss << dir_name << '/' << dirent->d_name;
-
-	string fullpath( ss.str() );
-
-	if (unlink (fullpath.c_str())) {
-	    jack_error ("cannot unlink `%s' (%s)", fullpath.c_str(),
-			strerror (errno));
-	}
-    } 
-
-    closedir (dir);
-
-    /* now, delete the per-server subdirectory, itself */
-    if (rmdir (dir_name)) {
-	jack_error ("cannot remove `%s' (%s)", dir_name,
-		    strerror (errno));
-    }
-
-    /* finally, delete the per-user subdirectory, if empty */
-    if (rmdir (jack_user_dir ())) {
-	if (errno != ENOTEMPTY) {
-	    jack_error ("cannot remove `%s' (%s)",
-			jack_user_dir (), strerror (errno));
-	}
-    }
 }
 
 static void display_version( ostream & os )
@@ -338,8 +277,6 @@ int main (int argc, char *argv[])
 {
     setvbuf (stdout, NULL, _IOLBF, 0);
 
-    cout << "Jackd CPP Test Server *** NOT TO BE USED ***" << endl;
-
 #ifdef DEBUG_ENABLED
     jack_options_parser options_parser( argc, argv, true );
 #else
@@ -349,7 +286,7 @@ int main (int argc, char *argv[])
     jack_options & parsed_options = options_parser.get_parsed_options();
 
     if( parsed_options.show_temporary ) {
-	cout << jack_tmpdir << endl;
+	cout << server_tmp_dir() << endl;
 	return 0;
     }
 
@@ -419,7 +356,7 @@ int main (int argc, char *argv[])
     }
 
     if( parsed_options.server_name.length() == 0 ) {
-	parsed_options.server_name = jack_default_server_name ();
+	parsed_options.server_name = server_default_name ();
     }
 
     int rc = jack_register_server( parsed_options.server_name.c_str(), parsed_options.replace_registry );
@@ -441,7 +378,7 @@ int main (int argc, char *argv[])
     /* clean up shared memory and files from any previous
      * instance of this server name */
     jack_cleanup_shm();
-    cleanup_files( parsed_options.server_name.c_str() );
+    cleanup_files( parsed_options.server_name );
 
     /* run the server engine until it terminates */
     main_loop( parsed_options,
@@ -455,7 +392,7 @@ int main (int argc, char *argv[])
     jack_cleanup_shm ();
     if( parsed_options.verbose )
 	cerr << "cleaning up files" << endl;
-    cleanup_files( parsed_options.server_name.c_str() );
+    cleanup_files( parsed_options.server_name );
     if( parsed_options.verbose )
 	cerr << "unregistering server '" << parsed_options.server_name << "'" << endl;
     jack_unregister_server( parsed_options.server_name.c_str() );

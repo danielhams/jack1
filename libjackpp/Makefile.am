@@ -30,6 +30,7 @@ SOURCE_FILES = \
 	unlock.cpp \
 	uuid.cpp \
 	jack_pp_debug.cpp \
+	jack_utils.cpp \
 	$(NULL)
 
 simd.lo: $(srcdir)/simd.cpp

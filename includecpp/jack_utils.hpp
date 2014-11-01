@@ -28,8 +28,13 @@
 namespace jack
 {
 
-const std::string & default_server_name();
-const std::string & user_dir();
+const std::string & server_default_name();
+const std::string & server_user_dir();
+const std::string & server_tmp_dir();
+const std::string & server_dir( const std::string & server_name );
+
+const std::string & client_user_dir();
+const std::string & client_tmp_dir();
 
 void cleanup_files( const std::string & server_name );
 

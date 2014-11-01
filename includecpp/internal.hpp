@@ -529,12 +529,6 @@ extern jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
 /* internal clients call this. it's defined in jack/engine.c */
 void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
-extern char *jack_tmpdir;
-
-extern char *jack_user_dir (void);
-
-extern char *jack_server_dir (const char *server_name, char *server_dir);
-
 extern void *jack_zero_filled_buffer;
 
 extern jack_port_functions_t jack_builtin_audio_functions;
@@ -548,8 +542,6 @@ extern void jack_transport_copy_position (jack_position_t *from,
 extern void jack_call_sync_client (jack_client_t *client);
 
 extern void jack_call_timebase_master (jack_client_t *client);
-
-extern char *jack_default_server_name (void);
 
 void silent_jack_error_callback (const char *desc);
 

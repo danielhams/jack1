@@ -1038,15 +1038,8 @@ void jack_engine_client_internal_delete( jack_engine_t & engine, jack_client_int
     */
     jack_engine_property_change_notify( engine, PropertyDeleted, uuid, NULL);
 
-    if( client->private_client ) {
-	delete client->private_client;
-    }
-
     if (jack_client_is_internal(client)) {
-
-//	delete client->private_client;
-//	free ((void *) client->control);
-
+	delete client->private_client;
 	if( client->control ) {
 	    free( (void*)client->control);
 	}

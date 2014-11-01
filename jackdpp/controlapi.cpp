@@ -50,6 +50,7 @@
 #include "jack_signals.hpp"
 #include "jack_drivers.hpp"
 #include "jack_engine.hpp"
+#include "jack_utils.hpp"
 
 // C++
 #include <vector>
@@ -80,6 +81,9 @@ using jack::jack_signals_wait;
 using jack::jack_options;
 
 using jack::drivers;
+
+using jack::cleanup_files;
+using jack::server_default_name;
 
 /*
  * XXX: dont like statics here.
@@ -327,70 +331,6 @@ static bool jackctl_add_driver_parameters( struct jackctl_driver * driver_ptr )
     return false;
 }
 
-static void jack_cleanup_files( const char *server_name )
-{
-    DIR *dir;
-    struct dirent *dirent;
-    char dir_name[PATH_MAX+1] = "";
-    jack_server_dir (server_name, dir_name);
-
-    /* On termination, we remove all files that jackd creates so
-     * subsequent attempts to start jackd will not believe that an
-     * instance is already running.  If the server crashes or is
-     * terminated with SIGKILL, this is not possible.  So, cleanup
-     * is also attempted when jackd starts.
-     *
-     * There are several tricky issues.  First, the previous JACK
-     * server may have run for a different user ID, so its files
-     * may be inaccessible.  This is handled by using a separate
-     * JACK_TMP_DIR subdirectory for each user.  Second, there may
-     * be other servers running with different names.  Each gets
-     * its own subdirectory within the per-user directory.  The
-     * current process has already registered as `server_name', so
-     * we know there is no other server actively using that name.
-     */
-
-    /* nothing to do if the server directory does not exist */
-    if ((dir = opendir (dir_name)) == NULL) {
-	return;
-    }
-
-    /* unlink all the files in this directory, they are mine */
-    while ((dirent = readdir (dir)) != NULL) {
-
-	char fullpath[PATH_MAX+1];
-
-	if ((strcmp (dirent->d_name, ".") == 0)
-	    || (strcmp (dirent->d_name, "..") == 0)) {
-	    continue;
-	}
-
-	snprintf (fullpath, sizeof (fullpath), "%s/%s",
-		  dir_name, dirent->d_name);
-
-	if (unlink (fullpath)) {
-	    jack_error ("cannot unlink `%s' (%s)", fullpath,
-			strerror (errno));
-	}
-    } 
-
-    closedir (dir);
-
-    /* now, delete the per-server subdirectory, itself */
-    if (rmdir (dir_name)) {
-	jack_error ("cannot remove `%s' (%s)", dir_name,
-		    strerror (errno));
-    }
-
-    /* finally, delete the per-user subdirectory, if empty */
-    if (rmdir (jack_user_dir ())) {
-	if (errno != ENOTEMPTY) {
-	    jack_error ("cannot remove `%s' (%s)",
-			jack_user_dir (), strerror (errno));
-	}
-    }
-}
-
 static int jackctl_drivers_load( struct jackctl_server * server_ptr )
 {
     struct jackctl_driver * driver_ptr;
@@ -544,6 +484,7 @@ jackctl_server_t * jackctl_server_create(
 {
     struct jackctl_server * server_ptr;
     union jackctl_parameter_value value;
+    string default_server_name_str;
 
     server_ptr = (struct jackctl_server *)malloc(sizeof(struct jackctl_server));
     if (server_ptr == NULL)
@@ -559,7 +500,9 @@ jackctl_server_t * jackctl_server_create(
     server_ptr->parameters_vector.clear();
     server_ptr->parameters = NULL;
 
-    strcpy(value.str, jack_default_server_name() );
+    default_server_name_str = server_default_name();
+
+    strcpy(value.str, default_server_name_str.c_str() );
     if (jackctl_add_parameter(
             &server_ptr->parameters,
 	    'n',
@@ -804,7 +747,7 @@ bool jackctl_server_stop(jackctl_server_t *server_ptr)
 
     //jack_log("cleaning up files");
 
-    jack_cleanup_files( server_ptr->name.str );
+    cleanup_files( server_ptr->name.str );
 
     //jack_log("unregistering server `%s'", server_ptr->name.str);
 
@@ -850,7 +793,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
     /* clean up shared memory and files from any previous
      * instance of this server name */
     jack_cleanup_shm ();
-    jack_cleanup_files (server_ptr->name.str);
+    cleanup_files( server_ptr->name.str );
 
     if (!server_ptr->realtime.b && server_ptr->client_timeout.i == 0)
         server_ptr->client_timeout.i = 500; /* 0.5 sec; usable when non realtime. */
@@ -905,7 +848,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
 
     //jack_log("cleaning up files");
 
-    jack_cleanup_files(server_ptr->name.str);
+    cleanup_files( server_ptr->name.str );
 
     //jack_log("unregistering server `%s'", server_ptr->name.str);
 
