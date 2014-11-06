@@ -4505,6 +4505,87 @@ jack_client_internal_t * jack_engine_client_internal_by_id( jack_engine_t & engi
 namespace jack
 {
 
+void engine::reset_rolling_usecs()
+{
+    memset( rolling_client_usecs, 0,
+	    sizeof( rolling_client_usecs ) );
+    rolling_client_usecs_index = 0;
+    rolling_client_usecs_cnt = 0;
+
+    if( driver) {
+	rolling_interval = jack_rolling_interval( driver->period_usecs );
+    } else {
+	rolling_interval = JACK_ENGINE_ROLLING_INTERVAL;
+    }
+
+    spare_usecs = 0;
+}
+
+int engine::set_sample_rate( jack_nframes_t nframes )
+{
+    control->current_time.frame_rate = nframes;
+    control->pending_time.frame_rate = nframes;
+
+    return 0;
+}
+
+int engine::get_fifo_fd( unsigned int which_fifo )
+{
+    /* caller must hold client_lock */
+    char path[PATH_MAX+1];
+    struct stat statbuf;
+
+    snprintf (path, sizeof (path), "%s-%d", fifo_prefix,
+	      which_fifo);
+
+    DEBUG ("%s", path);
+
+    if (stat (path, &statbuf)) {
+	if (errno == ENOENT) {
+
+	    if (mkfifo(path, 0666) < 0){
+		jack_error ("cannot create inter-client FIFO"
+			    " [%s] (%s)\n", path,
+			    strerror (errno));
+		return -1;
+	    }
+
+	} else {
+	    jack_error ("cannot check on FIFO %d\n", which_fifo);
+	    return -1;
+	}
+    } else {
+	if (!S_ISFIFO(statbuf.st_mode)) {
+	    jack_error ("FIFO %d (%s) already exists, but is not"
+			" a FIFO!\n", which_fifo, path);
+	    return -1;
+	}
+    }
+
+    if( which_fifo >= fifo_size ) {
+	unsigned int i;
+
+	fifo = (int *)realloc( fifo,
+			       sizeof (int) * (fifo_size + 16));
+	for( i = fifo_size; i < fifo_size + 16; i++) {
+	    fifo[i] = -1;
+	}
+	fifo_size += 16;
+    }
+
+    if( fifo[which_fifo] < 0) {
+	if( (fifo[which_fifo] = open (path, O_RDWR|O_CREAT|O_NONBLOCK, 0666)) < 0) {
+	    jack_error ("cannot open fifo [%s] (%s)", path,
+			strerror (errno));
+	    return -1;
+	}
+	DEBUG ("opened engine.fifo[%d] == %d (%s)",
+	       which_fifo, fifo[which_fifo], path);
+    }
+
+    return fifo[which_fifo];
+}
+
 engine::engine(
     int timeout_threshold,
     int frame_time_offset,
@@ -4524,51 +4605,257 @@ engine::engine(
     driver( NULL ),
     driver_desc( NULL ),
     driver_params( NULL ),
-    set_sample_rate( (set_sample_rate_callback)jack_engine_set_sample_rate ),
-    set_buffer_size( (set_buffer_size_callback)jack_engine_driver_buffer_size ),
-    run_cycle( (run_cycle_callback)jack_engine_run_cycle ),
-    delay( (delay_callback)jack_engine_delay ),
-    driver_exit( (driver_exit_callback)jack_engine_driver_exit ),
-    transport_cycle_start( (transport_cycle_start_callback)jack_transport_cycle_start ),
+    set_buffer_size_c( (set_buffer_size_callback)jack_engine_driver_buffer_size ),
+    set_sample_rate_c( (set_sample_rate_callback)jack_engine_set_sample_rate ),
+    run_cycle_c( (run_cycle_callback)jack_engine_run_cycle ),
+    delay_c( (delay_callback)jack_engine_delay ),
+    transport_cycle_start_c( (transport_cycle_start_callback)jack_transport_cycle_start ),
+    driver_exit_c( (driver_exit_callback)jack_engine_driver_exit ),
+    get_microseconds_c( (get_microseconds_callback)jack_get_microseconds_pointer() ),
     client_timeout_msecs( client_timeout ),
-    timeout_count( 0 ),
-    problems( 0 ),
     port_max( port_max ),
     server_thread( 0 ),
-    rtpriority( realtime_priority ),
-    silent_buffer( 0 ),
-    verbose( verbose ),
-    server_name( server_name ),
-    temporary( temporary ),
-    freewheeling( 0 ),
-    stop_freewheeling( 0 ),
-// jack_uuid_clear(fwclient),
-    feedbackcount( 0 ),
-    wait_pid( waitpid ),
-    nozombies( no_zombies ),
-    timeout_count_threshold( timeout_threshold ),
-    removing_clients( 0 ),
-    new_clients_allowed( 1 ),
-    session_reply_fd( -1 ),
-    session_pending_replies( 0 ),
-    audio_out_cnt( 0 ),
-    audio_in_cnt( 0 ),
-    midi_out_cnt( 0 ),
-    midi_in_cnt( 0 ),
-// jack_engine_reset_rolling_usecs( *engine ),
-// pthread_rwlock_init (&engine->client_lock, 0);
-// pthread_mutex_init (&engine->port_lock, 0);
-// pthread_mutex_init (&engine->request_lock, 0);
-// pthread_mutex_init (&engine->problem_lock, 0);
     pfd_size( 0 ),
     pfd_max( 0 ),
     pfd( 0 ),
     fifo_size( 16 ),
-// fifo malloc,
+    session_reply_fd( -1 ),
+    session_pending_replies( 0 ),
     external_client_cnt( 0 ),
-    get_microseconds( (get_microseconds_callback)jack_get_microseconds_pointer() ),
-    first_wakeup( 1 )
+    realtime( realtime ),
+    rtpriority( realtime_priority ),
+    freewheeling( false ),
+    stop_freewheeling( false ),
+    verbose( verbose ),
+    memory_locked( memory_locked ),
+    do_munlock( unlock_gui_memory ),
+    server_name( server_name ),
+    temporary( temporary ),
+    reordered( 0 ),
+    feedbackcount( 0 ),
+    removing_clients( false ),
+    wait_pid( waitpid ),
+    nozombies( no_zombies ),
+    timeout_count_threshold( timeout_threshold ),
+    frame_time_offset( frame_time_offset ),
+    problems( false ),
+    timeout_count( 0 ),
+    new_clients_allowed( true ),
+    silent_buffer( 0 ),
+    first_wakeup( true ),
+    audio_out_cnt( 0 ),
+    audio_in_cnt( 0 ),
+    midi_out_cnt( 0 ),
+    midi_in_cnt( 0 )
 {
+}
+
+void engine::transport_init()
+{
+    timebase_client = NULL;
+    control->transport_state = JackTransportStopped;
+    control->transport_cmd = TransportCommandStop;
+    control->previous_cmd = TransportCommandStop;
+    memset( &control->current_time, 0, sizeof(control->current_time) );
+    memset( &control->pending_time, 0, sizeof(control->pending_time) );
+    memset( &control->request_time, 0, sizeof(control->request_time) );
+    control->prev_request = 0;
+//    control->seq_number = 1;		/* can't start at 0 */
+    control->new_pos = 0;
+    control->pending_pos = 0;
+    control->pending_frame = 0;
+    control->sync_clients = 0;
+    control->sync_remain = 0;
+    control->sync_timeout = 2000000;	/* 2 second default */
+    control->sync_time_left = 0;
+
+    seq_number = 1;
+}
+
+int engine::init()
+{
+    if( realtime ) {
+	if( jack_acquire_real_time_scheduling( pthread_self(), 10) != 0 ) {
+	    return -1;
+	}
+
+	jack_drop_real_time_scheduling( pthread_self() );
+
+#ifdef USE_MLOCK
+	if( memory_locked && ( mlockall( MCL_CURRENT | MCL_FUTURE ) != 0 ) ) {
+	    jack_error( "cannot lock down memory for jackd (%s)",
+			strerror( errno ) );
+#ifdef ENSURE_MLOCK
+	    return -1;
+#endif /* ENSURE_MLOCK */
+	}
+#endif /* USE_MLOCK */
+    }
+
+    jack_messagebuffer_init();
+
+    jack_init_time ();
+
+    jack_uuid_clear( &fwclient );
+
+    reset_rolling_usecs();
+
+    pthread_rwlock_init( &client_lock, 0 );
+    pthread_mutex_init( &port_lock, 0 );
+    pthread_mutex_init( &request_lock, 0 );
+    pthread_mutex_init( &problem_lock, 0 );
+
+    fifo = (int *) malloc (sizeof (int) * fifo_size);
+    for( uint32_t i = 0; i < fifo_size; i++ ) {
+	fifo[i] = -1;
+    }
+
+    if( pipe( cleanup_fifo ) ) {
+	jack_error ("cannot create cleanup FIFOs (%s)", strerror (errno));
+	return -1;
+    }
+
+    if( fcntl( cleanup_fifo[0], F_SETFL, O_NONBLOCK ) ) {
+	jack_error ("cannot set O_NONBLOCK on cleanup read FIFO (%s)", strerror (errno));
+	return -1;
+    }
+
+    if( fcntl( cleanup_fifo[1], F_SETFL, O_NONBLOCK ) ) {
+	jack_error ("cannot set O_NONBLOCK on cleanup write FIFO (%s)", strerror (errno));
+	return -1;
+    }
+
+    srandom( time( (time_t *) 0 )  );
+
+    if( jack_shmalloc( sizeof( jack_control_t )
+		       + ( (sizeof( jack_port_shared_t ) * port_max) ),
+		       &control_shm) ) {
+	jack_error ("cannot create engine control shared memory "
+		    "segment (%s)", strerror(errno));
+	return -1;
+    }
+
+    if( jack_attach_shm( &control_shm ) ) {
+	jack_error ("cannot attach to engine control shared memory"
+		    " (%s)", strerror (errno));
+	jack_destroy_shm( &control_shm );
+	return -1;
+    }
+
+    control = (jack_control_t *)jack_shm_addr(&control_shm);
+
+    /* Setup port type information from builtins. buffer space is
+     * allocated when the driver calls jack_driver_buffer_size().
+     */
+    for( uint32_t i = 0 ; i < jack_builtin_port_types.size() ; ++i ) {
+	jack_port_type_info_t & bipt = jack_builtin_port_types[i];
+
+	memcpy( &control->port_types[i],
+		&bipt,
+		sizeof( jack_port_type_info_t ));
+
+	VERBOSE( this, "registered builtin port type %s",
+		 control->port_types[i].type_name);
+
+	/* the port type id is index into port_types array */
+	control->port_types[i].ptype_id = i;
+
+	/* be sure to initialize mutex correctly */
+	pthread_mutex_init( &port_buffers[i].lock, NULL);
+
+	/* set buffer list info correctly */
+	port_buffers[i].freelist_vector.clear();
+	port_buffers[i].info = NULL;
+
+	/* mark each port segment as not allocated */
+	port_segment[i].index = -1;
+	port_segment[i].attached_at = 0;
+    }
+
+    control->n_port_types = jack_builtin_port_types.size();
+
+    /* Mark all ports as available */
+
+    for( uint32_t i = 0; i < port_max; i++ ) {
+	control->ports[i].in_use = 0;
+	control->ports[i].id = i;
+	control->ports[i].alias1[0] = '\0';
+	control->ports[i].alias2[0] = '\0';
+    }
+
+    /* allocate internal port structures so that we can keep track
+     * of port connections.
+     */
+    internal_ports.resize( port_max );
+
+    for( uint32_t i = 0; i < port_max; i++ ) {
+	internal_ports[i].connections_vector.clear();
+    }
+
+    if( make_sockets( server_name, fds ) < 0) {
+	jack_error( "cannot create server sockets" );
+	return -1;
+    }
+
+    control->port_max = port_max;
+    control->real_time = realtime;
+
+    /* leave some headroom for other client threads to run
+       with priority higher than the regular client threads
+       but less than the server. see thread.h for
+       jack_client_real_time_priority() and jack_client_max_real_time_priority()
+       which are affected by this.
+    */
+
+    control->client_priority = ( realtime ?
+				 rtpriority - 5 : 0 );
+
+    control->max_client_priority = ( realtime ?
+				     rtpriority - 1 : 0 );
+
+    control->do_mlock = memory_locked;
+    control->do_munlock = do_munlock;
+    control->cpu_load = 0;
+    control->xrun_delayed_usecs = 0;
+    control->max_delayed_usecs = 0;
+
+    jack_set_clock_source( clock_source );
+    control->clock_source = clock_source;
+
+    VERBOSE( this, "clock source = %s", jack_clock_source_name( clock_source ) );
+
+    control->frame_timer.frames = frame_time_offset;
+    control->frame_timer.reset_pending = 0;
+    control->frame_timer.current_wakeup = 0;
+    control->frame_timer.next_wakeup = 0;
+    control->frame_timer.initialized = 0;
+    control->frame_timer.filter_omega = 0; /* Initialised later */
+    control->frame_timer.period_usecs = 0; /* Initialised later */
+
+    first_wakeup = 1;
+
+    control->buffer_size = 0;
+    transport_init();
+    set_sample_rate( 0 );
+    control->internal = 0;
+
+    control->has_capabilities = 0;
+
+    control->engine_ok = 1;
+
+    const string & server_dir_str = server_dir( server_name );
+
+    snprintf( fifo_prefix, sizeof( fifo_prefix ),
+	      "%s/jack-ack-fifo-%d",
+	      server_dir_str.c_str(), getpid());
+
+    (void)get_fifo_fd( 0 );
+
+    jack_client_create_thread( NULL,
+			       &server_thread, 0, FALSE,
+			       &jack_server_thread, this );
+
+    return 0;
 }
 
 engine::~engine()

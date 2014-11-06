@@ -187,20 +187,13 @@ struct engine {
     std::vector<jack_driver_t*> slave_drivers;
 
     /* these are "callbacks" made by the driver backend */
-//    int  (*set_buffer_size) (engine *, jack_nframes_t frames);
-//    int  (*set_sample_rate) (engine *, jack_nframes_t frames);
-//    int  (*run_cycle)	    (engine *, jack_nframes_t nframes, float delayed_usecs);
-//    void (*delay)	    (engine *, float delayed_usecs);
-//    void (*transport_cycle_start) (engine *, jack_time_t time);
-//    void (*driver_exit)     (engine *);
-//    jack_time_t (*get_microseconds)(void);
-    set_buffer_size_callback set_buffer_size;
-    set_sample_rate_callback set_sample_rate;
-    run_cycle_callback run_cycle;
-    delay_callback delay;
-    transport_cycle_start_callback transport_cycle_start;
-    driver_exit_callback driver_exit;
-    get_microseconds_callback get_microseconds;
+    set_buffer_size_callback set_buffer_size_c;
+    set_sample_rate_callback set_sample_rate_c;
+    run_cycle_callback run_cycle_c;
+    delay_callback delay_c;
+    transport_cycle_start_callback transport_cycle_start_c;
+    driver_exit_callback driver_exit_c;
+    get_microseconds_callback get_microseconds_c;
 
     /* "private" sections starts here */
 
@@ -243,24 +236,27 @@ struct engine {
     int		    session_pending_replies;
 
     unsigned long   external_client_cnt;
+    bool            realtime;
     int		    rtpriority;
-    volatile char   freewheeling;
-    volatile char   stop_freewheeling;
+    volatile bool   freewheeling;
+    volatile bool   stop_freewheeling;
     jack_uuid_t     fwclient;
     pthread_t       freewheel_thread;
-    char	    verbose;
-    char	    do_munlock;
+    bool	    verbose;
+    bool            memory_locked;
+    bool	    do_munlock;
     const std::string server_name;
-    char	    temporary;
+    bool	    temporary;
     int		    reordered;
     int		    feedbackcount;
-    int             removing_clients;
+    bool            removing_clients;
     pid_t           wait_pid;
-    int             nozombies;
+    bool            nozombies;
     int             timeout_count_threshold;
+    int             frame_time_offset;
     volatile int    problems;
     volatile int    timeout_count;
-    volatile int    new_clients_allowed;
+    volatile bool   new_clients_allowed;
 
     /* these are protected by `client_lock' */
     std::vector<jack_client_internal_t*> clients;
@@ -279,7 +275,7 @@ struct engine {
     float	    max_usecs;
     float	    spare_usecs;
 
-    int first_wakeup;
+    bool first_wakeup;
 
     /* used for port names munging */
     int audio_out_cnt;
@@ -303,7 +299,14 @@ struct engine {
 	pid_t waitpid,
 	const std::vector<jack_driver_desc_t*> & loaded_drivers );
 
+    int init();
+
     ~engine();
+
+    void reset_rolling_usecs();
+    int set_sample_rate( jack_nframes_t nframes );
+    int get_fifo_fd( unsigned int which_fifo );
+    void transport_init();
 };
 
 }
