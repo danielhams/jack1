@@ -23,10 +23,6 @@
 namespace jack
 {
 
-#ifdef WIN32
-
-#else
-
 static void do_nothing_handler (int sig)
 {
     /* this is used by the child (active) process, but it never
@@ -169,6 +165,32 @@ int jack_signals_wait( sigset_t & signals, jack_engine_t * engine )
     return sig;
 }
 
-#endif
+int jack_signals_wait_pp( sigset_t & signals, jack::engine * engine )
+{
+    int sig;
+    bool waiting = true;
+
+    while( waiting ) {
+	sigwait( &signals, &sig );
+
+	jack_info( "jack main caught signal %d", sig );
+
+	switch( sig ) {
+	    case SIGUSR1:
+		if( engine != nullptr ) {
+                    engine->dump_configuration( 1 );
+		}
+		break;
+	    case SIGUSR2:
+		/* driver exit */
+		waiting = false;
+		break;
+	    default:
+		waiting = false;
+		break;
+	}
+    }
+    return sig;
+}
 
 }

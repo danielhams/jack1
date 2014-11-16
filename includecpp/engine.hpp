@@ -310,6 +310,10 @@ struct engine {
 
     int init();
 
+    void intclient_load_request( jack_request_t *req );
+
+    void dump_configuration( int take_lock );
+
     void signal_problems();
     int linux_poll_bug_encountered( jack_time_t then, jack_time_t * required );
 

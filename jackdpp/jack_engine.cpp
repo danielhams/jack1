@@ -6830,4 +6830,85 @@ int engine::generate_unique_name( char *name )
     return 0;
 }
 
+void engine::intclient_load_request( jack_request_t *req )
+{
+    /* called with the request_lock */
+    jack_client_internal_t *client;
+    jack_status_t status = (jack_status_t)0;
+    jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
+
+    VERBOSE( this, "load internal client %s from %s, init `%s', "
+	     "options: 0x%x", req->x.intclient.name,
+	     req->x.intclient.path, req->x.intclient.init,
+	     req->x.intclient.options );
+
+    jack_uuid_clear( &empty_uuid );
+
+    jack_options_t client_options = (jack_options_t)(req->x.intclient.options | JackUseExactName);
+
+    client = setup_client( ClientInternal, req->x.intclient.name, empty_uuid,
+			   client_options, &status, -1,
+			   req->x.intclient.path, req->x.intclient.init );
+
+    if( client == nullptr ) {
+	status = (jack_status_t)(status | JackFailure);	/* just making sure */
+	jack_uuid_clear( &req->x.intclient.uuid );
+	VERBOSE( this, "load failed, status = 0x%x", status);
+    } else {
+	jack_uuid_copy( &req->x.intclient.uuid, client->control->uuid );
+    }
+
+    req->status = status;
+}
+
+/**
+ * Dumps current engine configuration.
+ */
+void engine::dump_configuration( int take_lock )
+{
+    jack_info( "jack_engine.cpp: <-- dump begins -->");
+
+    if( take_lock ) {
+	jack_rdlock_graph( this );
+    }
+
+    int n = 0;
+    int m = 0;
+    int o = 0;
+
+    for( jack_client_internal_t * client : clients ) {
+	jack_client_control_t *ctl = client->control;
+
+	jack_info( "client #%d: %s (type: %d, process? %s, thread ? %s"
+		   " start=%d wait=%d",
+		   ++n,
+		   ctl->name,
+		   ctl->type,
+		   ctl->process_cbset ? "yes" : "no",
+		   ctl->thread_cb_cbset ? "yes" : "no",
+		   client->subgraph_start_fd,
+		   client->subgraph_wait_fd );
+
+	for( jack_port_internal_t * port : client->ports_vector ) {
+	    jack_info("\t port #%d: %s", ++m, port->shared->name);
+
+	    for( jack_connection_internal_t * connection : port->connections_vector ) {
+		jack_info("\t\t connection #%d: %s %s",
+			  ++o,
+			  (port->shared->flags
+			   & JackPortIsInput)? "<-": "->",
+			  (port->shared->flags & JackPortIsInput)?
+			  connection->source->shared->name:
+			  connection->destination->shared->name);
+	    }
+	}
+    }
+
+    if( take_lock ) {
+	jack_unlock_graph( this );
+    }
+
+    jack_info( "jack_engine.cpp: <-- dump ends -->" );
+}
+
 }

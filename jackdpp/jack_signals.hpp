@@ -34,6 +34,7 @@ sigset_t jack_signals_block();
 void jack_signals_unblock( sigset_t & signals );
 void jack_signals_install_do_nothing_action( sigset_t & signals );
 int jack_signals_wait( sigset_t & signals, jack_engine_t * engine );
+int jack_signals_wait_pp( sigset_t & signals, jack::engine * engine );
 
 }
 
