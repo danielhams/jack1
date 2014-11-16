@@ -301,6 +301,29 @@ struct engine {
 
     int init();
 
+    void signal_problems();
+    int linux_poll_bug_encountered( jack_time_t then, jack_time_t * required );
+
+    void cleanup();
+
+    void deliver_event_to_all( jack_event_t * event );
+    int deliver_event( jack_client_internal_t * client,
+		       const jack_event_t * event,
+		       ... );
+
+    int drivers_start();
+    int unload_slave_driver( jack_driver_t * driver_desc );
+    void slave_driver_remove( jack_driver_t * sdriver );
+
+    void property_change_notify( jack_property_change_t change,
+				 jack_uuid_t uuid,
+				 const char * key );
+
+    void client_registration_notify( const char * name, int yn );
+    void client_internal_delete( jack_client_internal_t * client );
+
+    int do_stop_freewheeling( int engine_exiting );
+
     ~engine();
 
     void reset_rolling_usecs();

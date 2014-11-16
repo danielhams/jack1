@@ -405,7 +405,7 @@ int jack_engine_deliver_event( jack_engine_t & engine, jack_client_internal_t *c
 	    /* for property changes, deliver the extra data representing
 	       the variable length "key" that has changed in some way.
 	    */
-                        
+
 	    if (event->type == PropertyChange) {
 		if (write (client->event_fd, key, keylen) != (ssize_t)keylen) {
 		    jack_error ("cannot send property change key to client [%s] (%s)",
@@ -420,7 +420,7 @@ int jack_engine_deliver_event( jack_engine_t & engine, jack_client_internal_t *c
 		status = -1;
 	    } else {
 		// then we check whether there really is an error.... :)
- 
+
 		struct pollfd pfd[1];
 		pfd[0].fd = client->event_fd;
 		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
@@ -4602,9 +4602,9 @@ engine::engine(
     pid_t waitpid,
     const std::vector<jack_driver_desc_t*> & loaded_drivers ) :
     drivers( loaded_drivers ),
-    driver( NULL ),
-    driver_desc( NULL ),
-    driver_params( NULL ),
+    driver( nullptr ),
+    driver_desc( nullptr ),
+    driver_params( nullptr ),
     set_buffer_size_c( (set_buffer_size_callback)jack_engine_driver_buffer_size ),
     set_sample_rate_c( (set_sample_rate_callback)jack_engine_set_sample_rate ),
     run_cycle_c( (run_cycle_callback)jack_engine_run_cycle ),
@@ -4638,7 +4638,7 @@ engine::engine(
     nozombies( no_zombies ),
     timeout_count_threshold( timeout_threshold ),
     frame_time_offset( frame_time_offset ),
-    problems( false ),
+    problems( 0 ),
     timeout_count( 0 ),
     new_clients_allowed( true ),
     silent_buffer( 0 ),
@@ -4652,7 +4652,7 @@ engine::engine(
 
 void engine::transport_init()
 {
-    timebase_client = NULL;
+    timebase_client = nullptr;
     control->transport_state = JackTransportStopped;
     control->transport_cmd = TransportCommandStop;
     control->previous_cmd = TransportCommandStop;
@@ -4854,6 +4854,542 @@ int engine::init()
     jack_client_create_thread( NULL,
 			       &server_thread, 0, FALSE,
 			       &jack_server_thread, this );
+
+    return 0;
+}
+
+void engine::signal_problems()
+{
+    jack_lock_problems( this );
+    problems++;
+    jack_unlock_problems( this );
+    // REMOVE THIS HACK
+    jack_wake_server_thread( (jack_engine_t*)this );
+}
+
+int engine::linux_poll_bug_encountered( jack_time_t then, jack_time_t * required )
+{
+    if( control->clock_source != JACK_TIMER_SYSTEM_CLOCK || system_clock_monotonic ) {
+	jack_time_t now = jack_get_microseconds();
+
+	if( (now - then) < *required ) {
+	    /*
+	      So, adjust poll timeout to account for time already spent waiting.
+	    */
+
+	    VERBOSE( this, "FALSE WAKEUP (%lldusecs vs. %lld usec)", (now - then), *required );
+	    *required -= (now - then);
+
+	    /* allow 0.25msec slop */
+	    return 1;
+	}
+    }
+    return 0;
+}
+
+void engine::cleanup()
+{
+    VERBOSE( this, "starting server engine shutdown" );
+
+    do_stop_freewheeling( 1 );
+
+    control->engine_ok = 0;	/* tell clients we're going away */
+
+    /* this will wake the server thread and cause it to exit */
+
+    close( cleanup_fifo[0]);
+    close( cleanup_fifo[1]);
+
+    /* shutdown master socket to prevent new clients arriving */
+    shutdown( fds[0], SHUT_RDWR);
+    // close (fds[0]);
+
+    /* now really tell them we're going away */
+
+    for ( size_t i = 0; i < pfd_max; ++i) {
+	shutdown( pfd[i].fd, SHUT_RDWR );
+    }
+
+    if( driver ) {
+	jack_driver_t* driverToStop = driver;
+
+	VERBOSE( this, "stopping driver");
+	driverToStop->stop( driverToStop );
+	// VERBOSE (this, "detaching driver");
+	// driver->detach (driver, this);
+	jack_driver_unload( driverToStop );
+	driver = nullptr;
+    }
+
+    if( slave_drivers.size() > 0 ) {
+	VERBOSE( this, "unloading slave drivers");
+	for( jack_driver_t * slave_driver : slave_drivers ) {
+	    unload_slave_driver( slave_driver );
+	    free( slave_driver );
+	}
+    }
+
+    VERBOSE( this, "freeing shared port segments");
+    for ( ssize_t i = 0; i < control->n_port_types; ++i) {
+	jack_release_shm( &port_segment[i] );
+	jack_destroy_shm( &port_segment[i] );
+    }
+
+    /* stop the other engine threads */
+    VERBOSE( this, "stopping server thread");
+
+    pthread_cancel( server_thread );
+    pthread_join( server_thread, NULL );
+
+    VERBOSE( this, "last xrun delay: %.3f usecs",
+	     control->xrun_delayed_usecs);
+    VERBOSE( this, "max delay reported by backend: %.3f usecs",
+	     control->max_delayed_usecs);
+
+    /* free engine control shm segment */
+    control = nullptr;
+    VERBOSE( this, "freeing engine shared memory");
+    jack_release_shm( &control_shm);
+    jack_destroy_shm( &control_shm);
+
+    VERBOSE( this, "max usecs: %.3f, engine deleted", max_usecs);
+
+    jack_messagebuffer_exit();
+
+    if( fifo ) {
+	free( fifo );
+	fifo = nullptr;
+    }
+}
+
+void engine::deliver_event_to_all( jack_event_t * event )
+{
+    jack_rdlock_graph( this );
+    for( jack_client_internal_t * client : clients ) {
+	deliver_event( client, event );
+    }
+    jack_unlock_graph( this );
+}
+
+int engine::deliver_event( jack_client_internal_t * client,
+			   const jack_event_t * event,
+			   ... )
+{
+    va_list ap;
+    char status=0;
+    char* key = 0;
+    size_t keylen = 0;
+
+    va_start( ap, event );
+
+    /* caller must hold the graph lock */
+
+    DEBUG ("delivering event (type %s)", jack_event_type_name (event->type));
+
+    /* we are not RT-constrained here, so use kill(2) to beef up
+       our check on a client's continued well-being
+    */
+
+    if( client->control->dead || client->error >= JACK_ERROR_WITH_SOCKETS
+	|| (client->control->type == ClientExternal && kill (client->control->pid, 0))) {
+	DEBUG ("client %s is dead - no event sent",
+	       client->control->name);
+	return 0;
+    }
+
+    DEBUG ("client %s is still alive", client->control->name);
+
+    /* Check property change events for matching key_size and keys */
+
+    if( event->type == PropertyChange ) {
+	key = va_arg (ap, char*);
+	if( key && key[0] != '\0' ) {
+	    keylen = strlen (key) + 1;
+	    if( event->y.key_size != keylen ) {
+		jack_error ("property change key %s sent with wrong length (%d vs %d)", key, event->y.key_size, keylen);
+		return -1;
+	    }
+	}
+    }
+
+    va_end( ap );
+
+    if( jack_client_is_internal( client )) {
+	switch( event->type ) {
+	    case PortConnected:
+	    case PortDisconnected:
+		jack_client_handle_port_connection( client->private_client,
+						    (jack_event_t*)event);
+		break;
+	    case BufferSizeChange:
+		jack_client_fix_port_buffers( client->private_client );
+
+		if( client->control->bufsize_cbset ) {
+		    if( event->x.n < 16 ) {
+			abort ();
+		    }
+		    client->private_client->bufsize( event->x.n,
+						     client->private_client->bufsize_arg );
+		}
+		break;
+	    case SampleRateChange:
+		if( client->control->srate_cbset ) {
+		    client->private_client->srate( event->x.n,
+						   client->private_client->srate_arg );
+		}
+		break;
+	    case GraphReordered:
+		if( client->control->graph_order_cbset ) {
+		    client->private_client->graph_order( client->private_client->graph_order_arg );
+		}
+		break;
+	    case XRun:
+		if( client->control->xrun_cbset ) {
+		    client->private_client->xrun( client->private_client->xrun_arg );
+		}
+		break;
+	    case PropertyChange:
+		if( client->control->property_cbset ) {
+		    client->private_client->property_cb( event->x.uuid,
+							 key,
+							 event->z.property_change,
+							 client->private_client->property_cb_arg );
+		}
+		break;
+	    case LatencyCallback:
+		jack_client_handle_latency_callback( client->private_client,
+						     (jack_event_t*)event,
+						     (client->control->type == ClientDriver));
+		break;
+	    default:
+		/* internal clients don't need to know */
+		break;
+	}
+    }
+    else {
+	if( client->control->active ) {
+
+	    /* there's a thread waiting for events, so
+	     * it's worth telling the client */
+
+	    DEBUG ("engine writing on event fd");
+
+	    if( write( client->event_fd, event, sizeof (*event) ) != sizeof (*event)) {
+		jack_error ("cannot send event to client [%s]"
+			    " (%s)", client->control->name,
+			    strerror (errno));
+		client->error += JACK_ERROR_WITH_SOCKETS;
+		signal_problems();
+	    }
+
+	    /* for property changes, deliver the extra data representing
+	       the variable length "key" that has changed in some way.
+	    */
+
+	    if( event->type == PropertyChange ) {
+		if( write( client->event_fd, key, keylen) != (ssize_t)keylen ) {
+		    jack_error ("cannot send property change key to client [%s] (%s)",
+				client->control->name,
+				strerror (errno));
+		    client->error += JACK_ERROR_WITH_SOCKETS;
+		    signal_problems();
+		}
+	    }
+
+	    if( client->error ) {
+		status = -1;
+	    } else {
+		// then we check whether there really is an error.... :)
+
+		struct pollfd pfd[1];
+		pfd[0].fd = client->event_fd;
+		pfd[0].events = POLLERR|POLLIN|POLLHUP|POLLNVAL;
+		jack_time_t poll_timeout = JACKD_CLIENT_EVENT_TIMEOUT;
+		int poll_ret;
+		jack_time_t then = jack_get_microseconds();
+		jack_time_t now;
+
+		/* if we're not running realtime and there is a client timeout set
+		   that exceeds the default client event timeout (which is not
+		   bound by RT limits, then use the larger timeout.
+		*/
+
+		if (!control->real_time && ((size_t)client_timeout_msecs > poll_timeout)) {
+		    poll_timeout = client_timeout_msecs;
+		}
+
+#ifdef __linux
+	      again:
+#endif
+		VERBOSE( this,"client event poll on %d for %s starts at %lld",
+			 client->event_fd, client->control->name, then );
+		if( (poll_ret = poll( pfd, 1, poll_timeout )) < 0 ) {
+		    DEBUG( "client event poll not ok! (-1) poll returned an error" );
+		    jack_error( "poll on subgraph processing failed (%s)", strerror (errno) );
+		    status = -1;
+		} else {
+		    DEBUG( "\n\n\n\n\n back from client event poll, revents = 0x%x\n\n\n", pfd[0].revents );
+		    now = jack_get_microseconds();
+		    VERBOSE( this, "back from client event poll after %lld usecs", now - then );
+
+		    if( pfd[0].revents & ~POLLIN ) {
+
+			/* some kind of OOB socket event */
+
+			DEBUG( "client event poll not ok! (-2), revents = %d\n", pfd[0].revents );
+			jack_error( "subgraph starting at %s lost client", client->control->name );
+			status = -2;
+
+		    } else if( pfd[0].revents & POLLIN ) {
+
+			/* client responded normally */
+
+			DEBUG("client event poll ok!");
+			status = 0;
+
+		    } else if( poll_ret == 0 ) {
+
+			/* no events, no errors, we woke up because poll()
+			   decided that time was up ...
+			*/
+
+#ifdef __linux
+			if( linux_poll_bug_encountered( then, &poll_timeout) ) {
+			    goto again;
+			}
+
+			if( poll_timeout < 200 ) {
+			    VERBOSE( this, "FALSE WAKEUP skipped, remaining = %lld usec", poll_timeout );
+			    status = 0;
+			} else {
+#endif
+			    DEBUG( "client event poll not ok! (1 = poll timed out, revents = 0x%04x, poll_ret = %d)", pfd[0].revents, poll_ret );
+			    VERBOSE( this, "client %s did not respond to event type %d in time"
+				     "(fd=%d, revents = 0x%04x, timeout was %lld)",
+				     client->control->name, event->type,
+				     client->event_fd,
+				     pfd[0].revents,
+				     poll_timeout );
+			    status = -2;
+#ifdef __linux
+			}
+#endif
+		    }
+		}
+	    }
+
+	    if( status == 0 ) {
+		if( read( client->event_fd, &status, sizeof (status)) != sizeof (status) ) {
+		    jack_error( "cannot read event response from "
+				"client [%s] (%s)",
+				client->control->name,
+				strerror (errno) );
+		    status = -1;
+		}
+	    } else {
+		switch( status ) {
+		    case -1:
+			jack_error( "internal poll failure reading response from client %s to a %s event",
+				    client->control->name,
+				    jack_event_type_name (event->type));
+			break;
+		    case -2:
+			jack_error( "timeout waiting for client %s to handle a %s event",
+				    client->control->name,
+				    jack_event_type_name (event->type));
+			break;
+		    default:
+			jack_error( "bad status (%d) from client %s while handling a %s event",
+				    (int) status,
+				    client->control->name,
+				    jack_event_type_name (event->type));
+		}
+	    }
+
+	    if( status<0 ) {
+		client->error += JACK_ERROR_WITH_SOCKETS;
+		signal_problems();
+	    }
+	}
+    }
+    DEBUG( "event delivered" );
+
+    return status;
+}
+
+int engine::drivers_start()
+{
+    vector<jack_driver_t*> failed_drivers;
+    /* first start the slave drivers */
+    for( jack_driver_t * sdriver : slave_drivers ) {
+	if( sdriver->start( sdriver ) ) {
+	    failed_drivers.push_back( sdriver );
+	}
+    }
+    for( jack_driver_t * sdriver : failed_drivers ) {
+	jack_error( "slave driver %s failed to start, removing it", sdriver->internal_client->control->name );
+	slave_driver_remove( sdriver );
+    }
+    /* now the master driver is started */
+    return driver->start( driver );
+}
+
+int engine::unload_slave_driver( jack_driver_t * driver_desc )
+{
+    slave_driver_remove( driver_desc );
+    client_internal_delete( driver_desc->internal_client );
+    return 0;
+}
+
+void engine::slave_driver_remove( jack_driver_t * sdriver )
+{
+    // REMOVE THIS HACK
+    sdriver->detach( sdriver, (jack_engine_t*)this );
+    auto sdFinder = std::find( slave_drivers.begin(), slave_drivers.end(), sdriver );
+    if( sdFinder != slave_drivers.end() ) {
+	slave_drivers.erase( sdFinder );
+    }
+
+    jack_driver_unload( sdriver );
+}
+
+void engine::property_change_notify( jack_property_change_t change,
+				     jack_uuid_t uuid,
+				     const char* key )
+{
+    jack_event_t event;
+
+    event.type = PropertyChange;
+    event.z.property_change = change;
+    jack_uuid_copy( &event.x.uuid, uuid );
+
+    if( key ) {
+	event.y.key_size = strlen( key ) + 1;
+    } else {
+	event.y.key_size = 0;
+    }
+
+    for( jack_client_internal_t * client : clients ) {
+	if( !client->control->active ) {
+	    continue;
+	}
+
+	if( client->control->property_cbset ) {
+	    if( deliver_event( client, &event, key ) ) {
+		jack_error( "cannot send property change notification to %s (%s)",
+			    client->control->name,
+			    strerror(errno) );
+	    }
+	}
+    }
+}
+
+void engine::client_registration_notify( const char * name, int yn )
+{
+    jack_event_t event;
+
+    event.type = (yn ? ClientRegistered : ClientUnregistered);
+    snprintf( event.x.name, sizeof (event.x.name), "%s", name );
+
+    for( jack_client_internal_t * client : clients ) {
+
+	if (!client->control->active) {
+	    continue;
+	}
+
+	if( strcmp((char*) client->control->name, (char*) name) == 0 ) {
+	    /* do not notify client of its own registration */
+	    continue;
+	}
+
+	if( client->control->client_register_cbset ) {
+	    if( deliver_event( client, &event )) {
+		jack_error( "cannot send client registration"
+			    " notification to %s (%s)",
+			    client->control->name,
+			    strerror(errno) );
+	    }
+	}
+    }
+}
+
+void engine::client_internal_delete( jack_client_internal_t * client )
+{
+    jack_uuid_t uuid = JACK_UUID_EMPTY_INITIALIZER;
+    jack_uuid_copy( &uuid, client->control->uuid );
+
+    client_registration_notify( (const char*) client->control->name, 0 );
+
+    jack_remove_properties( nullptr, uuid );
+    /* have to do the notification ourselves, since the client argument
+       to jack_remove_properties() was NULL
+    */
+    property_change_notify( PropertyDeleted, uuid, nullptr );
+
+    if( jack_client_is_internal(client) ) {
+	delete client->private_client;
+	if( client->control ) {
+	    free( (void*)client->control);
+	}
+
+    } else {
+
+	/* release the client segment, mark it for
+	   destruction, and free up the shm registry
+	   information so that it can be reused.
+	*/
+
+	jack_release_shm( &client->control_shm );
+	jack_destroy_shm( &client->control_shm );
+    }
+
+    delete client;
+}
+
+int engine::do_stop_freewheeling( int engine_exiting )
+{
+    jack_event_t event;
+    void *ftstatus;
+
+    if( !freewheeling ) {
+	return 0;
+    }
+
+    if( driver == nullptr ) {
+	jack_error ("cannot start freewheeling without a driver!");
+	return -1;
+    }
+
+    if( !freewheeling ) {
+	VERBOSE( this, "stop freewheel when not freewheeling" );
+	return 0;
+    }
+
+    /* tell the freewheel thread to stop, and wait for it
+       to exit.
+    */
+
+    stop_freewheeling = 1;
+
+    VERBOSE( this, "freewheeling stopped, waiting for thread");
+    pthread_join( freewheel_thread, &ftstatus );
+    VERBOSE( this, "freewheel thread has returned");
+
+    jack_uuid_clear( &fwclient );
+    freewheeling = 0;
+    control->frame_timer.reset_pending = 1;
+
+    if( !engine_exiting ) {
+	/* tell everyone we've stopped */
+	event.type = StopFreewheel;
+	deliver_event_to_all( &event );
+
+	/* restart the driver */
+	if( drivers_start() ) {
+	    jack_error ("could not restart driver after freewheeling");
+	    return -1;
+	}
+    }
 
     return 0;
 }
