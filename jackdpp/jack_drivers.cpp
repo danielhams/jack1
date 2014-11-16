@@ -18,6 +18,9 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+// Needed to get PRId32 formatters
+#define __STDC_FORMAT_MACROS
+
 #include <config.h>
 
 #include <unistd.h>

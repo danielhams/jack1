@@ -24,6 +24,9 @@ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 */
 
+// Needed to get PRId32 formatters
+#define __STDC_FORMAT_MACROS
+
 #include <string>
 #include <iostream>
 #include <vector>
