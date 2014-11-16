@@ -35,7 +35,13 @@ struct _jack_driver;
 struct _jack_client_internal;
 struct _jack_port_internal;
 
-/* Structures is allocated by the engine in local memory to keep track
+constexpr const int32_t JACKD_WATCHDOG_TIMEOUT = 10000;
+constexpr const int32_t JACKD_CLIENT_EVENT_TIMEOUT = 2000;
+
+constexpr const int32_t JACK_ENGINE_ROLLING_COUNT = 32;
+constexpr const int32_t JACK_ENGINE_ROLLING_INTERVAL = 1024;
+
+/* Structures allocated by the engine in local memory to keep track
  * of port buffers and connections.
  */
 
@@ -51,12 +57,15 @@ typedef struct _jack_reserved_name {
     char name[JACK_CLIENT_NAME_SIZE];
 } jack_reserved_name_t;
 
+typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, const JSList *);
+typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
 
-constexpr const int32_t JACKD_WATCHDOG_TIMEOUT = 10000;
-constexpr const int32_t JACKD_CLIENT_EVENT_TIMEOUT = 2000;
-
-constexpr const int32_t JACK_ENGINE_ROLLING_COUNT = 32;
-constexpr const int32_t JACK_ENGINE_ROLLING_INTERVAL = 1024;
+typedef struct _jack_driver_info {
+    jack_driver_info_init_callback_t initialize;
+    jack_driver_info_finish_callback_t finish;
+    char           (*client_name);
+    dlhandle       handle;
+} jack_driver_info_t;
 
 /* The main engine structure in local memory. */
 struct _jack_engine {
@@ -312,7 +321,13 @@ struct engine {
 		       ... );
 
     int drivers_start();
-    int unload_slave_driver( jack_driver_t * driver_desc );
+    int load_driver( jack_driver_desc_t * driver_desc,
+		     JSList * driver_params_jsl );
+    int use_driver( jack_driver_t * driver );
+    int load_slave_driver( jack_driver_desc_t * driver_desc,
+			   JSList * driver_params_jsl );
+    int add_slave_driver( jack_driver_t * sdriver );
+    int unload_slave_driver( jack_driver_t * sdriver );
     void slave_driver_remove( jack_driver_t * sdriver );
 
     void property_change_notify( jack_property_change_t change,
@@ -320,7 +335,19 @@ struct engine {
 				 const char * key );
 
     void client_registration_notify( const char * name, int yn );
+
+    jack_client_internal_t * setup_client(
+	ClientType type, char *name, jack_uuid_t uuid,
+	jack_options_t options, jack_status_t *status,
+	int client_fd, const char *object_path, const char *object_data);
+    jack_client_t * internal_client_alloc( jack_client_control_t *cc );
     void client_internal_delete( jack_client_internal_t * client );
+    jack_client_internal_t * create_driver_client_internal( char *name );
+    void remove_client_internal( jack_client_internal_t *client );
+    jack_client_internal_t * client_internal_by_id( jack_uuid_t id );
+    jack_client_internal_t * client_by_name( const char * name );
+    int client_name_reserved( const char * name );
+    int generate_unique_name( char *name );
 
     int do_stop_freewheeling( int engine_exiting );
 
@@ -330,6 +357,66 @@ struct engine {
     int set_sample_rate( jack_nframes_t nframes );
     int get_fifo_fd( unsigned int which_fifo );
     void transport_init();
+
+    void port_clear_connections( jack_port_internal_t * port );
+    void port_registration_notify( jack_port_id_t port_id, int yn );
+    void port_release( jack_port_internal_t *port );
+
+    int rechain_graph();
+
+private:
+    jack_driver_info_t * load_driver_so_( jack_driver_desc_t * driver_desc );
+    int load_client_( jack_client_internal_t *client,
+		      const char *so_name );
+    void client_internal_unload_( jack_client_internal_t * client );
+
+    void zombify_client_( jack_client_internal_t * client );
+    jack_client_internal_t * setup_client_control_(
+	int fd, ClientType type, const char *name, jack_uuid_t uuid );
+
+    void client_disconnect_ports_( jack_client_internal_t *client );
+    int client_do_deactivate_( jack_client_internal_t *client,
+			       int sort_graph );
+    void client_truefeed_remove_(
+	std::vector<jack_client_internal_t*> & truefeeds,
+	jack_client_internal_t * client_to_remove );
+    void client_sortfeed_remove_(
+	std::vector<jack_client_internal_t*> & sortfeeds,
+	jack_client_internal_t * client_to_remove );
+
+    int client_name_invalid_( char *name, jack_options_t options,
+			      jack_status_t *status );
+
+    jack_port_buffer_list_t * port_buffer_list_( jack_port_internal_t *port );
+    int port_disconnect_internal_( jack_port_internal_t *srcport,
+				   jack_port_internal_t *dstport );
+    void port_connection_remove_(
+	std::vector<jack_connection_internal_t*> & connections,
+	jack_connection_internal_t * to_remove );
+    void compute_all_port_total_latencies_();
+    jack_nframes_t get_port_total_latency_(
+	jack_port_internal_t *port, int hop_count, int toward_port );
+
+    void sort_graph_();
+    void check_acyclic_();
+    void compute_new_latency_();
+
+    int send_connection_notification_(
+	jack_uuid_t client_id,
+	jack_port_id_t self_id,
+	jack_port_id_t other_id,
+	int connected );
+
+    void notify_all_port_interested_clients_(
+	jack_uuid_t src,
+	jack_uuid_t dst,
+	jack_port_id_t a,
+	jack_port_id_t b,
+	int connected );
+
+    void clear_fifos_();
+
+    void ensure_uuid_unique_( jack_uuid_t uuid );
 };
 
 }

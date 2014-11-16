@@ -91,7 +91,7 @@ int jack_engine_client_do_deactivate( jack_engine_t &engine,
 
     client->control->active = FALSE;
 
-    jack_transport_client_exit( engine, client );
+    jack_transport_client_exit( &engine, client );
 
     if( !jack_client_is_internal(client) &&
 	engine.external_client_cnt > 0) {
@@ -958,7 +958,7 @@ int jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id )
     {
 	client->control->active = TRUE;
 
-	jack_transport_activate( engine, client );
+	jack_transport_activate( &engine, client );
 
 	/* we call this to make sure the FIFO is
 	 * built+ready by the time the client needs

@@ -24,6 +24,7 @@
 
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include <pthread.h>
 #include <errno.h>
@@ -43,10 +44,17 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <sysdeps/poll.h>
+#include <sysdeps/ipc.h>
+#include <sysdeps/cycles.h>
+
+#include "local.hpp"
+
 #include <jack/jack.h>
 #include <jack/jslist.h>
 #include <jack/thread.h>
 #include <jack/uuid.h>
+#include <jack/types.h>
 
 #include "internal.hpp"
 #include "engine.hpp"
@@ -61,15 +69,8 @@
 #include "jack_constants.hpp"
 #include "jack_utils.hpp"
 
-#include <algorithm>
-
 #include <sysdeps/time.h>
 
-#include "local.hpp"
-
-#include <sysdeps/poll.h>
-#include <sysdeps/ipc.h>
-#include <sysdeps/cycles.h>
 
 using std::vector;
 using std::string;

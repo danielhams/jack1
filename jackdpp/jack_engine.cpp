@@ -25,6 +25,7 @@
 #include "jack_engine.hpp"
 #include "jack_signals.hpp"
 #include "jack_utils.hpp"
+#include "jack_constants.hpp"
 
 #include <string>
 #include <sstream>
@@ -63,16 +64,6 @@ using std::make_unique;
 using jack::server_tmp_dir;
 using jack::server_user_dir;
 using jack::server_dir;
-
-typedef jack_driver_t * (*jack_driver_info_init_callback_t)(jack_client_t*, const JSList *);
-typedef void (*jack_driver_info_finish_callback_t)(jack_driver_t*);
-
-typedef struct _jack_driver_info {
-    jack_driver_info_init_callback_t initialize;
-    jack_driver_info_finish_callback_t finish;
-    char           (*client_name);
-    dlhandle       handle;
-} jack_driver_info_t;
 
 jack_timer_type_t clock_source = JACK_TIMER_SYSTEM_CLOCK;
 
@@ -1032,7 +1023,7 @@ static void jack_engine_post_process( jack_engine_t & engine )
 {
     /* precondition: caller holds the graph lock. */
 
-    jack_transport_cycle_end( engine );
+    jack_transport_cycle_end( &engine );
     jack_engine_calc_cpu_load( engine );
     jack_engine_check_clients( engine, 0 );
 }
@@ -1843,7 +1834,7 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
     for( n = 0 ; current_iterator != end_marker ; ++current_iterator ) {
 	jack_client_internal_t * client = *current_iterator;
 	vector<jack_client_internal_t*>::iterator next_iterator = current_iterator + 1;
-                
+
 	jack_client_control_t * ctl = client->control;
 
 	if (!ctl->process_cbset && !ctl->thread_cb_cbset) {
@@ -1872,15 +1863,15 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 
 	    client->execution_order = n;
 	    client->next_client = next_client;
-			
+
 	    if( jack_client_is_internal( client ) ) {
-				
+
 		/* break the chain for the current
 		 * subgraph. the server will wait for
 		 * chain on the nth FIFO, and will
 		 * then execute this internal
 		 * client. */
-				
+
 		if (subgraph_client) {
 		    subgraph_client->subgraph_wait_fd =
 			jack_engine_get_fifo_fd( engine, n );
@@ -1907,13 +1898,12 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 		subgraph_client = 0;
 
 	    } else {
-				
 		if (subgraph_client == NULL) {
 
 		    /* start a new subgraph. the
 		     * engine will start the chain
 		     * by writing to the nth
-		     * FIFO. 
+		     * FIFO.
 		     */
 
 		    subgraph_client = client;
@@ -1933,7 +1923,7 @@ int jack_engine_rechain_graph( jack_engine_t & engine )
 
 		    upstream_is_jackd = 1;
 
-		} 
+		}
 		else {
 		    VERBOSE( &engine, "client %s: in"
 			     " subgraph after %s, "
@@ -2569,7 +2559,7 @@ static int jack_engine_port_do_connect( jack_engine_t & engine,
 	dstport->connections_vector.push_back( connection );
 	srcport->connections_vector.push_back( connection );
 		
-	DEBUG ("actually sorted the graph...");
+	DEBUG( "actually sorted the graph..." );
 
 	jack_engine_send_connection_notification( engine,
 						  srcport->shared->client_id,
@@ -3000,7 +2990,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
     jack_info ("%sFor port %s (%s)", prefix, port->shared->name, (toward_port ? "toward" : "away"));
 #endif
-	
+
     for( jack_connection_internal_t * connection : port->connections_vector ) {
 
 	jack_nframes_t this_latency;
@@ -3019,7 +3009,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 	}
 
 #ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
-	jack_info ("%s\tconnection %s->%s ... ", 
+	jack_info ("%s\tconnection %s->%s ... ",
 		   prefix,
 		   connection->source->shared->name,
 		   connection->destination->shared->name);
@@ -3034,7 +3024,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 		this_latency = connection->source->shared->latency;
 	    } else {
 		this_latency = jack_engine_get_port_total_latency(
-		    engine, connection->source, hop_count + 1, 
+		    engine, connection->source, hop_count + 1,
 		    toward_port);
 	    }
 
@@ -3046,7 +3036,7 @@ static jack_nframes_t jack_engine_get_port_total_latency(
 		this_latency = connection->destination->shared->latency;
 	    } else {
 		this_latency = jack_engine_get_port_total_latency(
-		    engine, connection->destination, hop_count + 1, 
+		    engine, connection->destination, hop_count + 1,
 		    toward_port);
 	    }
 	}
@@ -3439,25 +3429,25 @@ static void jack_engine_do_request( jack_engine_t & engine, jack_request_t *req,
 	    break;
 
 	case SetTimeBaseClient:
-	    req->status = jack_timebase_set( engine,
+	    req->status = jack_timebase_set( &engine,
 					     req->x.timebase.client_id,
 					     req->x.timebase.conditional);
 	    break;
 
 	case ResetTimeBaseClient:
-	    req->status = jack_timebase_reset( engine, req->x.client_id);
+	    req->status = jack_timebase_reset( &engine, req->x.client_id);
 	    break;
 
 	case SetSyncClient:
-	    req->status = jack_transport_client_set_sync( engine, req->x.client_id);
+	    req->status = jack_transport_client_set_sync( &engine, req->x.client_id);
 	    break;
 
 	case ResetSyncClient:
-	    req->status = jack_transport_client_reset_sync( engine, req->x.client_id);
+	    req->status = jack_transport_client_reset_sync( &engine, req->x.client_id);
 	    break;
 
 	case SetSyncTimeout:
-	    req->status = jack_transport_set_sync_timeout( engine, req->x.timeout);
+	    req->status = jack_transport_set_sync_timeout( &engine, req->x.timeout);
 	    break;
 
 	case GetPortConnections:
@@ -4133,7 +4123,7 @@ unique_ptr<jack_engine_t> jack_engine_create(
     engine->first_wakeup = 1;
 
     engine->control->buffer_size = 0;
-    jack_transport_init( *engine );
+    jack_transport_init( engine.get() );
     jack_engine_set_sample_rate( engine.get(), 0 );
     engine->control->internal = 0;
 
@@ -5234,10 +5224,176 @@ int engine::drivers_start()
     return driver->start( driver );
 }
 
-int engine::unload_slave_driver( jack_driver_t * driver_desc )
+int engine::load_driver( jack_driver_desc_t * idriver_desc,
+			 JSList * idriver_params_jsl )
 {
-    slave_driver_remove( driver_desc );
-    client_internal_delete( driver_desc->internal_client );
+    jack_client_internal_t *client;
+    jack_driver_t *driver;
+    jack_driver_info_t *info;
+
+    if( (info = load_driver_so_( idriver_desc )) == nullptr) {
+	return -1;
+    }
+
+    if( (client = create_driver_client_internal( info->client_name )) == nullptr) {
+	return -1;
+    }
+
+    if( (driver = info->initialize( client->private_client, idriver_params_jsl)) == nullptr) {
+	free( info );
+	return -1;
+    }
+
+    driver->handle = info->handle;
+    driver->finish = info->finish;
+    driver->internal_client = client;
+    free( info );
+
+    if( use_driver( driver ) < 0 ) {
+	remove_client_internal( client );
+	return -1;
+    }
+
+    driver_desc   = idriver_desc;
+    driver_params = idriver_params_jsl;
+
+    return 0;
+}
+
+int engine::use_driver( jack_driver_t * idriver )
+{
+    if( idriver ) {
+	// REMOVE THIS HACK
+	idriver->detach( idriver, (jack_engine_t*)this );
+	idriver = nullptr;
+    }
+
+    if( idriver ) {
+	driver = idriver;
+
+	// REMOVE THIS HACK
+	if( idriver->attach( idriver, (jack_engine_t*)this )) {
+	    driver = nullptr;
+	    return -1;
+	}
+
+	rolling_interval = jack_rolling_interval( driver->period_usecs );
+    }
+
+    return 0;
+}
+
+jack_driver_info_t * engine::load_driver_so_( jack_driver_desc_t * driver_desc )
+{
+    const char *errstr;
+    jack_driver_info_t *info;
+
+    info = (jack_driver_info_t *)calloc( 1, sizeof(*info) );
+
+    info->handle = dlopen( driver_desc->file, RTLD_NOW|RTLD_GLOBAL );
+
+    if( info->handle == nullptr ) {
+	if( (errstr = dlerror()) != 0 ) {
+	    jack_error( "can't load \"%s\": %s", driver_desc->file,
+			errstr);
+	} else {
+	    jack_error( "bizarre error loading driver shared "
+			"object %s", driver_desc->file);
+	}
+	goto fail;
+    }
+
+    info->initialize = (jack_driver_info_init_callback_t)dlsym( info->handle, "driver_initialize" );
+
+    if( (errstr = dlerror()) != 0 ) {
+	jack_error( "no initialize function in shared object %s\n",
+		    driver_desc->file );
+	goto fail;
+    }
+
+    info->finish = (jack_driver_info_finish_callback_t)dlsym( info->handle, "driver_finish" );
+
+    if( (errstr = dlerror()) != 0 ) {
+	jack_error( "no finish function in in shared driver object %s",
+		    driver_desc->file );
+	goto fail;
+    }
+
+    info->client_name = (char *)dlsym( info->handle, "driver_client_name" );
+
+    if( (errstr = dlerror()) != 0 ) {
+	jack_error( "no client name in in shared driver object %s",
+		    driver_desc->file );
+	goto fail;
+    }
+
+    return info;
+
+  fail:
+    if( info->handle ) {
+	dlclose( info->handle );
+    }
+    free( info );
+    return nullptr;
+}
+
+int engine::load_slave_driver( jack_driver_desc_t * idriver_desc,
+			       JSList * idriver_params_jsl )
+{
+    jack_client_internal_t *client;
+    jack_driver_t *driver;
+    jack_driver_info_t *info;
+
+    if( (info = load_driver_so_( idriver_desc )) == nullptr ) {
+	jack_info( "Loading slave failed\n" );
+	return -1;
+    }
+
+    if( (client = create_driver_client_internal( info->client_name ) ) == nullptr ) {
+	jack_info( "Creating slave failed\n" );
+	return -1;
+    }
+
+    if( (driver = info->initialize( client->private_client,
+				    idriver_params_jsl )) == nullptr ) {
+	free( info );
+	jack_info( "Initializing slave failed\n" );
+	return -1;
+    }
+
+    driver->handle = info->handle;
+    driver->finish = info->finish;
+    driver->internal_client = client;
+    free( info );
+
+    if( add_slave_driver( driver ) < 0 ) {
+	jack_info( "Adding slave failed\n" );
+	client_internal_delete( client );
+	return -1;
+    }
+
+    return 0;
+}
+
+int engine::add_slave_driver( jack_driver_t * sdriver )
+{
+    if( sdriver ) {
+	// REMOVE THIS HACK
+	if( sdriver->attach( sdriver, (jack_engine_t*)this )) {
+	    jack_info( "could not attach slave %s\n", sdriver->internal_client->control->name );
+	    return -1;
+	}
+
+	slave_drivers.push_back( sdriver );
+    }
+
+    return 0;
+}
+
+int engine::unload_slave_driver( jack_driver_t * sdriver )
+{
+    slave_driver_remove( sdriver );
+    client_internal_delete( sdriver->internal_client );
     return 0;
 }
 
@@ -5346,6 +5502,117 @@ void engine::client_internal_delete( jack_client_internal_t * client )
     delete client;
 }
 
+jack_client_internal_t * engine::create_driver_client_internal( char *name )
+{
+    jack_client_connect_request_t req;
+    jack_status_t status;
+    jack_client_internal_t *client;
+    jack_uuid_t empty_uuid = JACK_UUID_EMPTY_INITIALIZER;
+
+    VALGRIND_MEMSET(&empty_uuid, 0, sizeof(empty_uuid));
+
+    snprintf( req.name, sizeof (req.name), "%s", name );
+
+    jack_uuid_clear( &empty_uuid );
+
+    pthread_mutex_lock( &request_lock );
+    client = setup_client( ClientDriver, name, empty_uuid, JackUseExactName,
+			   &status, -1, nullptr, nullptr );
+    pthread_mutex_unlock( &request_lock );
+
+    return client;
+}
+
+void engine::remove_client_internal( jack_client_internal_t *client )
+{
+    jack_uuid_t finalizer = JACK_UUID_EMPTY_INITIALIZER;
+
+    jack_uuid_clear( &finalizer );
+
+    /* caller must write-hold the client lock */
+
+    VERBOSE( this, "removing client \"%s\"", client->control->name);
+
+    if( client->control->type == ClientInternal ) {
+	/* unload it while its still a regular client */
+
+	client_internal_unload_( client );
+    }
+
+    /* if its not already a zombie, make it so */
+
+    if( !client->control->dead ) {
+	zombify_client_( client );
+    }
+
+    if( client->session_reply_pending ) {
+	session_pending_replies -= 1;
+
+	if( session_pending_replies == 0 ) {
+	    if( write( session_reply_fd, &finalizer, sizeof (finalizer))
+		< (ssize_t) sizeof (finalizer)) {
+		jack_error( "cannot write SessionNotify result "
+			    "to client via fd = %d (%s)",
+			    session_reply_fd, strerror (errno));
+	    }
+	    session_reply_fd = -1;
+	}
+    }
+
+    if( client->control->type == ClientExternal ) {
+	/* try to force the server thread to return from poll */
+	close( client->event_fd );
+	close( client->request_fd );
+    }
+
+    VERBOSE( this, "before: client vector contains %d", clients.size() );
+
+    auto cFinder = std::find_if( clients.begin(), clients.end(),
+				 [&client] ( jack_client_internal_t * ic ) {
+				     return jack_uuid_compare( ic->control->uuid, client->control->uuid ) == 0;
+				 } );
+
+    if( cFinder != clients.end() ) {
+	clients.erase( cFinder );
+	VERBOSE( this, "Found and removed from client vector via matching UUID" );
+    }
+
+    VERBOSE( this, "after: client vector contains %d", clients.size() );
+
+    client_internal_delete( client );
+
+    if( temporary ) {
+	int external_clients = 0;
+
+	/* count external clients only when deciding whether to shutdown */
+
+	for( jack_client_internal_t * client : clients ) {
+	    if( client->control->type == ClientExternal ) {
+		++external_clients;
+	    }
+	}
+
+	if( external_clients == 0 ) {
+	    if( wait_pid >= 0 ) {
+		/* block new clients from being created
+		   after we release the lock.
+		*/
+		new_clients_allowed = 0;
+		/* tell the waiter we're done
+		   to initiate a normal shutdown.
+		*/
+		VERBOSE( this, "Kill wait pid to stop");
+		kill( wait_pid, SIGUSR2 );
+		/* unlock the graph so that the server thread can finish */
+		jack_unlock_graph( this );
+		sleep( -1 );
+	    } else {
+		exit( 0 );
+	    }
+	}
+    }
+}
+
 int engine::do_stop_freewheeling( int engine_exiting )
 {
     jack_event_t event;
@@ -5396,6 +5663,1171 @@ int engine::do_stop_freewheeling( int engine_exiting )
 
 engine::~engine()
 {
+}
+
+void engine::client_internal_unload_( jack_client_internal_t * client )
+{
+    if( client->handle ) {
+	if( client->finish ) {
+	    client->finish( client->private_client->process_arg );
+	}
+	dlclose( client->handle );
+    }
+}
+
+void engine::zombify_client_( jack_client_internal_t * client )
+{
+    VERBOSE( this, "removing client \"%s\" from the processing chain",
+	     client->control->name );
+
+    /* caller must hold the client_lock */
+
+    /* this stops jack_engine_deliver_event() from contacing this client */
+
+    client->control->dead = TRUE;
+
+    client_disconnect_ports_( client );
+    client_do_deactivate_( client, FALSE );
+}
+
+void engine::client_disconnect_ports_( jack_client_internal_t *client )
+{
+    /* call tree **** MUST HOLD *** engine->client_lock */
+
+    for( jack_port_internal_t * port : client->ports_vector ) {
+	port_clear_connections( port );
+	port_registration_notify( port->shared->id, FALSE );
+	port_release( port );
+    }
+
+    client->truefeeds_vector.clear();
+    client->sortfeeds_vector.clear();
+    client->ports_vector.clear();
+}
+
+int engine::client_do_deactivate_( jack_client_internal_t *client,
+				   int sort_graph )
+{
+    /* caller must hold engine->client_lock and must have checked for and/or
+     *   cleared all connections held by client.
+     */
+    VERBOSE( this,"+++ deactivate %s", client->control->name);
+
+    client->control->active = FALSE;
+
+    // REMOVE THIS HACK
+    jack_transport_client_exit( (jack_engine_t*)this, client );
+
+    if( !jack_client_is_internal(client) &&
+	external_client_cnt > 0) {
+	external_client_cnt--;
+    }
+
+    if( sort_graph ) {
+	sort_graph_();
+    }
+    return 0;
+}
+
+void engine::port_clear_connections( jack_port_internal_t *port )
+{
+    // Take a copy so our iterators aren't invalidated
+    vector<jack_connection_internal_t*> port_connections = port->connections_vector;
+    for( jack_connection_internal_t * connection : port_connections ) {
+	port_disconnect_internal_( connection->source, connection->destination );
+    }
+
+    port->connections_vector.clear();
+}
+
+void engine::port_registration_notify( jack_port_id_t port_id, int yn )
+{
+    jack_event_t event;
+
+    event.type = (yn ? PortRegistered : PortUnregistered);
+    event.x.port_id = port_id;
+
+    for( jack_client_internal_t * client : clients ) {
+	if (!client->control->active) {
+	    continue;
+	}
+
+	if (client->control->port_register_cbset) {
+	    if( deliver_event( client, &event) ) {
+		jack_error( "cannot send port registration"
+			    " notification to %s (%s)",
+			    client->control->name,
+			    strerror(errno) );
+	    }
+	}
+    }
+}
+
+void engine::port_release( jack_port_internal_t *port )
+{
+    char buf[JACK_UUID_STRING_SIZE];
+    jack_uuid_unparse( port->shared->uuid, buf );
+    if( jack_remove_properties( NULL, port->shared->uuid ) > 0) {
+	/* have to do the notification ourselves, since the client argument
+	   to jack_remove_properties() was NULL
+	*/
+	property_change_notify( PropertyDeleted, port->shared->uuid, NULL );
+    }
+
+    pthread_mutex_lock( &port_lock );
+    port->shared->in_use = 0;
+    port->shared->alias1[0] = '\0';
+    port->shared->alias2[0] = '\0';
+
+    if( port->buffer_info ) {
+	jack_port_buffer_list_t *blist = port_buffer_list_( port );
+	pthread_mutex_lock( &blist->lock );
+	blist->freelist_vector.push_back( port->buffer_info );
+	port->buffer_info = NULL;
+	pthread_mutex_unlock( &blist->lock );
+    }
+    pthread_mutex_unlock( &port_lock );
+}
+
+int engine::port_disconnect_internal_( jack_port_internal_t *srcport,
+				       jack_port_internal_t *dstport )
+{
+    int ret = -1;
+    jack_port_id_t src_id, dst_id;
+    int check_acyclic = feedbackcount;
+
+    /* call tree **** MUST HOLD **** engine->client_lock. */
+    for( jack_connection_internal_t * connection : srcport->connections_vector ) {
+	if( connection->source == srcport &&
+	    connection->destination == dstport ) {
+	    VERBOSE( this, "connections_vector DIS-connect %s and %s",
+		     srcport->shared->name,
+		     dstport->shared->name);
+
+	    port_connection_remove_( srcport->connections_vector, connection );
+	    port_connection_remove_( dstport->connections_vector, connection );
+
+	    src_id = srcport->shared->id;
+	    dst_id = dstport->shared->id;
+
+	    // this is a bit harsh, but it basically says
+	    // that if we actually do a disconnect, and
+	    // its the last one, then make sure that any
+	    // input monitoring is turned off on the
+	    // srcport. this isn't ideal for all
+	    // situations, but it works better for most of
+	    // them.
+
+	    if( srcport->connections_vector.size() == 0 ) {
+		srcport->shared->monitor_requests = 0;
+	    }
+
+	    send_connection_notification_( srcport->shared->client_id, src_id, dst_id, FALSE );
+	    send_connection_notification_( dstport->shared->client_id, dst_id, src_id, FALSE );
+
+	    // send a port connection notification just once to everyone who cares
+	    // excluding clients involved in the connection
+
+	    notify_all_port_interested_clients_( srcport->shared->client_id,
+						 dstport->shared->client_id,
+						 src_id,
+						 dst_id,
+						 0 );
+
+	    if( connection->dir ) {
+
+		jack_client_internal_t *src;
+		jack_client_internal_t *dst;
+
+		src = client_internal_by_id( srcport->shared->client_id );
+
+		dst = client_internal_by_id( dstport->shared->client_id );
+
+		jack_info( "Attempting to remove from %d to %d",
+			   srcport->shared->client_id,
+			   dstport->shared->client_id );
+
+		client_truefeed_remove_( src->truefeeds_vector, dst );
+
+		dst->fedcount--;
+
+		if( connection->dir == 1 ) {
+		    // normal connection: remove dest from
+		    // source's sortfeeds list
+		    client_sortfeed_remove_( src->sortfeeds_vector, dst );
+		} else {
+		    // feedback connection: remove source
+		    // from dest's sortfeeds list
+		    client_sortfeed_remove_( dst->sortfeeds_vector, src );
+		    feedbackcount--;
+		    VERBOSE( this,
+			     "feedback count down to %d",
+			     feedbackcount);
+
+		}
+	    } // else self-connection: do nothing
+
+	    free( connection );
+	    ret = 0;
+	    break;
+	}
+    }
+
+    if( check_acyclic ) {
+	check_acyclic_();
+    }
+
+    sort_graph_();
+
+    return ret;
+}
+
+void engine::sort_graph_()
+{
+    /* called, obviously, must hold engine->client_lock */
+
+    VERBOSE( this, "++ jack_engine_sort_graph");
+
+    std::sort( clients.begin(), clients.end(), jack_engine_clients_compare() );
+
+    compute_all_port_total_latencies_();
+    compute_new_latency_();
+    rechain_graph();
+    timeout_count = 0;
+
+    VERBOSE( this, "-- jack_engine_sort_graph");
+}
+
+jack_port_buffer_list_t * engine::port_buffer_list_( jack_port_internal_t *port )
+{
+    /* Points to the engine's private port buffer list struct. */
+    return &port_buffers[port->shared->ptype_id];
+}
+
+void engine::port_connection_remove_( std::vector<jack_connection_internal_t*> & connections,
+				      jack_connection_internal_t * to_remove )
+{
+    auto cFinder = std::find(connections.begin(), connections.end(), to_remove );
+
+    if( cFinder == connections.end() ) {
+	VERBOSE( this, "-- failed port connection removal");
+    }
+    else {
+	connections.erase( cFinder );
+    }
+}
+
+int engine::send_connection_notification_(
+    jack_uuid_t client_id,
+    jack_port_id_t self_id,
+    jack_port_id_t other_id,
+    int connected )
+{
+    jack_client_internal_t *client;
+    jack_event_t event;
+
+    VALGRIND_MEMSET(&event, 0, sizeof(event));
+
+    if( (client = client_internal_by_id( client_id) ) == nullptr ) {
+	jack_error( "no such client %" PRIu32
+		    " during connection notification", client_id);
+	return -1;
+    }
+
+    if( client->control->active ) {
+	event.type = (connected ? PortConnected : PortDisconnected);
+	event.x.self_id = self_id;
+	event.y.other_id = other_id;
+
+	if( deliver_event( client, &event) ) {
+	    jack_error( "cannot send port connection notification"
+			" to client %s (%s)",
+			client->control->name, strerror (errno));
+	    return -1;
+	}
+    }
+
+    return 0;
+}
+
+void engine::notify_all_port_interested_clients_(
+    jack_uuid_t src,
+    jack_uuid_t dst,
+    jack_port_id_t a,
+    jack_port_id_t b,
+    int connected )
+{
+    jack_event_t event;
+
+    event.type = (connected ? PortConnected : PortDisconnected);
+    event.x.self_id = a;
+    event.y.other_id = b;
+
+    /* GRAPH MUST BE LOCKED : see callers of jack_engine_send_connection_notification()
+     */
+
+    jack_client_internal_t* src_client = client_internal_by_id( src );
+    jack_client_internal_t* dst_client = client_internal_by_id( dst );
+
+    for( jack_client_internal_t * client : clients ) {
+	if( src_client != client && dst_client != client && client->control->port_connect_cbset != FALSE ) {
+
+	    /* one of the ports belong to this client or it has a port connect callback */
+	    deliver_event( client, &event );
+	}
+    }
+}
+
+jack_client_internal_t * engine::client_internal_by_id( jack_uuid_t id )
+{
+    jack_client_internal_t * client = NULL;
+
+    /* call tree ***MUST HOLD*** the graph lock */
+
+    auto cFinder = std::find_if( clients.begin(),
+				 clients.end(),
+				 [&id] ( jack_client_internal_t * client ) {
+				     return jack_uuid_compare( client->control->uuid, id) == 0;
+				 } );
+
+    if( cFinder != clients.end() ) {
+	client = *cFinder;
+    }
+
+    return client;
+}
+
+void engine::client_truefeed_remove_( vector<jack_client_internal_t*> & truefeeds,
+				     jack_client_internal_t * client_to_remove )
+{
+    auto tf_finder = std::find( truefeeds.begin(),
+				truefeeds.end(),
+				client_to_remove );
+    if( tf_finder != truefeeds.end() ) {
+	truefeeds.erase( tf_finder );
+    }
+    else {
+	jack_error("Failed to find client to remove from truefeeds");
+    }
+}
+
+void engine::client_sortfeed_remove_( vector<jack_client_internal_t*> & sortfeeds,
+				     jack_client_internal_t * client_to_remove )
+{
+    auto sf_finder = std::find( sortfeeds.begin(),
+				sortfeeds.end(),
+				client_to_remove );
+    if( sf_finder != sortfeeds.end() ) {
+	sortfeeds.erase( sf_finder );
+    }
+    else {
+	jack_error("Failed to find client to remove from sortfeeds");
+    }
+}
+
+/**
+ * Checks whether the graph has become acyclic and if so modifies client
+ * sortfeeds lists to turn leftover feedback connections into normal ones.
+ * This lowers latency, but at the expense of some data corruption.
+ */
+void engine::check_acyclic_()
+{
+    jack_client_internal_t *src, *dst;
+    jack_port_internal_t *port;
+    jack_connection_internal_t *conn;
+    int stuck;
+    int unsortedclients = 0;
+
+    VERBOSE( this, "checking for graph become acyclic");
+
+    for( auto cvIter = clients.begin(), end = clients.end() ;
+	 cvIter != end ; ++cvIter ) {
+	src = *cvIter;
+	src->tfedcount = src->fedcount;
+	unsortedclients++;
+    }
+
+    stuck = FALSE;
+
+    /* find out whether a normal sort would have been possible */
+    while( unsortedclients && !stuck ) {
+	stuck = TRUE;
+	for( auto cvIter = clients.begin(), end = clients.end() ;
+	     cvIter != end ; ++cvIter ) {
+	    src = *cvIter;
+	    if (!src->tfedcount) {
+		stuck = FALSE;
+		unsortedclients--;
+		src->tfedcount = -1;
+		for( auto tf_iter = src->truefeeds_vector.begin(),
+			 tf_end = src->truefeeds_vector.end() ;
+		     tf_iter != tf_end ;
+		     ++tf_iter ) {
+		    dst = *tf_iter;
+		    dst->tfedcount--;
+		}
+	    }
+	}
+    }
+
+    if (stuck) {
+	VERBOSE( this, "graph is still cyclic" );
+    } else {
+	VERBOSE( this, "graph has become acyclic");
+
+	/* turn feedback connections around in sortfeeds */
+	for( auto cvIter = clients.begin(), end = clients.end() ;
+	     cvIter != end ; ++cvIter ) {
+	    src = *cvIter;
+
+	    for( auto sp_iter = src->ports_vector.begin(), sp_end = src->ports_vector.end() ;
+		 sp_iter != sp_end ; ++sp_iter ) {
+		port = *sp_iter;
+
+		vector<jack_connection_internal_t*>::iterator con_iter = port->connections_vector.begin();
+		vector<jack_connection_internal_t*>::iterator con_end = port->connections_vector.end();
+		for( ; con_iter != con_end ; ++con_iter ) {
+		    conn = *con_iter;
+		    if( conn->dir == -1 ) /* && conn->srcclient == src) */{
+
+			VERBOSE( this,
+				 "reversing connection from "
+				 "%s to %s",
+				 conn->srcclient->control->name,
+				 conn->dstclient->control->name);
+			conn->dir = 1;
+			client_sortfeed_remove_( conn->dstclient->sortfeeds_vector,
+						 conn->srcclient );
+
+			client_sortfeed_remove_( conn->srcclient->sortfeeds_vector,
+						 conn->dstclient );
+		    }
+		}
+	    }
+	}
+	feedbackcount = 0;
+    }
+}
+
+void engine::compute_all_port_total_latencies_()
+{
+    jack_port_shared_t *shared = control->ports;
+    unsigned int i;
+    int toward_port;
+
+    for( i = 0; i < control->port_max; i++ ) {
+	if( shared[i].in_use ) {
+
+	    if( shared[i].flags & JackPortIsOutput ) {
+		toward_port = FALSE;
+	    } else {
+		toward_port = TRUE;
+	    }
+
+	    shared[i].total_latency = get_port_total_latency_(
+		&internal_ports[i],
+		0,
+		toward_port);
+	}
+    }
+}
+
+void engine::compute_new_latency_()
+{
+    jack_event_t event;
+
+    VALGRIND_MEMSET( &event, 0, sizeof(event) );
+
+    event.type = LatencyCallback;
+    event.x.n  = 0;
+
+    /* iterate over all clients in graph order, and emit
+     * capture latency callback.
+     * also builds up list in reverse graph order.
+     */
+    for( jack_client_internal_t * client : clients ) {
+	deliver_event( client, &event );
+    }
+
+    if( driver ) {
+	deliver_event( driver->internal_client, &event );
+    }
+
+    /* now issue playback latency callbacks in reverse graphorder
+     */
+    event.x.n  = 1;
+    for( auto rcIter = clients.rbegin(), end = clients.rend() ;
+	 rcIter != end ; ++rcIter ) {
+	jack_client_internal_t * client = *rcIter;
+	deliver_event( client, &event );
+    }
+
+    if( driver ) {
+	deliver_event( driver->internal_client, &event );
+    }
+}
+
+int engine::rechain_graph()
+{
+    unsigned long n;
+    int err = 0;
+    jack_client_internal_t *subgraph_client, *next_client;
+    jack_event_t event;
+    int upstream_is_jackd;
+
+    VALGRIND_MEMSET( &event, 0, sizeof(event) );
+
+    clear_fifos_();
+
+    subgraph_client = 0;
+
+    VERBOSE( this, "++ jack_engine_rechain_graph():");
+
+    event.type = GraphReordered;
+
+    vector<jack_client_internal_t*>::iterator current_iterator = clients.begin();
+    vector<jack_client_internal_t*>::iterator end_marker = clients.end();
+
+    for( n = 0 ; current_iterator != end_marker ; ++current_iterator ) {
+	jack_client_internal_t * client = *current_iterator;
+	vector<jack_client_internal_t*>::iterator next_iterator = current_iterator + 1;
+
+	jack_client_control_t * ctl = client->control;
+
+	if (!ctl->process_cbset && !ctl->thread_cb_cbset) {
+	    continue;
+	}
+
+	VERBOSE( this, "+++ client is now %s active ? %d", ctl->name, ctl->active);
+
+	if( ctl->active ) {
+
+	    /* find the next active client. its ok for
+	     * this to be NULL */
+	    while( next_iterator != end_marker ) {
+		if( ctl->active &&
+		    (ctl->process_cbset || ctl->thread_cb_cbset)) {
+		    break;
+		}
+		++next_iterator;
+	    };
+
+	    if( next_iterator == end_marker ) {
+		next_client = NULL;
+	    } else {
+		next_client = *next_iterator;
+	    }
+
+	    client->execution_order = n;
+	    client->next_client = next_client;
+
+	    if( jack_client_is_internal( client ) ) {
+
+		/* break the chain for the current
+		 * subgraph. the server will wait for
+		 * chain on the nth FIFO, and will
+		 * then execute this internal
+		 * client. */
+
+		if( subgraph_client ) {
+		    subgraph_client->subgraph_wait_fd = get_fifo_fd( n );
+		    VERBOSE( this, "client %s: wait_fd="
+			     "%d, execution_order="
+			     "%lu.",
+			     subgraph_client->control->name,
+			     subgraph_client->subgraph_wait_fd,
+			     n);
+		    n++;
+		}
+
+		VERBOSE( this, "client %s: internal "
+			 "client, execution_order="
+			 "%lu.",
+			 ctl->name, n);
+
+		/* this does the right thing for
+		 * internal clients too
+		 */
+
+		deliver_event( client, &event );
+
+		subgraph_client = 0;
+
+	    } else {
+
+		if( subgraph_client == NULL ) {
+
+		    /* start a new subgraph. the
+		     * engine will start the chain
+		     * by writing to the nth
+		     * FIFO.
+		     */
+
+		    subgraph_client = client;
+		    subgraph_client->subgraph_start_fd = get_fifo_fd( n );
+		    VERBOSE( this, "client %s: "
+			     "start_fd=%d, execution"
+			     "_order=%lu.",
+			     subgraph_client->control->name,
+			     subgraph_client->subgraph_start_fd,
+			     n);
+
+		    /* this external client after
+		       this will have jackd as its
+		       upstream connection.
+		    */
+
+		    upstream_is_jackd = 1;
+
+		}
+		else {
+		    VERBOSE( this, "client %s: in"
+			     " subgraph after %s, "
+			     "execution_order="
+			     "%lu.",
+			     ctl->name,
+			     subgraph_client->control->name,
+			     n);
+		    subgraph_client->subgraph_wait_fd = -1;
+
+		    /* this external client after
+		       this will have another
+		       client as its upstream
+		       connection.
+		    */
+
+		    upstream_is_jackd = 0;
+		}
+
+		/* make sure fifo for 'n + 1' exists
+		 * before issuing client reorder
+		 */
+		(void)get_fifo_fd( client->execution_order + 1 );
+		event.x.n = client->execution_order;
+		event.y.n = upstream_is_jackd;
+		deliver_event( client, &event);
+		n++;
+	    }
+	}
+    }
+
+    if( subgraph_client ) {
+	subgraph_client->subgraph_wait_fd = get_fifo_fd( n );
+	VERBOSE( this, "client %s: wait_fd=%d, execution_order=%lu (last client).",
+		 subgraph_client->control->name,
+		 subgraph_client->subgraph_wait_fd, n);
+    }
+
+    VERBOSE( this, "-- jack_engine_rechain_graph()");
+
+    return err;
+}
+
+jack_nframes_t engine::get_port_total_latency_( jack_port_internal_t *port, int hop_count, int toward_port )
+{
+    jack_nframes_t latency;
+    jack_nframes_t max_latency = 0;
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+    char prefix[32];
+    int i;
+
+    for (i = 0; i < hop_count; ++i) {
+	prefix[i] = '\t';
+    }
+
+    prefix[i] = '\0';
+#endif
+
+    /* call tree must hold engine->client_lock. */
+
+    latency = port->shared->latency;
+
+    /* we don't prevent cyclic graphs, so we have to do something
+       to bottom out in the event that they are created.
+    */
+
+    if (hop_count > 8) {
+	return latency;
+    }
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+    jack_info( "%sFor port %s (%s)", prefix, port->shared->name, (toward_port ? "toward" : "away") );
+#endif
+
+    for( jack_connection_internal_t * connection : port->connections_vector ) {
+	jack_nframes_t this_latency;
+
+	if( (toward_port && (connection->source->shared == port->shared)) ||
+	    (!toward_port && (connection->destination->shared == port->shared))) {
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+	    jack_info( "%s\tskip connection %s->%s",
+		       prefix,
+		       connection->source->shared->name,
+		       connection->destination->shared->name );
+#endif
+
+	    continue;
+	}
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+	jack_info( "%s\tconnection %s->%s ... ",
+		   prefix,
+		   connection->source->shared->name,
+		   connection->destination->shared->name );
+#endif
+	/* if we're a destination in the connection, recurse
+	   on the source to get its total latency
+	*/
+
+	if( connection->destination == port ) {
+
+	    if( connection->source->shared->flags & JackPortIsTerminal ) {
+		this_latency = connection->source->shared->latency;
+	    } else {
+		this_latency = get_port_total_latency_( connection->source,
+						       hop_count + 1,
+						       toward_port );
+	    }
+
+	} else {
+
+	    /* "port" is the source, so get the latency of
+	     * the destination */
+	    if( connection->destination->shared->flags & JackPortIsTerminal ) {
+		this_latency = connection->destination->shared->latency;
+	    } else {
+		this_latency = get_port_total_latency_( connection->destination,
+						       hop_count + 1,
+						       toward_port );
+	    }
+	}
+
+	if( this_latency > max_latency ) {
+	    max_latency = this_latency;
+	}
+    }
+
+#ifdef DEBUG_TOTAL_LATENCY_COMPUTATION
+    jack_info( "%s\treturn %lu + %lu = %lu", prefix, latency, max_latency, latency + max_latency );
+#endif
+
+    return latency + max_latency;
+}
+
+void engine::clear_fifos_()
+{
+    /* caller must hold client_lock */
+
+    unsigned int i;
+    char buf[16];
+
+    /* this just drains the existing FIFO's of any data left in
+       them by aborted clients, etc. there is only ever going to
+       be 0, 1 or 2 bytes in them, but we'll allow for up to 16.
+    */
+    for( i = 0; i < fifo_size; i++ ) {
+	if( fifo[i] >= 0 ) {
+	    int nread = read( fifo[i], buf, sizeof(buf) );
+
+	    if( nread < 0 && errno != EAGAIN ) {
+		jack_error( "clear fifo[%d] error: %s",
+			    i, strerror(errno) );
+	    }
+	}
+    }
+}
+
+/* set up all types of clients */
+jack_client_internal_t * engine::setup_client(
+    ClientType type, char *name, jack_uuid_t uuid, jack_options_t options,
+    jack_status_t *status, int client_fd, const char *object_path, const char *object_data )
+{
+    /* called with the request_lock */
+    jack_client_internal_t *client;
+    char bufx[64];
+
+    /* validate client name, generate a unique one if appropriate */
+    if( client_name_invalid_( name, options, status ) )
+	return NULL;
+
+    ensure_uuid_unique_( uuid );
+
+    /* create a client struct for this name */
+    if( (client = setup_client_control_( client_fd, type, name, uuid)) == NULL) {
+	*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
+	jack_error( "cannot create new client object" );
+	return NULL;
+    }
+
+    /* only for internal clients, driver is already loaded */
+    if( type == ClientInternal ) {
+	if( load_client_( client, object_path ) ) {
+	    jack_error( "cannot dynamically load client from"
+			" \"%s\"", object_path );
+	    client_internal_delete( client );
+	    *status = (jack_status_t)(*status | (JackFailure|JackLoadFailure));
+	    return NULL;
+	}
+    }
+
+    jack_uuid_unparse( client->control->uuid, bufx );
+
+    VERBOSE( this, "new client: %s, uuid = %s"
+	     " type %d @ %p fd = %d",
+	     client->control->name, bufx,
+	     type, client->control, client_fd);
+
+    if( jack_client_is_internal(client) ) {
+
+	// XXX: do i need to lock the graph here ?
+	// i moved this one up in the init process, lets see what happens.
+
+	/* Internal clients need to make regular JACK API
+	 * calls, which need a jack_client_t structure.
+	 * Create one here.
+	 */
+	client->private_client = internal_client_alloc( client->control );
+
+	/* Set up the pointers necessary for the request
+	 * system to work.  The client is in the same address
+	 * space */
+
+	client->private_client->deliver_request = internal_client_request;
+	client->private_client->deliver_arg = this;
+    }
+
+    /* add new client to the clients list */
+    jack_lock_graph( this );
+
+    clients.push_back( client );
+
+    reset_rolling_usecs();
+
+    if( jack_client_is_internal( client ) ) {
+
+	jack_unlock_graph( this );
+
+	/* Call its initialization function.  This function
+	 * may make requests of its own, so we temporarily
+	 * release and then reacquire the request_lock.  */
+	if( client->control->type == ClientInternal ) {
+
+	    pthread_mutex_unlock( &request_lock );
+	    if( client->initialize( client->private_client,
+				    object_data ) ) {
+
+		/* failed: clean up client data */
+		VERBOSE( this, "%s jack_initialize() failed!", client->control->name );
+		jack_lock_graph( this );
+		remove_client_internal( client );
+		jack_unlock_graph( this );
+		*status = (jack_status_t)(*status | (JackFailure|JackInitFailure));
+		client = NULL;
+		//JOQ: not clear that all allocated
+		//storage has been cleaned up properly.
+	    }
+	    pthread_mutex_lock( &request_lock );
+	}
+
+    } else {			/* external client */
+	jack_unlock_graph( this );
+    }
+
+    return client;
+}
+
+int engine::client_name_invalid_( char *name, jack_options_t options, jack_status_t *status)
+{
+    /* Since this is always called from the server thread, no
+     * other new client will be created at the same time.  So,
+     * testing a name for uniqueness is valid here.  When called
+     * from jack_engine_load_driver() this is not strictly true,
+     * but that seems to be adequately serialized due to engine
+     * startup.  There are no other clients at that point, anyway.
+     */
+
+    if( client_by_name( name ) || client_name_reserved( name )) {
+
+	*status = (jack_status_t)(*status | JackNameNotUnique);
+
+	if( options & JackUseExactName ) {
+	    jack_error( "cannot create new client; %s already"
+			" exists", name );
+	    *status = (jack_status_t)(*status | JackFailure);
+	    return TRUE;
+	}
+
+	if( generate_unique_name( name ) ) {
+	    *status = (jack_status_t)(*status | JackFailure);
+	    return TRUE;
+	}
+    }
+
+    return FALSE;
+}
+
+void engine::ensure_uuid_unique_( jack_uuid_t uuid )
+{
+    if( jack_uuid_empty( uuid ) ) {
+	return;
+    }
+
+    jack_lock_graph( this );
+
+    for( jack_client_internal_t * client : clients ) {
+	if( jack_uuid_compare( client->control->uuid, uuid ) == 0 ) {
+	    jack_uuid_clear( &uuid );
+	}
+    }
+    jack_unlock_graph( this );
+}
+
+/* Set up the engine's client internal and control structures for both
+ * internal and external clients. */
+jack_client_internal_t * engine::setup_client_control_(
+    int fd, ClientType type, const char *name, jack_uuid_t uuid )
+{
+    jack_client_internal_t *client;
+
+    client = new jack_client_internal_t();
+
+    client->request_fd = fd;
+    client->event_fd = -1;
+    client->ports_vector.clear();
+    client->truefeeds_vector.clear();
+    client->sortfeeds_vector.clear();
+    client->execution_order = UINT_MAX;
+    client->next_client = NULL;
+    client->handle = NULL;
+    client->finish = NULL;
+    client->error = 0;
+    client->private_client = NULL;
+
+    if( type != ClientExternal ) {
+	client->control = (jack_client_control_t *)malloc(sizeof(jack_client_control_t));
+    } else {
+	if( jack_shmalloc( sizeof(jack_client_control_t), &client->control_shm) ) {
+	    jack_error( "cannot create client control block for %s",
+			name );
+	    delete client;
+	    return 0;
+	}
+
+	if( jack_attach_shm( &client->control_shm ) ) {
+	    jack_error( "cannot attach to client control block "
+			"for %s (%s)", name, strerror(errno) );
+	    jack_destroy_shm( &client->control_shm );
+	    delete client;
+	    return 0;
+	}
+
+	client->control = (jack_client_control_t *)jack_shm_addr( &client->control_shm );
+    }
+
+    client->control->type = type;
+    client->control->active = 0;
+    client->control->dead = FALSE;
+    client->control->timed_out = 0;
+
+    if( jack_uuid_empty( uuid ) ) {
+	client->control->uuid = jack_client_uuid_generate();
+    } else {
+	jack_uuid_t * jud = (jack_uuid_t*)(&client->control->uuid);
+	jack_uuid_copy( jud, uuid );
+    }
+
+    strcpy( (char *)client->control->name, name );
+    client->subgraph_start_fd = -1;
+    client->subgraph_wait_fd = -1;
+
+    client->session_reply_pending = FALSE;
+
+    client->control->process_cbset = FALSE;
+    client->control->bufsize_cbset = FALSE;
+    client->control->srate_cbset = FALSE;
+    client->control->xrun_cbset = FALSE;
+    client->control->port_register_cbset = FALSE;
+    client->control->port_connect_cbset = FALSE;
+    client->control->graph_order_cbset = FALSE;
+    client->control->client_register_cbset = FALSE;
+    client->control->thread_cb_cbset = FALSE;
+    client->control->session_cbset = FALSE;
+    client->control->property_cbset = FALSE;
+    client->control->latency_cbset = FALSE;
+
+#if 0
+    if( type != ClientExternal ) {
+	client->process = NULL;
+	client->process_arg = NULL;
+	client->bufsize = NULL;
+	client->bufsize_arg = NULL;
+	client->srate = NULL;
+	client->srate_arg = NULL;
+	client->xrun = NULL;
+	client->xrun_arg = NULL;
+	client->port_register = NULL;
+	client->port_register_arg = NULL;
+	client->port_connect = NULL;
+	client->port_connect_arg = NULL;
+	client->graph_order = NULL;
+	client->graph_order_arg = NULL;
+	client->client_register = NULL;
+	client->client_register_arg = NULL;
+	client->thread_cb = NULL;
+	client->thread_cb_arg = NULL;
+    }
+#endif
+    jack_transport_client_new( client );
+
+    return client;
+}
+
+int engine::load_client_( jack_client_internal_t *client,
+			  const char *so_name )
+{
+    const char *errstr;
+
+    if( !so_name ) {
+	return -1;
+    }
+
+    stringstream ss( stringstream::out );
+    if( so_name[0] == '/' ) {
+	/* Absolute, use as-is, user beware ... */
+	ss << so_name << ".so";
+    } else {
+	ss << jack::addon_dir << '/' << so_name << ".so";
+    }
+
+    string path_to_so( ss.str() );
+    const char * path_to_so_cstr = path_to_so.c_str();
+
+    client->handle = dlopen( path_to_so_cstr, RTLD_NOW|RTLD_GLOBAL );
+
+    if( client->handle == 0 ) {
+	if( (errstr = dlerror()) != 0 ) {
+	    jack_error( "%s", errstr );
+	} else {
+	    jack_error( "bizarre error loading %s", so_name );
+	}
+	return -1;
+    }
+
+    client->initialize =
+	(int (*)(jack_client_t*,const char*))dlsym( client->handle, "jack_initialize" );
+
+    if( (errstr = dlerror()) != 0 ) {
+	jack_error( "%s has no initialize() function\n", so_name );
+	dlclose( client->handle );
+	client->handle = 0;
+	return -1;
+    }
+
+    client->finish =
+	(void (*)(void *)) dlsym( client->handle, "jack_finish" );
+
+    if( (errstr = dlerror ()) != 0 ) {
+	jack_error( "%s has no finish() function", so_name );
+	dlclose( client->handle );
+	client->handle = 0;
+	return -1;
+    }
+
+    return 0;
+}
+
+/*
+ * Build the jack_client_t structure for an internal client.
+ */
+jack_client_t * engine::internal_client_alloc( jack_client_control_t *cc )
+{
+    jack_client_t* client;
+
+    client = jack_client_alloc();
+
+    client->control = cc;
+    client->engine = control;
+
+    client->n_port_types = client->engine->n_port_types;
+    client->port_segment = &port_segment[0];
+
+    return client;
+}
+
+jack_client_internal_t * engine::client_by_name( const char *name )
+{
+    jack_client_internal_t *client = NULL;
+
+    jack_rdlock_graph( this );
+
+    auto cFinder = std::find_if( clients.begin(),
+				 clients.end(),
+				 [&name] ( jack_client_internal_t * client ) {
+				     return strcmp( (const char *)client->control->name,
+						    name ) == 0;
+				 } );
+
+    if( cFinder != clients.end() ) {
+	client = *cFinder;
+    }
+
+    jack_unlock_graph( this );
+    return client;
+}
+
+int engine::client_name_reserved( const char *name )
+{
+    auto cnFinder = std::find_if( reserved_client_names.begin(),
+				  reserved_client_names.end(),
+				  [&name] ( jack_reserved_name_t * res ) {
+				      return strcmp( res->name, name ) == 0;
+				  } );
+
+    if( cnFinder != reserved_client_names.end() ) {
+	return 1;
+    }
+    else {
+	return 0;
+    }
+}
+
+/* generate a unique client name
+ *
+ * returns 0 if successful, updates name in place
+ */
+int engine::generate_unique_name( char *name )
+{
+    int tens, ones;
+    int length = strlen( name );
+
+    if( length > JACK_CLIENT_NAME_SIZE - 4 ) {
+	jack_error( "%s exists and is too long to make unique", name );
+	return 1;		/* failure */
+    }
+
+    /*  generate a unique name by appending "-01".."-99" */
+    name[length++] = '-';
+    tens = length++;
+    ones = length++;
+    name[tens] = '0';
+    name[ones] = '1';
+    name[length] = '\0';
+    while( client_by_name( name ) || client_name_reserved( name ) ) {
+	if( name[ones] == '9' ) {
+	    if( name[tens] == '9' ) {
+		jack_error( "client %s has 99 extra"
+			    " instances already", name );
+		return 1; /* give up */
+	    }
+	    name[tens]++;
+	    name[ones] = '0';
+	} else {
+	    name[ones]++;
+	}
+    }
+    return 0;
 }
 
 }
