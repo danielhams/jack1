@@ -22,6 +22,7 @@
 #define __jack_transengine_h__
 
 #include "internal.hpp"
+#include "engine.hpp"
 
 #ifdef __cplusplus
 extern "C" {
@@ -43,5 +44,13 @@ int	jack_transport_set_sync_timeout( jack_engine_t * engine, jack_time_t usecs )
 /* Close of extern "C" { */
 }
 #endif
+
+int	jack_timebase_reset_pp( jack::engine * engine, jack_uuid_t client_id );
+int	jack_timebase_set_pp( jack::engine * engine, jack_uuid_t client_id, int conditional );
+void	jack_transport_activate_pp( jack::engine * engine, jack_client_internal_t *client );
+int	jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t client_id );
+int	jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client_id );
+int	jack_transport_set_sync_timeout_pp( jack::engine * engine, jack_time_t usecs );
+void	jack_transport_cycle_end_pp( jack::engine * engine );
 
 #endif

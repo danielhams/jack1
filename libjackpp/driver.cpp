@@ -29,6 +29,10 @@
 #include <stdio.h>
 #include <errno.h>
 
+// For the engine::driver_exit kill
+#include <sys/types.h>
+#include <signal.h>
+
 #include <jack/thread.h>
 
 #include "internal.hpp"
@@ -40,7 +44,9 @@
 #endif /* USE_MLOCK */
 
 static int dummy_attach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
+static int dummy_attach_pp (jack_driver_t *drv, jack::engine *eng) { return 0; }
 static int dummy_detach (jack_driver_t *drv, jack_engine_t *eng) { return 0; }
+static int dummy_detach_pp (jack_driver_t *drv, jack::engine *eng) { return 0; }
 static int dummy_write (jack_driver_t *drv,
 			jack_nframes_t nframes) { return 0; }
 static int dummy_read (jack_driver_t *drv, jack_nframes_t nframes) { return 0; }
@@ -57,7 +63,9 @@ jack_driver_init (jack_driver_t *driver)
 	memset (driver, 0, sizeof (*driver));
 
 	driver->attach = dummy_attach;
+	driver->attach_pp = dummy_attach_pp;
 	driver->detach = dummy_detach;
+	driver->detach_pp = dummy_detach_pp;
 	driver->write = dummy_write;
 	driver->read = dummy_read;
 	driver->null_cycle = dummy_null_cycle;
@@ -93,6 +101,13 @@ jack_driver_nt_attach (jack_driver_nt_t * driver, jack_engine_t * engine)
 }
 
 static int
+jack_driver_nt_attach_pp( jack_driver_nt_t * driver, jack::engine * engine )
+{
+    driver->engine_pp = engine;
+    return driver->nt_attach_pp( driver );
+}
+
+static int
 jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
 {
 	int ret;
@@ -101,6 +116,17 @@ jack_driver_nt_detach (jack_driver_nt_t * driver, jack_engine_t * engine)
 	driver->engine = NULL;
 
 	return ret;
+}
+
+static int
+jack_driver_nt_detach_pp( jack_driver_nt_t * driver, jack::engine * engine )
+{
+    int ret;
+
+    ret = driver->nt_detach_pp( driver );
+    driver->engine = nullptr;
+
+    return ret;
 }
 
 static void *
@@ -139,6 +165,42 @@ jack_driver_nt_thread (void * arg)
 	pthread_exit (NULL);
 }
 
+static void *
+jack_driver_nt_thread_pp( void * arg )
+{
+    jack_driver_nt_t * driver = (jack_driver_nt_t *) arg;
+    int rc = 0;
+    int run;
+
+    /* This thread may start running before pthread_create()
+     * actually stores the driver->nt_thread value.  It's safer to
+     * store it here as well. 
+     */
+    driver->nt_thread = pthread_self();
+
+    pthread_mutex_lock( &driver->nt_run_lock );
+
+    while( (run = driver->nt_run) == DRIVER_NT_RUN ) {
+	pthread_mutex_unlock( &driver->nt_run_lock );
+
+	if( (rc = driver->nt_run_cycle_pp(driver)) != 0 ) {
+	    jack_error( "DRIVER NT: could not run driver cycle" );
+	    goto out;
+	}
+
+	pthread_mutex_lock( &driver->nt_run_lock );
+    }
+
+    pthread_mutex_unlock( &driver->nt_run_lock );
+
+  out:
+    if( rc ) {
+	driver->nt_run = DRIVER_NT_DYING;
+	driver->engine_pp->driver_exit();
+    }
+    pthread_exit( nullptr );
+}
+
 static int
 jack_driver_nt_start (jack_driver_nt_t * driver)
 {
@@ -153,8 +215,8 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 
 	if ((err = jack_client_create_thread (NULL,
 					      &driver->nt_thread, 
-					      driver->engine->rtpriority,
-					      driver->engine->control->real_time,
+					      driver->engine_pp->rtpriority,
+					      driver->engine_pp->control->real_time,
 					      jack_driver_nt_thread, driver)) != 0) {
 		jack_error ("DRIVER NT: could not start driver thread!");
 		return err;
@@ -173,6 +235,42 @@ jack_driver_nt_start (jack_driver_nt_t * driver)
 	pthread_mutex_unlock (&driver->nt_run_lock);
 
 	return 0;
+}
+
+static int
+jack_driver_nt_start_pp( jack_driver_nt_t * driver )
+{
+    int err;
+
+    /* stop the new thread from really starting until the driver has
+       been started.
+    */
+ 
+    pthread_mutex_lock( &driver->nt_run_lock );
+    driver->nt_run = DRIVER_NT_RUN;
+
+    if( (err = jack_client_create_thread( nullptr,
+					  &driver->nt_thread, 
+					  driver->engine_pp->rtpriority,
+					  driver->engine_pp->control->real_time,
+					  jack_driver_nt_thread_pp, driver) ) != 0) {
+	jack_error( "DRIVER NT: could not start driver thread!" );
+	return err;
+    }
+
+    if( (err = driver->nt_start(driver)) != 0 ) {
+	/* make the thread run and exit immediately */
+	driver->nt_run = DRIVER_NT_EXIT;
+	pthread_mutex_unlock( &driver->nt_run_lock );
+	jack_error( "DRIVER NT: could not start driver" );
+	return err;
+    }
+
+    /* let the thread run, since the underlying "device" has now been started */
+
+    pthread_mutex_unlock( &driver->nt_run_lock );
+
+    return 0;
 }
 
 static int
@@ -241,10 +339,13 @@ jack_driver_nt_init (jack_driver_nt_t * driver)
 	jack_driver_init ((jack_driver_t *) driver);
 
 	driver->attach       = (JackDriverAttachFunction)    jack_driver_nt_attach;
+	driver->attach_pp       = (JackDriverAttachFunctionPP)    jack_driver_nt_attach_pp;
 	driver->detach       = (JackDriverDetachFunction)    jack_driver_nt_detach;
+	driver->detach_pp       = (JackDriverDetachFunctionPP)    jack_driver_nt_detach_pp;
 	driver->bufsize      = (JackDriverBufSizeFunction)   jack_driver_nt_bufsize;
 	driver->stop         = (JackDriverStopFunction)      jack_driver_nt_stop;
-	driver->start        = (JackDriverStartFunction)     jack_driver_nt_start;
+	driver->start        = (JackDriverStartFunction)     jack_driver_nt_start_pp;
+	driver->start_pp     = (JackDriverStartFunctionPP)   jack_driver_nt_start_pp;
 
 	driver->nt_bufsize   = (JackDriverNTBufSizeFunction) dummy_bufsize;
 	driver->nt_start     = (JackDriverNTStartFunction)   dummy_start;
@@ -261,4 +362,22 @@ void
 jack_driver_nt_finish     (jack_driver_nt_t * driver)
 {
 	pthread_mutex_destroy (&driver->nt_run_lock);
+}
+
+namespace jack
+{
+
+void engine::driver_exit()
+{
+    VERBOSE( this, "stopping driver");
+    driver->stop( driver );
+    VERBOSE( this, "detaching driver");
+    driver->detach_pp( driver, this );
+
+    /* tell anyone waiting that the driver exited. */
+    kill( wait_pid, SIGUSR2 );
+	
+    driver = nullptr;
+}
+
 }

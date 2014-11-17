@@ -219,7 +219,7 @@ int jack_client_deliver_request (const jack_client_t *client, jack_request_t *re
 	 * the server.
 	 */
 
-	return client->deliver_request (client->deliver_arg, req);
+	return client->deliver_request( client->deliver_arg, req );
 }
 
 jack_client_t * jack_client_alloc ()

@@ -575,10 +575,10 @@ alsa_driver_configure_stream( alsa_driver_t *driver,
 }
 
 static int 
-alsa_driver_set_parameters (alsa_driver_t *driver,
+alsa_driver_set_parameters( alsa_driver_t *driver,
 			    jack_nframes_t frames_per_cycle,
 			    jack_nframes_t user_nperiods,
-			    jack_nframes_t rate)
+			    jack_nframes_t rate )
 {
 	int dir;
 	snd_pcm_uframes_t p_period_size = 0;
@@ -861,9 +861,8 @@ alsa_driver_set_parameters (alsa_driver_t *driver,
 				      driver->frame_rate) * 1000000.0f);
 	driver->poll_timeout = (int) floor (1.5f * driver->period_usecs);
 
-	if (driver->engine) {
-		if (driver->engine->set_buffer_size (driver->engine,
-						     driver->frames_per_cycle)) {
+	if( driver->engine_pp ) {
+	    if( driver->engine_pp->driver_set_buffer_size( driver->frames_per_cycle) ) {
 			jack_error ("ALSA: Cannot set engine buffer size to %d", driver->frames_per_cycle);
 			goto errout;
 		}
@@ -1081,7 +1080,7 @@ alsa_driver_stop (alsa_driver_t *driver)
 
 	for( jack_port_t * port : driver->capture_ports_vector ) {
 		char* buf;
-		jack_nframes_t nframes = driver->engine->control->buffer_size;
+		jack_nframes_t nframes = driver->engine_pp->control->buffer_size;
 		buf = (char*)jack_port_get_buffer (port, nframes);
 		memset (buf, 0, sizeof (jack_default_audio_sample_t) * nframes);
 	}
@@ -1274,7 +1273,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			nfds++;
 		}
 
-		poll_enter = driver->engine->get_microseconds ();
+		poll_enter = driver->engine_pp->get_microseconds_c();
 
 		if (poll_enter > driver->poll_next) {
 			/*
@@ -1308,7 +1307,7 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			
 		}
 
-		poll_ret = driver->engine->get_microseconds ();
+		poll_ret = driver->engine_pp->get_microseconds_c();
 
 		if (extra_fd < 0) {
 			if (driver->poll_next && poll_ret > driver->poll_next) {
@@ -1316,8 +1315,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			} 
 			driver->poll_last = poll_ret;
 			driver->poll_next = poll_ret + driver->period_usecs;
-			driver->engine->transport_cycle_start (driver->engine, 
-							       poll_ret);
+			driver->engine_pp->transport_cycle_start_c( driver->engine_pp,
+								    poll_ret);
 		}
 
 #ifdef DEBUG_WAKEUP
@@ -1539,7 +1538,7 @@ alsa_driver_read (alsa_driver_t *driver, jack_nframes_t nframes)
 		return -1;
 	}
 	
-	if (driver->engine->freewheeling) {
+	if (driver->engine_pp->freewheeling) {
 		return 0;
 	}
 
@@ -1607,7 +1606,7 @@ alsa_driver_write (alsa_driver_t* driver, jack_nframes_t nframes)
 
 	driver->process_count++;
 
-	if (!driver->playback_handle || driver->engine->freewheeling) {
+	if (!driver->playback_handle || driver->engine_pp->freewheeling) {
 		return 0;
 	}
 	if (nframes > driver->frames_per_cycle) {
@@ -1731,6 +1730,37 @@ alsa_driver_run_cycle (alsa_driver_t *driver)
 	return engine->run_cycle (engine, nframes, delayed_usecs);
 }
 
+static inline int
+alsa_driver_run_cycle_pp( alsa_driver_t *driver )
+{
+    jack::engine * engine_ptr = driver->engine_pp;
+
+    int wait_status;
+    float delayed_usecs;
+    jack_nframes_t nframes;
+
+    DEBUG( "alsa run cycle wait\n" );
+
+    nframes = alsa_driver_wait( driver, -1, &wait_status, &delayed_usecs );
+
+    DEBUG( "alsaback from wait, nframes = %lu", nframes );
+
+    if( unlikely(wait_status < 0) ) {
+	return -1;		/* driver failed */
+    }
+
+    if( unlikely(nframes == 0) ) {
+
+	/* we detected an xrun and restarted: notify
+	 * clients about the delay. 
+	 */
+	engine_ptr->delay_c( engine_ptr, delayed_usecs );
+	return 0;
+    } 
+
+    return engine_ptr->run_cycle_c( engine_ptr, nframes, delayed_usecs );
+}
+
 static void
 alsa_driver_latency_callback (jack_latency_callback_mode_t mode, void* arg)
 {
@@ -1758,11 +1788,11 @@ alsa_driver_attach (alsa_driver_t *driver)
 	int port_flags;
 	jack_latency_range_t range;
 
-	if (driver->engine->set_buffer_size (driver->engine, driver->frames_per_cycle)) {
+	if (driver->engine_pp->driver_set_buffer_size( driver->frames_per_cycle)) {
 		jack_error ("ALSA: cannot set engine buffer size for %d (check MIDI)", driver->frames_per_cycle);
 		return -1;
 	}
-	driver->engine->set_sample_rate (driver->engine, driver->frame_rate);
+	driver->engine_pp->set_sample_rate_c( driver->engine_pp, driver->frame_rate);
 
 	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
 
@@ -1831,6 +1861,85 @@ alsa_driver_attach (alsa_driver_t *driver)
 }
 
 static int
+alsa_driver_attach_pp( alsa_driver_t *driver )
+{
+    char buf[32];
+    channel_t chn;
+    jack_port_t *port;
+    int port_flags;
+    jack_latency_range_t range;
+
+    if( driver->engine_pp->driver_set_buffer_size( driver->frames_per_cycle ) ) {
+	jack_error( "ALSA: cannot set engine buffer size for %d (check MIDI)", driver->frames_per_cycle );
+	return -1;
+    }
+    driver->engine_pp->set_sample_rate( driver->frame_rate );
+
+    port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
+
+    if( driver->has_hw_monitoring ) {
+	port_flags |= JackPortCanMonitor;
+    }
+
+    for( chn = 0; chn < driver->capture_nchannels; chn++ ) {
+
+	snprintf (buf, sizeof(buf), "capture_%lu", chn+1);
+
+	if( (port = jack_port_register( driver->client, buf,
+					JACK_DEFAULT_AUDIO_TYPE,
+					port_flags, 0)) == nullptr ) {
+	    jack_error( "ALSA: cannot register port for %s", buf );
+	    break;
+	}
+
+	range.min = range.max = driver->frames_per_cycle + driver->capture_frame_latency;
+	jack_port_set_latency_range( port, JackCaptureLatency, &range );
+
+	driver->capture_ports_vector.push_back( port );
+    }
+
+    port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
+
+    for( chn = 0; chn < driver->playback_nchannels; chn++ ) {
+	jack_port_t *monitor_port;
+
+	snprintf( buf, sizeof(buf) - 1, "playback_%lu", chn+1 );
+
+	if( (port = jack_port_register( driver->client, buf,
+					JACK_DEFAULT_AUDIO_TYPE,
+					port_flags, 0)) == nullptr ) {
+	    jack_error( "ALSA: cannot register port for %s", buf );
+	    break;
+	}
+		
+	range.min = range.max = (driver->frames_per_cycle * (driver->user_nperiods - 1)) + driver->playback_frame_latency;
+	jack_port_set_latency_range( port, JackPlaybackLatency, &range );
+
+	driver->playback_ports_vector.push_back( port );
+
+	if( driver->with_monitor_ports ) {
+	    snprintf( buf, sizeof(buf) - 1, "monitor_%lu", chn+1 );
+			
+	    if( (monitor_port = jack_port_register(
+		     driver->client, buf,
+		     JACK_DEFAULT_AUDIO_TYPE,
+		     JackPortIsOutput, 0)) == nullptr ) {
+		jack_error( "ALSA: cannot register monitor "
+			    "port for %s", buf );
+	    }
+	    else {
+		range.min = range.max = driver->frames_per_cycle;
+		jack_port_set_latency_range( port, JackCaptureLatency, &range );
+				
+		driver->monitor_ports_vector.push_back( monitor_port );
+	    }
+	}
+    }
+
+    return jack_activate( driver->client );
+}
+
+static int
 alsa_driver_detach (alsa_driver_t *driver)
 {
 	if (driver->engine == NULL) {
@@ -1858,7 +1967,37 @@ alsa_driver_detach (alsa_driver_t *driver)
 	}
 
 	return 0;
- }
+}
+
+static int
+alsa_driver_detach_pp( alsa_driver_t *driver )
+{
+    if( driver->engine_pp == nullptr ) {
+	return 0;
+    }
+
+    for( jack_port_t * port : driver->capture_ports_vector ) {
+	jack_port_unregister( driver->client, port );
+    }
+
+    driver->capture_ports_vector.clear();
+
+    for( jack_port_t * port : driver->playback_ports_vector ) {
+	jack_port_unregister( driver->client, port );
+    }
+
+    driver->playback_ports_vector.clear();
+
+    if( driver->monitor_ports_vector.size() > 0 ) {
+	for( jack_port_t * port : driver->monitor_ports_vector ) {
+	    jack_port_unregister( driver->client, port );
+	}
+
+	driver->monitor_ports_vector.clear();
+    }
+
+    return 0;
+}
 
  #if 0
  static int  /* UNUSED */
@@ -2119,15 +2258,19 @@ alsa_driver_detach (alsa_driver_t *driver)
 	jack_driver_nt_init ((jack_driver_nt_t *) driver);
 
 	driver->nt_attach = (JackDriverNTAttachFunction) alsa_driver_attach;
+	driver->nt_attach_pp = (JackDriverNTAttachFunctionPP) alsa_driver_attach_pp;
         driver->nt_detach = (JackDriverNTDetachFunction) alsa_driver_detach;
+        driver->nt_detach_pp = (JackDriverNTDetachFunctionPP) alsa_driver_detach_pp;
 	driver->read = (JackDriverReadFunction) alsa_driver_read;
 	driver->write = (JackDriverReadFunction) alsa_driver_write;
 	driver->null_cycle =
 		(JackDriverNullCycleFunction) alsa_driver_null_cycle;
 	driver->nt_bufsize = (JackDriverNTBufSizeFunction) alsa_driver_bufsize;
 	driver->nt_start = (JackDriverNTStartFunction) alsa_driver_start;
+	driver->nt_start_pp = (JackDriverNTStartFunctionPP) alsa_driver_start;
 	driver->nt_stop = (JackDriverNTStopFunction) alsa_driver_stop;
 	driver->nt_run_cycle = (JackDriverNTRunCycleFunction) alsa_driver_run_cycle;
+	driver->nt_run_cycle_pp = (JackDriverNTRunCycleFunctionPP) alsa_driver_run_cycle_pp;
 
 	driver->playback_handle = NULL;
 	driver->capture_handle = NULL;

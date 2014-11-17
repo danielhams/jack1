@@ -50,11 +50,19 @@ typedef struct {
 
 struct _jack_engine;
 struct _jack_driver;
+namespace jack
+{
+class engine;
+};
 
 typedef int       (*JackDriverAttachFunction)(struct _jack_driver *,
 					      struct _jack_engine *);
+typedef int       (*JackDriverAttachFunctionPP)(struct _jack_driver *,
+						jack::engine *);
 typedef int       (*JackDriverDetachFunction)(struct _jack_driver *,
 					      struct _jack_engine *);
+typedef int       (*JackDriverDetachFunctionPP)(struct _jack_driver *,
+					      jack::engine *);
 typedef int       (*JackDriverReadFunction)(struct _jack_driver *,
 					    jack_nframes_t nframes);
 typedef int       (*JackDriverWriteFunction)(struct _jack_driver *,
@@ -63,6 +71,7 @@ typedef int       (*JackDriverNullCycleFunction)(struct _jack_driver *,
 						 jack_nframes_t nframes);
 typedef int       (*JackDriverStopFunction)(struct _jack_driver *);
 typedef int       (*JackDriverStartFunction)(struct _jack_driver *);
+typedef int       (*JackDriverStartFunctionPP)(struct _jack_driver *);
 typedef int	  (*JackDriverBufSizeFunction)(struct _jack_driver *,
 					       jack_nframes_t nframes);
 /* 
@@ -220,12 +229,15 @@ typedef struct _jack_driver {
     struct _jack_client_internal * internal_client; \
     void (*finish)(struct _jack_driver *);\
     JackDriverAttachFunction attach; \
+    JackDriverAttachFunctionPP attach_pp; \
     JackDriverDetachFunction detach; \
+    JackDriverDetachFunctionPP detach_pp; \
     JackDriverReadFunction read; \
     JackDriverWriteFunction write; \
     JackDriverNullCycleFunction null_cycle; \
     JackDriverStopFunction stop; \
     JackDriverStartFunction start; \
+    JackDriverStartFunctionPP start_pp; \
     JackDriverBufSizeFunction bufsize;
 
     JACK_DRIVER_DECL			/* expand the macro */
@@ -272,27 +284,36 @@ void jack_driver_unload (jack_driver_t *);
 struct _jack_driver_nt;
 
 typedef int       (*JackDriverNTAttachFunction)(struct _jack_driver_nt *);
+typedef int       (*JackDriverNTAttachFunctionPP)(struct _jack_driver_nt *);
 typedef int       (*JackDriverNTDetachFunction)(struct _jack_driver_nt *);
+typedef int       (*JackDriverNTDetachFunctionPP)(struct _jack_driver_nt *);
 typedef int       (*JackDriverNTStopFunction)(struct _jack_driver_nt *);
 typedef int       (*JackDriverNTStartFunction)(struct _jack_driver_nt *);
+typedef int       (*JackDriverNTStartFunctionPP)(struct _jack_driver_nt *);
 typedef int	  (*JackDriverNTBufSizeFunction)(struct _jack_driver_nt *,
 					       jack_nframes_t nframes);
 typedef int       (*JackDriverNTRunCycleFunction)(struct _jack_driver_nt *);
+typedef int       (*JackDriverNTRunCycleFunctionPP)(struct _jack_driver_nt *);
 
 typedef struct _jack_driver_nt {
 
 #define JACK_DRIVER_NT_DECL \
     JACK_DRIVER_DECL \
     struct _jack_engine * engine; \
+    jack::engine * engine_pp; \
     volatile int nt_run; \
     pthread_t nt_thread; \
     pthread_mutex_t nt_run_lock; \
     JackDriverNTAttachFunction nt_attach; \
+    JackDriverNTAttachFunction nt_attach_pp; \
     JackDriverNTDetachFunction nt_detach; \
+    JackDriverNTDetachFunction nt_detach_pp; \
     JackDriverNTStopFunction nt_stop; \
     JackDriverNTStartFunction nt_start; \
+    JackDriverNTStartFunctionPP nt_start_pp; \
     JackDriverNTBufSizeFunction nt_bufsize; \
-    JackDriverNTRunCycleFunction nt_run_cycle;
+    JackDriverNTRunCycleFunction nt_run_cycle; \
+    JackDriverNTRunCycleFunction nt_run_cycle_pp;
 #define nt_read read
 #define nt_write write
 #define nt_null_cycle null_cycle

@@ -20,6 +20,8 @@
 
 */
 
+#define USE_CPP_MAINLOOP 1
+
 // Needed to get PRId32 formatters
 #define __STDC_FORMAT_MACROS
 
@@ -555,10 +557,17 @@ int main (int argc, char *argv[])
     cleanup_files( parsed_options.server_name );
 
     /* run the server engine until it terminates */
+#ifdef USE_CPP_MAINLOOP
+    main_loop_pp( parsed_options,
+		  drivers,
+		  desc,
+		  driver_params_jsl );
+#else
     main_loop( parsed_options,
 	       drivers,
 	       desc,
 	       driver_params_jsl );
+#endif
 
     /* clean up shared memory and files from this server instance */
     if( parsed_options.verbose )
