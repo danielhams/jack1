@@ -5,7 +5,7 @@ MAINTAINCLEANFILES = Makefile.in
 AM_CFLAGS = $(JACK_CFLAGS) 
 AM_CXXFLAGS = $(JACK_CPPFLAGS) 
 
-plugindir = $(ADDONPP_DIR)
+plugindir = $(ADDON_DIR)
 
 plugin_LTLIBRARIES = jack_net.la
 
@@ -18,7 +18,7 @@ jack_net_la_SOURCES = \
 	netjack.cpp \
 	$(NULL)
 
-jack_net_la_LIBADD = $(top_builddir)/libjackpp/libjackpp.la
+jack_net_la_LIBADD = $(top_builddir)/libjack/libjack.la
 
 noinst_HEADERS = \
 	netjack.hpp \

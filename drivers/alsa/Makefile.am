@@ -5,7 +5,7 @@ MAINTAINERCLEANFILES=Makefile.in
 AM_CFLAGS = $(JACK_CFLAGS)
 AM_CXXFLAGS = $(JACK_CPPFLAGS)
 
-plugindir = $(ADDONPP_DIR)
+plugindir = $(ADDON_DIR)
 
 plugin_LTLIBRARIES = jack_alsa.la
 
@@ -30,4 +30,4 @@ noinst_HEADERS = \
 	$(NULL)
 
 #jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackdpp/libjackserverpp.la $(top_builddir)/libjackpp/libjackpp.la
-jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackdpp/libjackserverpp.la
+jack_alsa_la_LIBADD = $(ALSA_LIBS) $(top_builddir)/jackdpp/libjackserver.la

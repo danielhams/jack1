@@ -36,16 +36,16 @@ SOURCE_FILES = \
 simd.lo: $(srcdir)/simd.cpp
 	$(LIBTOOL) --mode=compile $(CXX) -I$(top_builddir) $(JACK_CORE_CPPFLAGS) $(SIMD_CFLAGS) -c -o simd.lo $(srcdir)/simd.cpp
 
-lib_LTLIBRARIES	= libjackpp.la
+lib_LTLIBRARIES	= libjack.la
 
 noinst_HEADERS	= local.hpp
 
 AM_CFLAGS = $(JACK_CFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 AM_CXXFLAGS = $(JACK_CPPFLAGS) -DJACK_LOCATION=\"$(bindir)\"
 
-libjackpp_la_CFLAGS = $(AM_CFLAGS)
-libjackpp_la_CXXFLAGS = $(AM_CXXFLAGS)
+libjack_la_CFLAGS = $(AM_CFLAGS)
+libjack_la_CXXFLAGS = $(AM_CXXFLAGS)
 
-libjackpp_la_SOURCES = $(SOURCE_FILES)
-libjackpp_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@
-libjackpp_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@
+libjack_la_SOURCES = $(SOURCE_FILES)
+libjack_la_LIBADD  = simd.lo -ldb @OS_LDFLAGS@
+libjack_la_LDFLAGS  = -export-dynamic -version-info @JACK_SO_VERSION@

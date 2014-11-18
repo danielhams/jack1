@@ -3,7 +3,7 @@ MAINTAINERCLEANFILES=Makefile.in
 AM_CFLAGS = $(JACK_CFLAGS)
 AM_CXXFLAGS = $(JACK_CPPFLAGS)
 
-plugindir = $(ADDONPP_DIR)
+plugindir = $(ADDON_DIR)
 
 plugin_LTLIBRARIES = jack_alsa_midi.la
 

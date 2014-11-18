@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl $Id$
 
-AC_INIT(jackdpp/jackdpp.cpp)
+AC_INIT(jackd/jackd.cpp)
 
 
 dnl
@@ -636,13 +636,9 @@ AC_ARG_ENABLE(stripped-jackd,
 # D Hams - added a second parallel add on directory for the cpp version
 
 ADDON_DIR='${libdir}/jack'
-ADDONPP_DIR='${libdir}/jackpp'
 AC_SUBST(ADDON_DIR)
-AC_SUBST(ADDONPP_DIR)
 AS_AC_EXPAND(ADDON_DIR_EXPANDED,${libdir}/jack)
-AS_AC_EXPAND(ADDONPP_DIR_EXPANDED,${libdir}/jackpp)
 AC_DEFINE_UNQUOTED(ADDON_DIR,"$ADDON_DIR_EXPANDED",[Directory for plugins])
-AC_DEFINE_UNQUOTED(ADDONPP_DIR,"$ADDONPP_DIR_EXPANDED",[Directory for plugins pp])
 
 AC_ARG_WITH(html-dir,
 		AC_HELP_STRING([--with-html-dir=PATH],[where to install the html documentation]))
@@ -880,22 +876,22 @@ config/os/macosx/Makefile
 config/sysdeps/Makefile
 doc/Makefile
 doc/reference.doxygen
-driverspp/Makefile
-driverspp/alsa/Makefile
-driverspp/alsa_midi/Makefile
-driverspp/dummy/Makefile
-driverspp/netjack/Makefile
+drivers/Makefile
+drivers/alsa/Makefile
+drivers/alsa_midi/Makefile
+drivers/dummy/Makefile
+drivers/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
-tools/zalsapp/Makefile
+tools/zalsa/Makefile
 man/Makefile
 jack.pc
 jack.spec
-jackdpp/Makefile
-jackdpp/jackdpp.1
-includecpp/version.hpp
-includecpp/Makefile
-libjackpp/Makefile
+jackd/Makefile
+jackd/jackd.1
+include/version.hpp
+include/Makefile
+libjack/Makefile
 python/Makefile
 )
 

@@ -15,14 +15,14 @@ endif
 
 # SUBDIRS =      libjack libjackpp jackd jackdpp drivers driverspp example-clients tools config $(DOC_DIR) man python
 # DIST_SUBDIRS = config libjack libjackpp jackd jackdpp include includecpp drivers driverspp example-clients tools doc man python
-SUBDIRS =      libjackpp jackdpp driverspp example-clients tools config $(DOC_DIR) man python
-DIST_SUBDIRS = config libjackpp jackdpp includecpp driverspp example-clients tools doc man python
+SUBDIRS =      libjack jackd drivers example-clients tools config $(DOC_DIR) man python
+DIST_SUBDIRS = config libjack jackd include drivers example-clients tools doc man python
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = jack.pc
 
 #EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c libjackpp/simd.c jack.spec
-EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjackpp/simd.c jack.spec
+EXTRA_DIST = COPYING COPYING.GPL COPYING.LGPL libjack/simd.c jack.spec
 
 AUTOMAKE_OPTIONS = foreign
 

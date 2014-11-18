@@ -9,7 +9,7 @@ MAINTAINERCLEANFILES    = Makefile.in
 AM_CFLAGS = $(JACK_CFLAGS)
 AM_CXXFLAGS = $(JACK_CPPFLAGS)
 
-driverdir = $(ADDONPP_DIR)
+driverdir = $(ADDON_DIR)
 
 driver_LTLIBRARIES = jack_alsa_midi.la
 
