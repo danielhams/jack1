@@ -16,10 +16,10 @@ noinst_HEADERS =		\
 	messagebuffer.hpp	\
 	pool.hpp		\
 	port.hpp		\
-	sanitycheck.hpp         \
+	sanitycheck.h           \
 	shm.hpp			\
 	start.hpp		\
-	systemtest.hpp          \
+	systemtest.h            \
 	unlock.hpp		\
 	varargs.hpp		\
 	version.hpp		\

@@ -1,4 +1,3 @@
-/* -*- mode: c; c-file-style: "linux"; -*- */
 /*
 NetJack Driver
 
@@ -41,13 +40,12 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include <sys/mman.h>
 
 #include <jack/types.h>
-#include "engine.h"
+#include "engine.hpp"
 #include <sysdeps/time.h>
 
 #include <sys/types.h>
 
 #include "config.h"
-
 
 #include "netjack.hpp"
 #include "netjack_packet.hpp"

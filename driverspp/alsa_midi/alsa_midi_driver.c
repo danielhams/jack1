@@ -1,5 +1,5 @@
 
-#include "alsa_midi.h"
+#include "alsa_midi.hpp"
 #include <string.h>
 
 static int

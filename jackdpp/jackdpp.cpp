@@ -66,7 +66,7 @@
 #include "messagebuffer.hpp"
 #include "engine.hpp"
 #include "clientengine.hpp"
-#include "sanitycheck.hpp"
+#include "sanitycheck.h"
 #include "jack_constants.hpp"
 
 #include "jack_options_parser.hpp"

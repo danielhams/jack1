@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl $Id$
 
-AC_INIT(jackd/jackd.c)
+AC_INIT(jackdpp/jackdpp.cpp)
 
 
 dnl
@@ -302,7 +302,7 @@ AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
--I\$(top_srcdir) -I\$(top_srcdir)/include \ 
+-I\$(top_srcdir) -I\$(top_srcdir)/includecpp \ 
 -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_CORE_CPPFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
@@ -788,96 +788,6 @@ AC_SUBST(NETJACK_CFLAGS)
 
 JACK_DEFAULT_DRIVER=\"dummy\"
 
-AC_ARG_ENABLE(portaudio,
-	AC_HELP_STRING([--enable-portaudio],[build PortAudio driver]),
-   TRY_PORTAUDIO=$enableval , TRY_PORTAUDIO=no)
-
-HAVE_PA="false"
-if test "x$TRY_PORTAUDIO" = "xyes"
-then
-	# check for portaudio V18
-	AC_CHECK_LIB(portaudio, Pa_Initialize,
-		[ AC_CHECK_HEADERS(portaudio.h,
-			[ HAVE_PA="true"
-			  PA_LIBS=-lportaudio
-			  JACK_DEFAULT_DRIVER=\"portaudio\"
-			])
-		])
-	AC_SUBST(PA_LIBS)
-fi
-AM_CONDITIONAL(HAVE_PA, $HAVE_PA)
-
-AC_ARG_ENABLE(coreaudio, AC_HELP_STRING([--disable-coreaudio], [ignore CoreAudio driver]),
-			TRY_COREAUDIO=$enableval , TRY_COREAUDIO=yes )
-HAVE_COREAUDIO="false"
-if test "x$TRY_COREAUDIO" = "xyes"
-then
-	# check for coreaudio
-	AC_CHECK_HEADERS(CoreAudio/CoreAudio.h,
-		[ HAVE_COREAUDIO="true"
-		  JACK_DEFAULT_DRIVER=\"coreaudio\"
-		])
-fi
-AM_CONDITIONAL(HAVE_COREAUDIO, $HAVE_COREAUDIO)
-
-AC_ARG_ENABLE(oss, AC_HELP_STRING([--disable-oss],[ignore OSS driver ]),
-			TRY_OSS=$enableval , TRY_OSS=yes ) 
-HAVE_OSS="false"
-if test "x$TRY_OSS" = "xyes"
-then
-	# check for Open Sound System
-	AC_CHECK_HEADER([sys/soundcard.h],
-	     [HAVE_OSS="true"
-              JACK_DEFAULT_DRIVER=\"oss\"])
-fi
-AM_CONDITIONAL(HAVE_OSS, $HAVE_OSS)
-
-AC_ARG_ENABLE(sun, AC_HELP_STRING([--disable-sun],[ignore Sun driver ]),
-			TRY_SUN=$enableval , TRY_SUN=yes ) 
-HAVE_SUN="false"
-if test "x$TRY_SUN" = "xyes"
-then
-	# check for Sun audio API
-	AC_CHECK_HEADER([sys/audioio.h],
-	     [HAVE_SUN="true"
-              JACK_DEFAULT_DRIVER=\"sun\"])
-fi
-AM_CONDITIONAL(HAVE_SUN, $HAVE_SUN)
-
-AC_ARG_ENABLE(freebob, AC_HELP_STRING([--disable-freebob],[ignore FreeBob driver ]),
-			TRY_FREEBOB=$enableval , TRY_FREEBOB=yes ) 
-HAVE_FREEBOB="false"
-if test "x$TRY_FREEBOB" = "xyes"
-then
-	# check for FreeBob libraries
-	PKG_CHECK_MODULES(LIBFREEBOB, libfreebob >= 1.0.0,
-	     [HAVE_FREEBOB="true"
-              JACK_DEFAULT_DRIVER=\"freebob\"
-	     ], AC_MSG_RESULT([no]))
-
-	AC_SUBST([LIBFREEBOB_CFLAGS])
-	AC_SUBST([LIBFREEBOB_LIBS])
-
-fi
-AM_CONDITIONAL(HAVE_FREEBOB,$HAVE_FREEBOB)
-
-AC_ARG_ENABLE(firewire, AC_HELP_STRING([--disable-firewire],[ignore FireWire driver (FFADO)]),
-			TRY_FIREWIRE=$enableval , TRY_FIREWIRE=yes ) 
-HAVE_FIREWIRE="false"
-if test "x$TRY_FIREWIRE" = "xyes"
-then
-	# check for FFADO libraries
-	PKG_CHECK_MODULES(LIBFFADO, libffado >= 1.999.17,
-	     [HAVE_FIREWIRE="true"
-              JACK_DEFAULT_DRIVER=\"firewire\"
-	     ], AC_MSG_RESULT([no]))
-
-	AC_SUBST([LIBFFADO_CFLAGS])
-	AC_SUBST([LIBFFADO_LIBS])
-
-fi
-AM_CONDITIONAL(HAVE_FIREWIRE,$HAVE_FIREWIRE)
-
 AC_ARG_ENABLE(alsa, AC_HELP_STRING([--disable-alsa],[ignore ALSA driver ]),
 			TRY_ALSA=$enableval , TRY_ALSA=yes ) 
 HAVE_ALSA="false"
@@ -974,12 +884,6 @@ driverspp/Makefile
 driverspp/alsa/Makefile
 driverspp/alsa_midi/Makefile
 driverspp/dummy/Makefile
-driverspp/oss/Makefile
-driverspp/sun/Makefile
-driverspp/portaudio/Makefile
-driverspp/coreaudio/Makefile
-driverspp/freebob/Makefile
-driverspp/firewire/Makefile
 driverspp/netjack/Makefile
 example-clients/Makefile
 tools/Makefile
@@ -1064,12 +968,6 @@ echo
 echo $PACKAGE $VERSION :
 echo
 echo \| Build with ALSA support............................... : $HAVE_ALSA
-echo \| Build with old FireWire \(FreeBob\) support............. : $HAVE_FREEBOB
-echo \| Build with new FireWire \(FFADO\) support............... : $HAVE_FIREWIRE
-echo \| Build with OSS support................................ : $HAVE_OSS
-echo \| Build with Sun audio support.......................... : $HAVE_SUN
-echo \| Build with CoreAudio support.......................... : $HAVE_COREAUDIO
-echo \| Build with PortAudio support.......................... : $HAVE_PA
 echo \| Build with Celt support............................... : $HAVE_CELT
 echo \| Build with dynamic buffer size support................ : $buffer_resizing
 echo \| Build with ZITA ALSA bridge support................... : $HAVE_ZITA_BRIDGE_DEPS

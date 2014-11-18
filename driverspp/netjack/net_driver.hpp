@@ -27,7 +27,7 @@
 #include <jack/jack.h>
 #include <jack/transport.h>
 
-#include "driver.h"
+#include "driver.hpp"
 
 #include <netinet/in.h>
 

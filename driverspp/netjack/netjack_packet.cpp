@@ -47,7 +47,7 @@
 #include <jack/types.h>
 
 // for jack_error in jack1
-#include "internal.h"
+#include "internal.hpp"
 
 #include <sys/types.h>
 

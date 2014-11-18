@@ -83,14 +83,14 @@ static inline void INIT_LIST_HEAD(struct list_head *list)
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_add(struct list_head *new,
+static inline void __list_add(struct list_head *lnew,
             struct list_head *prev,
             struct list_head *next)
 {
-  next->prev = new;
-  new->next = next;
-  new->prev = prev;
-  prev->next = new;
+  next->prev = lnew;
+  lnew->next = next;
+  lnew->prev = prev;
+  prev->next = lnew;
 }
 
 /**
@@ -101,9 +101,9 @@ static inline void __list_add(struct list_head *new,
  * Insert a new entry after the specified head.
  * This is good for implementing stacks.
  */
-static inline void list_add(struct list_head *new, struct list_head *head)
+static inline void list_add(struct list_head *lnew, struct list_head *head)
 {
-  __list_add(new, head, head->next);
+  __list_add(lnew, head, head->next);
 }
 
 /**
@@ -114,9 +114,9 @@ static inline void list_add(struct list_head *new, struct list_head *head)
  * Insert a new entry before the specified head.
  * This is useful for implementing queues.
  */
-static inline void list_add_tail(struct list_head *new, struct list_head *head)
+static inline void list_add_tail(struct list_head *lnew, struct list_head *head)
 {
-  __list_add(new, head->prev, head);
+  __list_add(lnew, head->prev, head);
 }
 
 /*
@@ -125,14 +125,14 @@ static inline void list_add_tail(struct list_head *new, struct list_head *head)
  * This is only for internal list manipulation where we know
  * the prev/next entries already!
  */
-static inline void __list_add_rcu(struct list_head * new,
+static inline void __list_add_rcu(struct list_head * lnew,
     struct list_head * prev, struct list_head * next)
 {
-  new->next = next;
-  new->prev = prev;
+  lnew->next = next;
+  lnew->prev = prev;
 //  smp_wmb();
-  next->prev = new;
-  prev->next = new;
+  next->prev = lnew;
+  prev->next = lnew;
 }
 
 /**
@@ -151,9 +151,9 @@ static inline void __list_add_rcu(struct list_head * new,
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
-static inline void list_add_rcu(struct list_head *new, struct list_head *head)
+static inline void list_add_rcu(struct list_head *lnew, struct list_head *head)
 {
-  __list_add_rcu(new, head, head->next);
+  __list_add_rcu(lnew, head, head->next);
 }
 
 /**
@@ -172,10 +172,10 @@ static inline void list_add_rcu(struct list_head *new, struct list_head *head)
  * the _rcu list-traversal primitives, such as
  * list_for_each_entry_rcu().
  */
-static inline void list_add_tail_rcu(struct list_head *new,
+static inline void list_add_tail_rcu(struct list_head *lnew,
           struct list_head *head)
 {
-  __list_add_rcu(new, head->prev, head);
+  __list_add_rcu(lnew, head->prev, head);
 }
 
 /*
@@ -200,8 +200,8 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
 static inline void list_del(struct list_head *entry)
 {
   __list_del(entry->prev, entry->next);
-  entry->next = LIST_POISON1;
-  entry->prev = LIST_POISON2;
+  entry->next = (struct list_head *)LIST_POISON1;
+  entry->prev = (struct list_head *)LIST_POISON2;
 }
 
 /**
@@ -231,7 +231,7 @@ static inline void list_del(struct list_head *entry)
 static inline void list_del_rcu(struct list_head *entry)
 {
   __list_del(entry->prev, entry->next);
-  entry->prev = LIST_POISON2;
+  entry->prev = (struct list_head *)LIST_POISON2;
 }
 
 /*
@@ -242,14 +242,14 @@ static inline void list_del_rcu(struct list_head *entry)
  * The old entry will be replaced with the new entry atomically.
  */
 static inline void list_replace_rcu(struct list_head *old,
-        struct list_head *new)
+        struct list_head *lnew)
 {
-  new->next = old->next;
-  new->prev = old->prev;
+  lnew->next = old->next;
+  lnew->prev = old->prev;
 //  smp_wmb();
-  new->next->prev = new;
-  new->prev->next = new;
-  old->prev = LIST_POISON2;
+  lnew->next->prev = lnew;
+  lnew->prev->next = lnew;
+  old->prev = (struct list_head *)LIST_POISON2;
 }
 
 /**
@@ -625,8 +625,8 @@ static inline void __hlist_del(struct hlist_node *n)
 static inline void hlist_del(struct hlist_node *n)
 {
   __hlist_del(n);
-  n->next = LIST_POISON1;
-  n->pprev = LIST_POISON2;
+  n->next = (struct hlist_node *)LIST_POISON1;
+  n->pprev = (struct hlist_node **)LIST_POISON2;
 }
 
 /**
@@ -651,7 +651,7 @@ static inline void hlist_del(struct hlist_node *n)
 static inline void hlist_del_rcu(struct hlist_node *n)
 {
   __hlist_del(n);
-  n->pprev = LIST_POISON2;
+  n->pprev = (struct hlist_node **)LIST_POISON2;
 }
 
 static inline void hlist_del_init(struct hlist_node *n)
@@ -670,17 +670,17 @@ static inline void hlist_del_init(struct hlist_node *n)
  * The old entry will be replaced with the new entry atomically.
  */
 static inline void hlist_replace_rcu(struct hlist_node *old,
-          struct hlist_node *new)
+          struct hlist_node *lnew)
 {
   struct hlist_node *next = old->next;
 
-  new->next = next;
-  new->pprev = old->pprev;
+  lnew->next = next;
+  lnew->pprev = old->pprev;
 //  smp_wmb();
   if (next)
-    new->next->pprev = &new->next;
-  *new->pprev = new;
-  old->pprev = LIST_POISON2;
+    lnew->next->pprev = &lnew->next;
+  *lnew->pprev = lnew;
+  old->pprev = (struct hlist_node **)LIST_POISON2;
 }
 
 static inline void hlist_add_head(struct hlist_node *n, struct hlist_head *h)

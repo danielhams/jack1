@@ -32,7 +32,7 @@
 #include <limits.h>
 #include <endian.h>
 
-#include "memops.h"
+#include "memops.hpp"
 
 /* Notes about these *_SCALING values.
 
