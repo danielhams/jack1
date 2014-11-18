@@ -76,6 +76,8 @@ alsa_midi_driver_new (jack_client_t *client, const char *name)
 
 /* DRIVER "PLUGIN" INTERFACE */
 
+extern "C" {
+
 const char driver_client_name[] = "alsa_midi";
 
 const jack_driver_desc_t *
@@ -119,4 +121,6 @@ void
 driver_finish (jack_driver_t *driver)
 {
 	alsa_midi_driver_delete ((alsa_midi_driver_t *) driver);
+}
+
 }
