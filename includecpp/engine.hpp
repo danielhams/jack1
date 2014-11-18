@@ -519,6 +519,8 @@ private:
 
     void calc_cpu_load_();
 
+    void wake_server_thread_();
+
 };
 
 }

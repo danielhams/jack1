@@ -391,6 +391,32 @@ void jack_transport_client_exit( jack_engine_t * engine, jack_client_internal_t 
     }
 }
 
+/* when any client exits the graph (either dead or not active)
+ *
+ * precondition: caller holds the graph lock */
+void jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_t *client )
+{
+    if( client == engine->timebase_client ) {
+	if( client->control->dead ) {
+	    engine->timebase_client->control->is_timebase = 0;
+	    engine->timebase_client->control->timebase_new = 0;
+	    engine->timebase_client = NULL;
+	    VERBOSE( engine, "timebase master exit" );
+	}
+	engine->control->current_time.valid = (jack_position_bits_t)0;
+	engine->control->pending_time.valid = (jack_position_bits_t)0;
+    }
+
+    if( client->control->is_slowsync ) {
+	if( client->control->active_slowsync ) {
+	    jack_sync_poll_deactivate_pp( engine, client );
+	}
+	if( client->control->dead ) {
+	    client->control->is_slowsync = 0;
+	}
+    }
+}
+
 /* when a new client is being created */
 void jack_transport_client_new( jack_client_internal_t *client )
 {

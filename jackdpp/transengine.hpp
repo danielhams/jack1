@@ -47,6 +47,7 @@ int	jack_transport_set_sync_timeout( jack_engine_t * engine, jack_time_t usecs )
 
 int	jack_timebase_reset_pp( jack::engine * engine, jack_uuid_t client_id );
 int	jack_timebase_set_pp( jack::engine * engine, jack_uuid_t client_id, int conditional );
+void	jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_t *client );
 void	jack_transport_activate_pp( jack::engine * engine, jack_client_internal_t *client );
 int	jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t client_id );
 int	jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client_id );

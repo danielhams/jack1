@@ -4862,8 +4862,6 @@ int engine::init()
 
     (void)get_fifo_fd( 0 );
 
-//    exit(-1);
-
     jack_client_create_thread( NULL,
 			       &server_thread, 0, FALSE,
 			       &server_thread_adaptor, this );
@@ -4876,8 +4874,7 @@ void engine::signal_problems()
     jack_lock_problems( this );
     problems++;
     jack_unlock_problems( this );
-    // REMOVE THIS HACK
-    jack_wake_server_thread( (jack_engine_t*)this );
+    wake_server_thread_();
 }
 
 int engine::linux_poll_bug_encountered( jack_time_t then, jack_time_t * required )
@@ -5407,8 +5404,7 @@ int engine::load_slave_driver( jack_driver_desc_t * idriver_desc,
 int engine::add_slave_driver( jack_driver_t * sdriver )
 {
     if( sdriver ) {
-	// REMOVE THIS HACK
-	if( sdriver->attach( sdriver, (jack_engine_t*)this )) {
+	if( sdriver->attach_pp( sdriver, this )) {
 	    jack_info( "could not attach slave %s\n", sdriver->internal_client->control->name );
 	    return -1;
 	}
@@ -5428,8 +5424,7 @@ int engine::unload_slave_driver( jack_driver_t * sdriver )
 
 void engine::slave_driver_remove( jack_driver_t * sdriver )
 {
-    // REMOVE THIS HACK
-    sdriver->detach( sdriver, (jack_engine_t*)this );
+    sdriver->detach_pp( sdriver, this );
     auto sdFinder = std::find( slave_drivers.begin(), slave_drivers.end(), sdriver );
     if( sdFinder != slave_drivers.end() ) {
 	slave_drivers.erase( sdFinder );
@@ -5744,8 +5739,7 @@ int engine::client_do_deactivate_( jack_client_internal_t *client,
 
     client->control->active = FALSE;
 
-    // REMOVE THIS HACK
-    jack_transport_client_exit( (jack_engine_t*)this, client );
+    jack_transport_client_exit_pp( this, client );
 
     if( !jack_client_is_internal(client) &&
 	external_client_cnt > 0) {
@@ -9564,6 +9558,14 @@ int engine::check_clients( int with_timeout_check )
     }
 
     return errs;
+}
+
+void engine::wake_server_thread_()
+{
+    char c = 0;
+    /* we don't actually care if this fails */
+    VERBOSE( this, "waking server thread" );
+    write( cleanup_fifo[1], &c, 1 );
 }
 
 }
