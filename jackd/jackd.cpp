@@ -70,7 +70,6 @@
 #include "jack_options_parser.hpp"
 #include "jack_signals.hpp"
 #include "jack_drivers.hpp"
-#include "jack_engine.hpp"
 #include "jack_utils.hpp"
 
 using std::cout;

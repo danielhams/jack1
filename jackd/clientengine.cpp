@@ -20,43 +20,6 @@
  *
  */
 
-#define __STDC_FORMAT_MACROS
-
-#include <config.h>
-
-#include <vector>
-#include <string>
-#include <sstream>
-
-#include <errno.h>
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <signal.h>
-
-#include "internal.hpp"
-#include "engine.hpp"
-#include "messagebuffer.hpp"
-#include "version.hpp"
-#include "driver.hpp"
-#include <sysdeps/poll.h>
-#include <sysdeps/ipc.h>
-
-#include "clientengine.hpp"
-#include "transengine.hpp"
-
-#include <jack/uuid.h>
-#include <jack/metadata.h>
-
-#include "libjack/local.hpp"
-
-#include "jack_constants.hpp"
-#include "jack_engine.hpp"
-
-using std::string;
-using std::stringstream;
-using std::vector;
-
 const char * client_state_names[] = {
     "Not triggered",
     "Triggered",

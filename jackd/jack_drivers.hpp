@@ -22,7 +22,7 @@
 #define JACK_DRIVERS_HPP
 
 #include "internal.hpp"
-#include "jack_engine.hpp"
+#include "engine.hpp"
 
 #include <string>
 #include <vector>

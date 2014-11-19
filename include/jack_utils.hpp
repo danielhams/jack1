@@ -38,6 +38,11 @@ const std::string & client_tmp_dir();
 
 void cleanup_files( const std::string & server_name );
 
+constexpr const uint32_t power_of_two( uint32_t n )
+{
+    return !(n & (n - 1));
+};
+
 }
 
 #endif // JACKD_UTILS_HPP

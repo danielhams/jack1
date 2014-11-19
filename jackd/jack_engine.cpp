@@ -22,7 +22,7 @@
 
 #include <config.h>
 
-#include "jack_engine.hpp"
+#include "jack_lock_helpers.hpp"
 #include "jack_signals.hpp"
 #include "jack_utils.hpp"
 #include "jack_constants.hpp"
@@ -30,6 +30,7 @@
 #include <string>
 #include <sstream>
 #include <vector>
+#include <algorithm>
 
 #include "internal.hpp"
 #include "driver.hpp"
@@ -4159,7 +4160,7 @@ int engine::set_buffer_size_request( jack_nframes_t nframes )
 	return ENXIO;		/* no such device */
     }
 
-    if( !jack_power_of_two(nframes) ) {
+    if( !power_of_two(nframes) ) {
 	jack_error( "buffer size %" PRIu32 " not a power of 2",
 		    nframes );
 	return EINVAL;

@@ -24,7 +24,7 @@
 #include <config.h>
 #include <signal.h>
 
-#include "jack_engine.hpp"
+#include "engine.hpp"
 
 namespace jack
 {

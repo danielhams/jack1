@@ -35,21 +35,11 @@
 #include "clientengine.hpp"
 #include "engine.hpp"
 
-//#include "JackError.h"
-//#include "JackServer.h"
-//#include "shm.h"
-//#include "JackTools.h"
-//#include "JackControlAPI.h"
-//#include "JackLockedEngine.h"
-//#include "JackConstants.h"
-//#include "JackDriverLoader.h"
-//#include "JackServerGlobals.h"
-
 #include "jack_options_parser.hpp"
 #include "jack_constants.hpp"
 #include "jack_signals.hpp"
 #include "jack_drivers.hpp"
-#include "jack_engine.hpp"
+#include "jack_lock_helpers.hpp"
 #include "jack_utils.hpp"
 
 // C++

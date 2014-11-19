@@ -39,6 +39,7 @@
 #include <dirent.h>
 #include <string.h>
 
+#include <algorithm>
 #include <sstream>
 
 namespace jack

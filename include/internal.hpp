@@ -66,6 +66,8 @@ typedef enum {
 	JACK_TIMER_HPET,
 } jack_timer_type_t;
 
+extern jack_timer_type_t clock_source;
+
 void        jack_init_time ();
 void        jack_set_clock_source (jack_timer_type_t);
 const char* jack_clock_source_name (jack_timer_type_t);

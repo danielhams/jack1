@@ -34,7 +34,8 @@
 #include "internal.hpp"
 #include "messagebuffer.hpp"
 #include "transengine.hpp"
-#include "jack_engine.hpp"
+#include "engine.hpp"
+#include "jack_lock_helpers.hpp"
 
 /********************** internal functions **********************/
 

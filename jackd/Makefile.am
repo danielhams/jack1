@@ -37,7 +37,7 @@ noinst_HEADERS = jack_md5.hpp \
 	jack_options_parser.hpp \
 	jack_signals.hpp \
 	jack_drivers.hpp \
-	jack_engine.hpp \
+	jack_lock_helpers.hpp \
 	md5.hpp \
 	md5_loc.hpp \
 	clientengine.hpp \
