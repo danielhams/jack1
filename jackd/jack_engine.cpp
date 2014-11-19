@@ -66,6 +66,8 @@ using jack::server_tmp_dir;
 using jack::server_user_dir;
 using jack::server_dir;
 
+struct pollfd tester;
+
 jack_timer_type_t clock_source = JACK_TIMER_SYSTEM_CLOCK;
 
 static int make_directory (const char *path)
@@ -678,7 +680,7 @@ void engine::cleanup()
 
     /* now really tell them we're going away */
 
-    for ( size_t i = 0; i < pfd_max; ++i) {
+    for( size_t i = 0; i < pfd_max; ++i) {
 	shutdown( pfd[i].fd, SHUT_RDWR );
     }
 
@@ -1053,14 +1055,14 @@ int engine::load_driver( jack_driver_desc_t * idriver_desc,
 int engine::use_driver( jack_driver_t * idriver )
 {
     if( driver ) {
-	driver->detach_pp( driver, this );
+	driver->detach( driver, this );
 	driver = nullptr;
     }
 
     if( idriver ) {
 	driver = idriver;
 
-	if( idriver->attach_pp( idriver, this )) {
+	if( idriver->attach( idriver, this )) {
 	    driver = nullptr;
 	    return -1;
 	}
@@ -1166,7 +1168,7 @@ int engine::load_slave_driver( jack_driver_desc_t * idriver_desc,
 int engine::add_slave_driver( jack_driver_t * sdriver )
 {
     if( sdriver ) {
-	if( sdriver->attach_pp( sdriver, this )) {
+	if( sdriver->attach( sdriver, this )) {
 	    jack_info( "could not attach slave %s\n", sdriver->internal_client->control->name );
 	    return -1;
 	}
@@ -1186,7 +1188,7 @@ int engine::unload_slave_driver( jack_driver_t * sdriver )
 
 void engine::slave_driver_remove( jack_driver_t * sdriver )
 {
-    sdriver->detach_pp( sdriver, this );
+    sdriver->detach( sdriver, this );
     auto sdFinder = std::find( slave_drivers.begin(), slave_drivers.end(), sdriver );
     if( sdFinder != slave_drivers.end() ) {
 	slave_drivers.erase( sdFinder );
@@ -5495,7 +5497,7 @@ void engine::driver_exit( engine * engine_ptr )
     VERBOSE( engine_ptr, "stopping driver");
     driver->stop( driver );
     VERBOSE( engine_ptr, "detaching driver");
-    driver->detach_pp( driver, engine_ptr );
+    driver->detach( driver, engine_ptr );
 
     /* tell anyone waiting that the driver exited. */
     kill( engine_ptr->wait_pid, SIGUSR2 );

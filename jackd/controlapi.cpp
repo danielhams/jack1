@@ -134,7 +134,6 @@ struct jackctl_server
     vector<struct jackctl_parameter*> parameters_vector;
     JSList * parameters;
 
-//    std::unique_ptr<jack_engine_t> engine;
     std::unique_ptr<jack::engine> engine;
 
     /* string, server name */
@@ -1136,7 +1135,7 @@ bool jackctl_server_switch_master(jackctl_server_t * server_ptr, jackctl_driver_
     if( old_driver )
     {
 	old_driver->stop( old_driver );
-	old_driver->detach_pp( old_driver, server_ptr->engine.get() );
+	old_driver->detach( old_driver, server_ptr->engine.get() );
 
 	pthread_mutex_lock( &server_ptr->engine->request_lock );
 	jack_lock_graph( server_ptr->engine.get() );

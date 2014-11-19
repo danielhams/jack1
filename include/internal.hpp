@@ -130,7 +130,6 @@ const char* jack_clock_source_name (jack_timer_type_t);
 #define	TRUE	(1)
 #endif
 
-typedef struct _jack_engine  jack_engine_t;
 typedef struct _jack_request jack_request_t;
 
 typedef void * dlhandle;
@@ -519,15 +518,11 @@ typedef struct _jack_thread_arg {
 	pid_t cap_pid;
 } jack_thread_arg_t;
 
-extern int  jack_client_handle_port_connection (jack_client_t *client,
-						jack_event_t *event);
-extern jack_client_t *jack_driver_client_new (jack_engine_t *,
-					      const char *client_name);
-extern jack_client_t *jack_client_alloc_internal (jack_client_control_t*,
-						  jack_engine_t*);
+extern int  jack_client_handle_port_connection( jack_client_t *client,
+						jack_event_t *event );
 
 /* internal clients call this. it's defined in jack/engine.c */
-void handle_internal_client_request (jack_control_t*, jack_request_t*);
+//void handle_internal_client_request (jack_control_t*, jack_request_t*);
 
 extern void *jack_zero_filled_buffer;
 

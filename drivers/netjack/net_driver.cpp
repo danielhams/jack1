@@ -69,15 +69,15 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
     netjack_driver_state_t *netj = &( driver->netj );
     int delay;
 
-    delay = netjack_wait( netj, driver->engine->get_microseconds );
+    delay = netjack_wait( netj, driver->engine->get_microseconds_c );
     if( delay ) {
-	    //driver->engine->delay( driver->engine, (float)delay );
-	    jack_error( "netxruns amount: %dms", delay/1000 );
+	//driver->engine->delay( driver->engine, (float)delay );
+	jack_error( "netxruns amount: %dms", delay/1000 );
     }
 
     
-    driver->last_wait_ust = driver->engine->get_microseconds ();
-    driver->engine->transport_cycle_start (driver->engine, driver->last_wait_ust);
+    driver->last_wait_ust = driver->engine->get_microseconds_c();
+    driver->engine->transport_cycle_start_c( driver->engine, driver->last_wait_ust );
 
     /* this driver doesn't work so well if we report a delay */
     /* XXX: this might not be the case anymore */
@@ -90,20 +90,20 @@ net_driver_wait (net_driver_t *driver, int extra_fd, int *status, float *delayed
 static int
 net_driver_run_cycle (net_driver_t *driver)
 {
-    jack_engine_t *engine = driver->engine;
+    jack::engine *engine = driver->engine;
     //netjack_driver_state_t *netj = &(driver->netj);
     int wait_status = -1;
     float delayed_usecs;
 
-    jack_nframes_t nframes = net_driver_wait (driver, -1, &wait_status,
-                             &delayed_usecs);
+    jack_nframes_t nframes = net_driver_wait( driver, -1, &wait_status,
+					      &delayed_usecs );
 
     // XXX: xrun code removed.
     //      especially with celt there are no real xruns anymore.
     //      things are different on the net.
 
     if (wait_status == 0)
-        return engine->run_cycle (engine, nframes, delayed_usecs);
+        return engine->run_cycle_c( engine, nframes, delayed_usecs );
 
     if (wait_status < 0)
         return -1;
@@ -277,11 +277,11 @@ static int
 net_driver_attach (net_driver_t *driver)
 {
     netjack_driver_state_t *netj = &( driver->netj );
-    if (driver->engine->set_buffer_size (driver->engine, netj->period_size)) {
-	    jack_error ("netjack: cannot set engine buffer size to %d (check MIDI)", netj->period_size);
-	    return -1;
+    if( driver->engine->set_buffer_size_c( driver->engine, netj->period_size ) ) {
+	jack_error ("netjack: cannot set engine buffer size to %d (check MIDI)", netj->period_size);
+	return -1;
     }
-    driver->engine->set_sample_rate (driver->engine, netj->sample_rate);
+    driver->engine->set_sample_rate_c( driver->engine, netj->sample_rate );
 
     netjack_attach( netj );
     return 0;

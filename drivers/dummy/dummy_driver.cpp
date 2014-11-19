@@ -152,9 +152,9 @@ dummy_driver_wait (dummy_driver_t *driver, int extra_fd, int *status,
 		driver->next_wakeup = add_ts(driver->next_wakeup, driver->wait_time);
 	}
 
-	driver->last_wait_ust = driver->engine->get_microseconds ();
-	driver->engine->transport_cycle_start (driver->engine,
-					       driver->last_wait_ust);
+	driver->last_wait_ust = driver->engine->get_microseconds_c();
+	driver->engine->transport_cycle_start_c(driver->engine,
+						driver->last_wait_ust);
 
 	return nframes;
 }
@@ -217,28 +217,28 @@ static int dummy_driver_nt_start (dummy_driver_t *drv)
 static inline int
 dummy_driver_run_cycle (dummy_driver_t *driver)
 {
-	jack_engine_t *engine = driver->engine;
-	int wait_status;
-	float delayed_usecs;
+    jack::engine *engine = driver->engine;
+    int wait_status;
+    float delayed_usecs;
 
-	jack_nframes_t nframes = dummy_driver_wait (driver, -1, &wait_status,
-						   &delayed_usecs);
-	if (nframes == 0) {
-		/* we detected an xrun and restarted: notify
-		 * clients about the delay. */
-		engine->delay (engine, delayed_usecs);
-		return 0;
-	} 
+    jack_nframes_t nframes = dummy_driver_wait( driver, -1, &wait_status,
+						&delayed_usecs );
+    if (nframes == 0) {
+	/* we detected an xrun and restarted: notify
+	 * clients about the delay. */
+	engine->delay (engine, delayed_usecs);
+	return 0;
+    } 
 
-	// FakeVideoSync (driver);
+    // FakeVideoSync (driver);
 
-	if (wait_status == 0)
-		return engine->run_cycle (engine, nframes, delayed_usecs);
+    if (wait_status == 0)
+	return engine->run_cycle_c( engine, nframes, delayed_usecs );
 
-	if (wait_status < 0)
-		return -1;
-	else
-		return 0;
+    if (wait_status < 0)
+	return -1;
+    else
+	return 0;
 }
 
 static int
@@ -250,18 +250,18 @@ dummy_driver_null_cycle (dummy_driver_t* driver, jack_nframes_t nframes)
 static int
 dummy_driver_bufsize (dummy_driver_t* driver, jack_nframes_t nframes)
 {
-	driver->period_size = nframes;  
-	driver->period_usecs = driver->wait_time =
-		(jack_time_t) floor ((((float) nframes) / driver->sample_rate)
-				     * 1000000.0f);
+    driver->period_size = nframes;
+    driver->period_usecs = driver->wait_time =
+	(jack_time_t) floor ((((float) nframes) / driver->sample_rate)
+			     * 1000000.0f);
 
-	/* tell the engine to change its buffer size */
-	if (driver->engine->set_buffer_size (driver->engine, nframes)) {
-		jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", nframes);
-		return -1;
-	}
+    /* tell the engine to change its buffer size */
+    if( driver->engine->set_buffer_size_c( driver->engine, nframes )) {
+	jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", nframes);
+	return -1;
+    }
 
-	return 0;
+    return 0;
 }
 
 static int
@@ -274,85 +274,85 @@ dummy_driver_write (dummy_driver_t* driver, jack_nframes_t nframes)
 static int
 dummy_driver_attach (dummy_driver_t *driver)
 {
-	jack_port_t * port;
-	char buf[32];
-	unsigned int chn;
-	int port_flags;
+    jack_port_t * port;
+    char buf[32];
+    unsigned int chn;
+    int port_flags;
 
-	if (driver->engine->set_buffer_size (driver->engine, driver->period_size)) {
-		jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
-		return -1;
-	}
-	driver->engine->set_sample_rate (driver->engine, driver->sample_rate);
+    if( driver->engine->set_buffer_size_c( driver->engine, driver->period_size ) ) {
+	jack_error ("dummy: cannot set engine buffer size to %d (check MIDI)", driver->period_size);
+	return -1;
+    }
+    driver->engine->set_sample_rate (driver->engine, driver->sample_rate);
 
-	port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
+    port_flags = JackPortIsOutput|JackPortIsPhysical|JackPortIsTerminal;
 
-	for (chn = 0; chn < driver->capture_channels; chn++)
+    for (chn = 0; chn < driver->capture_channels; chn++)
+    {
+	snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
+
+	port = jack_port_register (driver->client, buf,
+				   JACK_DEFAULT_AUDIO_TYPE,
+				   port_flags, 0);
+	if (!port)
 	{
-		snprintf (buf, sizeof(buf) - 1, "capture_%u", chn+1);
-
-		port = jack_port_register (driver->client, buf,
-					   JACK_DEFAULT_AUDIO_TYPE,
-					   port_flags, 0);
-		if (!port)
-		{
-			jack_error ("DUMMY: cannot register port for %s", buf);
-			break;
-		}
-
-		driver->capture_ports =
-			jack_slist_append (driver->capture_ports, port);
+	    jack_error ("DUMMY: cannot register port for %s", buf);
+	    break;
 	}
+
+	driver->capture_ports =
+	    jack_slist_append (driver->capture_ports, port);
+    }
 	
-	port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
+    port_flags = JackPortIsInput|JackPortIsPhysical|JackPortIsTerminal;
 
-	for (chn = 0; chn < driver->playback_channels; chn++)
+    for (chn = 0; chn < driver->playback_channels; chn++)
+    {
+	snprintf (buf, sizeof(buf) - 1, "playback_%u", chn+1);
+
+	port = jack_port_register (driver->client, buf,
+				   JACK_DEFAULT_AUDIO_TYPE,
+				   port_flags, 0);
+
+	if (!port)
 	{
-		snprintf (buf, sizeof(buf) - 1, "playback_%u", chn+1);
-
-		port = jack_port_register (driver->client, buf,
-					   JACK_DEFAULT_AUDIO_TYPE,
-					   port_flags, 0);
-
-		if (!port)
-		{
-			jack_error ("DUMMY: cannot register port for %s", buf);
-			break;
-		}
-
-		driver->playback_ports =
-			jack_slist_append (driver->playback_ports, port);
+	    jack_error ("DUMMY: cannot register port for %s", buf);
+	    break;
 	}
 
-	jack_activate (driver->client);
+	driver->playback_ports =
+	    jack_slist_append (driver->playback_ports, port);
+    }
 
-	return 0;
+    jack_activate (driver->client);
+
+    return 0;
 }
 
 static int
 dummy_driver_detach (dummy_driver_t *driver)
 {
-	JSList * node;
+    JSList * node;
 
-	if (driver->engine == 0)
-		return 0;
+    if (driver->engine == 0)
+	return 0;
 
-	for (node = driver->capture_ports; node; node = jack_slist_next (node))
-		jack_port_unregister (driver->client,
-				      ((jack_port_t *) node->data));
+    for (node = driver->capture_ports; node; node = jack_slist_next (node))
+	jack_port_unregister (driver->client,
+			      ((jack_port_t *) node->data));
 
-	jack_slist_free (driver->capture_ports);
-	driver->capture_ports = NULL;
+    jack_slist_free (driver->capture_ports);
+    driver->capture_ports = NULL;
 
 		
-	for (node = driver->playback_ports; node; node = jack_slist_next (node))
-		jack_port_unregister (driver->client,
-				      ((jack_port_t *) node->data));
+    for (node = driver->playback_ports; node; node = jack_slist_next (node))
+	jack_port_unregister (driver->client,
+			      ((jack_port_t *) node->data));
 
-	jack_slist_free (driver->playback_ports);
-	driver->playback_ports = NULL;
+    jack_slist_free (driver->playback_ports);
+    driver->playback_ports = NULL;
 
-	return 0;
+    return 0;
 }
 
 

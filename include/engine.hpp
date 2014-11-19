@@ -31,6 +31,8 @@
 #include <memory>
 #include <string>
 
+#include <poll.h>
+
 struct _jack_driver;
 struct _jack_client_internal;
 struct _jack_port_internal;
@@ -67,116 +69,13 @@ typedef struct _jack_driver_info {
     dlhandle       handle;
 } jack_driver_info_t;
 
-/* The main engine structure in local memory. */
-struct _jack_engine {
-    jack_control_t        *control;
-
-    std::vector<jack_driver_desc_t*> drivers;
-    struct _jack_driver   *driver;
-    jack_driver_desc_t    *driver_desc;
-    JSList                *driver_params;
-
-    std::vector<jack_driver_t*> slave_drivers;
-
-    /* these are "callbacks" made by the driver backend */
-    int  (*set_buffer_size) (struct _jack_engine *, jack_nframes_t frames);
-    int  (*set_sample_rate) (struct _jack_engine *, jack_nframes_t frames);
-    int  (*run_cycle)	    (struct _jack_engine *, jack_nframes_t nframes, float delayed_usecs);
-    void (*delay)	    (struct _jack_engine *, float delayed_usecs);
-    void (*transport_cycle_start) (struct _jack_engine *, jack_time_t time);
-    void (*driver_exit)     (struct _jack_engine *);
-    jack_time_t (*get_microseconds)(void);
-    /* "private" sections starts here */
-
-    /* engine serialization -- use precedence for deadlock avoidance */
-    pthread_mutex_t request_lock; /* precedes client_lock */
-    pthread_rwlock_t client_lock;
-    pthread_mutex_t port_lock;
-    pthread_mutex_t problem_lock; /* must hold write lock on client_lock */
-    int		    process_errors;
-    int		    period_msecs;
-
-    /* Time to wait for clients in msecs.  Used when jackd is run
-     * without realtime priority enabled. */
-    int		    client_timeout_msecs;
-
-    /* info on the shm segment containing this->control */
-
-    jack_shm_info_t control_shm;
-
-    /* address-space local port buffer and segment info,
-       indexed by the port type_id
-    */
-    jack_port_buffer_list_t port_buffers[JACK_MAX_PORT_TYPES];
-    jack_shm_info_t         port_segment[JACK_MAX_PORT_TYPES];
-
-    unsigned int    port_max;
-    pthread_t	    server_thread;
-
-    int		    fds[2];
-    int		    cleanup_fifo[2];
-    size_t	    pfd_size;
-    size_t	    pfd_max;
-    struct pollfd  *pfd;
-    char	    fifo_prefix[PATH_MAX+1];
-    int		   *fifo;
-    unsigned long   fifo_size;
-
-    /* session handling */
-    int		    session_reply_fd;
-    int		    session_pending_replies;
-
-    unsigned long   external_client_cnt;
-    int		    rtpriority;
-    volatile char   freewheeling;
-    volatile char   stop_freewheeling;
-    jack_uuid_t     fwclient;
-    pthread_t       freewheel_thread;
-    char	    verbose;
-    char	    do_munlock;
-    const char	   *server_name;
-    char	    temporary;
-    int		    reordered;
-    int		    feedbackcount;
-    int             removing_clients;
-    pid_t           wait_pid;
-    int             nozombies;
-    int             timeout_count_threshold;
-    volatile int    problems;
-    volatile int    timeout_count;
-    volatile int    new_clients_allowed;
-
-    /* these are protected by `client_lock' */
-    std::vector<jack_client_internal_t*> clients;
-    std::vector<jack_reserved_name_t*> reserved_client_names;
-
-    // Actually fixed size based on options
-    std::vector<jack_port_internal_t> internal_ports;
-    jack_client_internal_t  *timebase_client;
-    jack_port_buffer_info_t *silent_buffer;
-    jack_client_internal_t  *current_client;
-
-    jack_time_t rolling_client_usecs[JACK_ENGINE_ROLLING_COUNT];
-    int		    rolling_client_usecs_cnt;
-    int		    rolling_client_usecs_index;
-    int		    rolling_interval;
-    float	    max_usecs;
-    float	    spare_usecs;
-
-    int first_wakeup;
-
-    /* used for port names munging */
-    int audio_out_cnt;
-    int audio_in_cnt;
-    int midi_out_cnt;
-    int midi_in_cnt;
-};
 
 namespace jack
 {
 
 class engine;
 
+/* The main engine structure in local memory. */
 class engine {
 public:
     typedef int (*set_buffer_size_callback)(engine *, jack_nframes_t frames);

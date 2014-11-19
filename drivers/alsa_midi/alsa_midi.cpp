@@ -704,78 +704,78 @@ alsa_midi_stop (alsa_midi_driver_t* driver)
 }
 
 static int
-alsa_midi_attach (alsa_midi_driver_t* driver, jack_engine_t* engine)
+alsa_midi_attach( alsa_midi_driver_t* driver, jack::engine * engine )
 {
-  int error;
+    int error;
   
-  driver->port_add = jack_ringbuffer_create (2 * MAX_PORTS * sizeof(snd_seq_addr_t));
+    driver->port_add = jack_ringbuffer_create (2 * MAX_PORTS * sizeof(snd_seq_addr_t));
   
-  if (driver->port_add == NULL) {
-    return -1;
+    if (driver->port_add == NULL) {
+	return -1;
     
-  }
+    }
   
-  driver->port_del = jack_ringbuffer_create(2 * MAX_PORTS * sizeof(struct a2j_port *));
-  if (driver->port_del == NULL) {
-    return -1;
-  }
+    driver->port_del = jack_ringbuffer_create(2 * MAX_PORTS * sizeof(struct a2j_port *));
+    if (driver->port_del == NULL) {
+	return -1;
+    }
   
-  driver->outbound_events = jack_ringbuffer_create (MAX_EVENT_SIZE * 16 * sizeof(struct a2j_delivery_event));
-  if (driver->outbound_events == NULL) {
-    return -1;
-  }
+    driver->outbound_events = jack_ringbuffer_create (MAX_EVENT_SIZE * 16 * sizeof(struct a2j_delivery_event));
+    if (driver->outbound_events == NULL) {
+	return -1;
+    }
         
-  if (!a2j_stream_init (driver, A2J_PORT_CAPTURE)) {
-    return -1;
-  }
+    if (!a2j_stream_init (driver, A2J_PORT_CAPTURE)) {
+	return -1;
+    }
 
-  if (!a2j_stream_init (driver, A2J_PORT_PLAYBACK)) {
-    return -1;
-  }
+    if (!a2j_stream_init (driver, A2J_PORT_PLAYBACK)) {
+	return -1;
+    }
 
-  if ((error = snd_seq_open(&driver->seq, "hw", SND_SEQ_OPEN_DUPLEX, 0)) < 0) {
-    a2j_error("failed to open alsa seq");
-    return -1;
-  }
+    if ((error = snd_seq_open(&driver->seq, "hw", SND_SEQ_OPEN_DUPLEX, 0)) < 0) {
+	a2j_error("failed to open alsa seq");
+	return -1;
+    }
 
-  if ((error = snd_seq_set_client_name(driver->seq, "jackmidi")) < 0) {
-    a2j_error("snd_seq_set_client_name() failed");
-    return -1;
-  }
+    if ((error = snd_seq_set_client_name(driver->seq, "jackmidi")) < 0) {
+	a2j_error("snd_seq_set_client_name() failed");
+	return -1;
+    }
 
-  if ((driver->port_id = snd_seq_create_simple_port(
-         driver->seq,
-         "port",
-         SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_WRITE
+    if ((driver->port_id = snd_seq_create_simple_port(
+	     driver->seq,
+	     "port",
+	     SND_SEQ_PORT_CAP_READ|SND_SEQ_PORT_CAP_WRITE
 #ifndef DEBUG
-         |SND_SEQ_PORT_CAP_NO_EXPORT
+	     |SND_SEQ_PORT_CAP_NO_EXPORT
 #endif
-         ,SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
+	     ,SND_SEQ_PORT_TYPE_APPLICATION)) < 0) {
 
-    a2j_error("snd_seq_create_simple_port() failed");
-    return -1;
-  }
+	a2j_error("snd_seq_create_simple_port() failed");
+	return -1;
+    }
 
-  if ((driver->client_id = snd_seq_client_id(driver->seq)) < 0) {
-    a2j_error("snd_seq_client_id() failed");
-    return -1;
-  }
+    if ((driver->client_id = snd_seq_client_id(driver->seq)) < 0) {
+	a2j_error("snd_seq_client_id() failed");
+	return -1;
+    }
 	
-  if ((driver->queue = snd_seq_alloc_queue(driver->seq)) < 0) {
-    a2j_error("snd_seq_alloc_queue() failed");
-    return -1;
-  }
+    if ((driver->queue = snd_seq_alloc_queue(driver->seq)) < 0) {
+	a2j_error("snd_seq_alloc_queue() failed");
+	return -1;
+    }
 
-  if ((error = snd_seq_nonblock(driver->seq, 1)) < 0) {
-    a2j_error("snd_seq_nonblock() failed");
-    return -1;
-  }
+    if ((error = snd_seq_nonblock(driver->seq, 1)) < 0) {
+	a2j_error("snd_seq_nonblock() failed");
+	return -1;
+    }
 
-  return jack_activate (driver->jack_client);
+    return jack_activate (driver->jack_client);
 }
 
 static int
-alsa_midi_detach (alsa_midi_driver_t* driver, jack_engine_t* engine)
+alsa_midi_detach (alsa_midi_driver_t* driver, jack::engine * engine )
 {
   driver->finishing = true;
   
