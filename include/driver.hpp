@@ -250,8 +250,8 @@ typedef jack_driver_desc_t * (*JackDriverDescFunction) ();
 void jack_driver_init (jack_driver_t *);
 void jack_driver_release (jack_driver_t *);
 
-jack_driver_t *jack_driver_load (int argc, char **argv);
-void jack_driver_unload (jack_driver_t *);
+//jack_driver_t *jack_driver_load (int argc, char **argv);
+//void jack_driver_unload (jack_driver_t *);
 
 
 /****************************

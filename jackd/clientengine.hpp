@@ -43,30 +43,6 @@ static inline const char * jack_client_state_name (jack_client_internal_t *clien
 
 #define JACK_ERROR_WITH_SOCKETS 10000000
 
-int	jack_engine_client_activate( jack_engine_t & engine, jack_uuid_t id);
-int	jack_engine_client_deactivate( jack_engine_t & engine, jack_uuid_t id);
-int	jack_engine_client_create( jack_engine_t & engine, int client_fd);
-void	jack_engine_client_internal_delete( jack_engine_t & engine,
-					    jack_client_internal_t *client);
-int	jack_engine_mark_client_socket_error( jack_engine_t & engine, int fd);
-jack_client_internal_t *
-	jack_engine_create_driver_client_internal( jack_engine_t & engine, char *name);
-void	jack_engine_intclient_handle_request( jack_engine_t & engine,
-				       jack_request_t *req);
-void	jack_engine_intclient_load_request( jack_engine_t & engine,
-				     jack_request_t *req);
-void	jack_engine_intclient_name_request( jack_engine_t & engine,
-				     jack_request_t *req);
-void	jack_engine_intclient_unload_request( jack_engine_t & engine,
-				       jack_request_t *req);
-int	jack_engine_check_clients( jack_engine_t & engine, int with_timeout_check);
-
-void	jack_engine_remove_clients( jack_engine_t & engine, int* exit_freewheeling);
-
-void	jack_engine_client_registration_notify( jack_engine_t & engine, const char* name, int yn );
-
-void    jack_engine_remove_client_internal( jack_engine_t & engine, jack_client_internal_t *client );
-
 //#ifdef __cplusplus
 ///* Close of extern "C" { */
 //}

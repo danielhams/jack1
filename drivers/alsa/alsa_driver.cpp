@@ -37,7 +37,7 @@
 #include "internal.hpp"
 #include "engine.hpp"
 #include "messagebuffer.hpp"
-#include "libjackpp/local.hpp"
+#include "libjack/local.hpp"
 
 #include <sysdeps/time.h>
 

@@ -47,12 +47,9 @@ example-clients/jack_showtime
 example-clients/jack_simple_client
 example-clients/jack_transport_client
 jack/version.h
-jackd/jack_md5.h
+jackd/jack_md5.hpp
 jackd/jackd
 jackd/jackd.1
-jackdpp/jackpp_md5.hpp
-jackdpp/jackdpp
-jackdpp/jackdpp.1
 macros/libtool.m4
 macros/ltoptions.m4
 macros/ltsugar.m4

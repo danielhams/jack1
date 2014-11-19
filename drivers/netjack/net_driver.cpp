@@ -51,7 +51,7 @@ $Id: net_driver.c,v 1.17 2006/04/16 20:16:10 torbenh Exp $
 #include "netjack_packet.hpp"
 #include "net_driver.hpp"
 
-#include "libjackpp/jack_pp_debug.hpp"
+#include "libjack/jack_pp_debug.hpp"
 
 #undef DEBUG_WAKEUP
 

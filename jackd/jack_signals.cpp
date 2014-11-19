@@ -137,35 +137,7 @@ void jack_signals_install_do_nothing_action( sigset_t & signals )
     }
 }
 
-int jack_signals_wait( sigset_t & signals, jack_engine_t * engine )
-{
-    int sig;
-    bool waiting = true;
-
-    while (waiting) {
-	sigwait( &signals, &sig );
-
-	jack_info( "jack main caught signal %d", sig );
-		
-	switch (sig) {
-	    case SIGUSR1:
-		if( engine != nullptr ) {
-		    jack_engine_dump_configuration( *engine, 1 );
-		}
-		break;
-	    case SIGUSR2:
-		/* driver exit */
-		waiting = false;
-		break;
-	    default:
-		waiting = false;
-		break;
-	}
-    }
-    return sig;
-}
-
-int jack_signals_wait_pp( sigset_t & signals, jack::engine * engine )
+int jack_signals_wait( sigset_t & signals, jack::engine * engine )
 {
     int sig;
     bool waiting = true;

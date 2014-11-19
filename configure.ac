@@ -302,11 +302,11 @@ AC_DEFINE_UNQUOTED(JACK_SHM_TYPE, [$JACK_SHM_TYPE],
 AM_CONDITIONAL(USE_POSIX_SHM, $USE_POSIX_SHM)
 
 JACK_CORE_CFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
--I\$(top_srcdir) -I\$(top_srcdir)/includecpp \ 
+-I\$(top_srcdir) -I\$(top_srcdir)/include \ 
 -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_CORE_CPPFLAGS="-I\$(top_srcdir)/config -I\$(top_srcdir) \
--I\$(top_srcdir) -I\$(top_srcdir)/includecpp \ 
+-I\$(top_srcdir) -I\$(top_srcdir)/include \ 
 -D_REENTRANT -D_POSIX_PTHREAD_SEMANTICS -Wall"
 
 JACK_LIBC_HELPER_FLAGS=
@@ -894,67 +894,6 @@ include/Makefile
 libjack/Makefile
 python/Makefile
 )
-
-dnl Makefile
-dnl config/Makefile
-dnl config/cpu/Makefile
-dnl config/cpu/alpha/Makefile
-dnl config/cpu/cris/Makefile
-dnl config/cpu/generic/Makefile
-dnl config/cpu/i386/Makefile
-dnl config/cpu/i486/Makefile
-dnl config/cpu/ia64/Makefile
-dnl config/cpu/m68k/Makefile
-dnl config/cpu/mips/Makefile
-dnl config/cpu/powerpc/Makefile
-dnl config/cpu/s390/Makefile
-dnl config/os/Makefile
-dnl config/os/generic/Makefile
-dnl config/os/gnu-linux/Makefile
-dnl config/os/macosx/Makefile
-dnl config/sysdeps/Makefile
-dnl doc/Makefile
-dnl doc/reference.doxygen
-dnl drivers/Makefile
-dnl drivers/alsa/Makefile
-dnl drivers/alsa_midi/Makefile
-dnl drivers/dummy/Makefile
-dnl drivers/oss/Makefile
-dnl drivers/sun/Makefile
-dnl drivers/portaudio/Makefile
-dnl drivers/coreaudio/Makefile
-dnl drivers/freebob/Makefile
-dnl drivers/firewire/Makefile
-dnl drivers/netjack/Makefile
-dnl driverspp/Makefile
-dnl driverspp/alsa/Makefile
-dnl driverspp/alsa_midi/Makefile
-dnl driverspp/dummy/Makefile
-dnl driverspp/oss/Makefile
-dnl driverspp/sun/Makefile
-dnl driverspp/portaudio/Makefile
-dnl driverspp/coreaudio/Makefile
-dnl driverspp/freebob/Makefile
-dnl driverspp/firewire/Makefile
-dnl driverspp/netjack/Makefile
-dnl example-clients/Makefile
-dnl tools/Makefile
-dnl tools/zalsa/Makefile
-dnl tools/zalsapp/Makefile
-dnl man/Makefile
-dnl jack.pc
-dnl jack.spec
-dnl jackd/Makefile
-dnl jackd/jackd.1
-dnl jackdpp/Makefile
-dnl jackdpp/jackdpp.1
-dnl include/version.h
-dnl include/Makefile
-dnl includecpp/version.hpp
-dnl includecpp/Makefile
-dnl libjack/Makefile
-dnl libjackpp/Makefile
-dnl python/Makefile
 
 dnl
 dnl Output summary message

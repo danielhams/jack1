@@ -195,7 +195,7 @@ const string & client_tmp_dir()
 
 	for( auto & token : tokens ) {
 	    stringstream jackdss( stringstream::out );
-	    jackdss << token << "/jackdpp";
+	    jackdss << token << "/jackd";
 	    string jackd = jackdss.str();
 	    if( access( jackd.c_str(), X_OK ) == 0 ) {
 		stringstream commandss( stringstream::out );

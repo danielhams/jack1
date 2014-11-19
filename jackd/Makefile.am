@@ -12,7 +12,7 @@ install-exec-hook:
 			chown root.root $(DESTDIR)$(bindir)/jackstart; \
 			chmod 4555 $(DESTDIR)$(bindir)/jackstart; \
 	else    echo "You must be root to set ownership and permissions"; \
-			echo " for jackdpp and jackstartpp."; \
+			echo " for jackd and jackstart."; \
 	fi
 else
 CAP_PROGS =
@@ -46,7 +46,7 @@ noinst_HEADERS = jack_md5.hpp \
 
 BUILT_SOURCES = jack_md5.hpp
 
-jackpp_md5.hpp: jackd
+jack_md5.hpp: jackd
 if STRIPPED_JACKD
 	strip -R .note -R .comment .libs/jackd
 endif

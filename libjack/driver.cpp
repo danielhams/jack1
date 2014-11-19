@@ -160,7 +160,7 @@ jack_driver_nt_thread (void * arg)
  out:
 	if (rc) {
 		driver->nt_run = DRIVER_NT_DYING;
-		driver->engine->driver_exit (driver->engine);
+		jack::engine::driver_exit( driver->engine_pp );
 	}
 	pthread_exit (NULL);
 }
@@ -196,7 +196,7 @@ jack_driver_nt_thread_pp( void * arg )
   out:
     if( rc ) {
 	driver->nt_run = DRIVER_NT_DYING;
-	driver->engine_pp->driver_exit();
+	jack::engine::driver_exit( driver->engine_pp );
     }
     pthread_exit( nullptr );
 }
@@ -367,17 +367,19 @@ jack_driver_nt_finish     (jack_driver_nt_t * driver)
 namespace jack
 {
 
-void engine::driver_exit()
+void engine::driver_exit( engine * engine_ptr )
 {
-    VERBOSE( this, "stopping driver");
+    jack_driver_t* driver = engine_ptr->driver;
+
+    VERBOSE( engine_ptr, "stopping driver");
     driver->stop( driver );
-    VERBOSE( this, "detaching driver");
-    driver->detach_pp( driver, this );
+    VERBOSE( engine_ptr, "detaching driver");
+    driver->detach_pp( driver, engine_ptr );
 
     /* tell anyone waiting that the driver exited. */
-    kill( wait_pid, SIGUSR2 );
+    kill( engine_ptr->wait_pid, SIGUSR2 );
 	
-    driver = nullptr;
+    engine_ptr->driver = NULL;
 }
 
 }

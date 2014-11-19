@@ -39,7 +39,7 @@
 
 #include "jack/start.hpp"
 #include "md5.hpp"
-#include "jackpp_md5.hpp"
+#include "jack_md5.hpp"
 
 #define READ_BLOCKSIZE 4096
 

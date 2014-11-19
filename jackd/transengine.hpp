@@ -28,6 +28,7 @@
 extern "C" {
 #endif
 
+/*
 int	jack_timebase_reset( jack_engine_t * engine, jack_uuid_t client_id );
 int	jack_timebase_set( jack_engine_t * engine, jack_uuid_t client_id, int conditional );
 void	jack_transport_activate( jack_engine_t * engine, jack_client_internal_t *client );
@@ -39,6 +40,7 @@ int	jack_transport_client_set_sync( jack_engine_t * engine, jack_uuid_t client_i
 void	jack_transport_cycle_end( jack_engine_t * engine );
 void	jack_transport_cycle_start( jack_engine_t * engine, jack_time_t time );
 int	jack_transport_set_sync_timeout( jack_engine_t * engine, jack_time_t usecs );
+*/
 
 #ifdef __cplusplus
 /* Close of extern "C" { */
@@ -47,11 +49,14 @@ int	jack_transport_set_sync_timeout( jack_engine_t * engine, jack_time_t usecs )
 
 int	jack_timebase_reset_pp( jack::engine * engine, jack_uuid_t client_id );
 int	jack_timebase_set_pp( jack::engine * engine, jack_uuid_t client_id, int conditional );
-void	jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_t *client );
 void	jack_transport_activate_pp( jack::engine * engine, jack_client_internal_t *client );
+void	jack_transport_init( jack::engine * engine );
+void	jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_t *client );
+void	jack_transport_client_new_pp( jack_client_internal_t *client );
 int	jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t client_id );
 int	jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client_id );
-int	jack_transport_set_sync_timeout_pp( jack::engine * engine, jack_time_t usecs );
 void	jack_transport_cycle_end_pp( jack::engine * engine );
+void	jack_transport_cycle_start_pp( jack::engine * engine, jack_time_t time );
+int	jack_transport_set_sync_timeout_pp( jack::engine * engine, jack_time_t usecs );
 
 #endif

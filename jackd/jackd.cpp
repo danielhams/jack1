@@ -20,8 +20,6 @@
 
 */
 
-#define USE_CPP_MAINLOOP 1
-
 // Needed to get PRId32 formatters
 #define __STDC_FORMAT_MACROS
 
@@ -100,96 +98,7 @@ typedef jack::engine engine_pp;
 namespace jack
 {
 
-static void load_internal_clients( jack_engine_t * engine, const vector<string> & internal_clients )
-{
-    for( const string & internal_client : internal_clients ) {
-	jack_request_t req;
-	string client_name, path, args, rest;
-
-	/* possible argument forms:
-
-	   client-name:client-type/args
-	   client-type/args
-	   client-name:client-type
-	   client-type
-
-	   client-name is the desired JACK client name.
-	   client-type is basically the name of the DLL/DSO without any suffix.
-	   args is a string whose contents will be passed to the client as
-	   it is instantiated
-	*/
-	string::size_type str_length = internal_client.size();
-
-	string::size_type colon_pos = internal_client.find(':');
-	string::size_type slash_pos = internal_client.find('/');
-
-	if ((slash_pos == string::npos && colon_pos == string::npos) ||
-	    ((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos))) {
-	    /* client-type */
-	    client_name = internal_client;
-	    path = client_name;
-	}
-	else if (slash_pos != string::npos && colon_pos != string::npos) {
-	    /* client-name:client-type/args */
-	    client_name = internal_client.substr(0,colon_pos);
-
-	    string::size_type len = slash_pos - (colon_pos + 1);
-	    if (len > 0) {
-		path = internal_client.substr(colon_pos+1,len);
-	    } else {
-		path = client_name;
-	    }
-
-	    string::size_type rest_len = len - (slash_pos + 1);
-	    if (rest_len > 0 )
-	    {
-		rest = internal_client.substr(slash_pos+1,rest_len);
-		args = rest;
-	    }
-	} else if (slash_pos != string::npos && colon_pos == string::npos) {
-	    /* client-type/args */
-	    path = internal_client.substr(0, slash_pos);
-	    string::size_type rest_len = str_length - (slash_pos+1);
-	    if (rest_len > 0) {
-		rest = internal_client.substr(slash_pos+1,rest_len);
-		args = rest;
-	    }
-	} else {
-	    /* client-name:client-type */
-	    client_name = internal_client.substr(0,colon_pos);
-	    string::size_type rest_len = str_length - (colon_pos+1);
-	    if( rest_len > 0 ) {
-		path = internal_client.substr((colon_pos+1),rest_len);
-	    }
-	}
-
-	// Check client name / path format
-	if (client_name.size() == 0 || path.size() == 0 ) {
-	    cerr << "incorrect format for internal client specification (" << internal_client << ")" << endl;
-	    exit (1);
-	}
-
-	memset (&req, 0, sizeof (req));
-	req.type = IntClientLoad;
-	const char * client_name_cstr = client_name.c_str();
-	strncpy (req.x.intclient.name, client_name_cstr, sizeof (req.x.intclient.name));
-	const char * path_cstr = path.c_str();
-	strncpy (req.x.intclient.path, path_cstr, sizeof (req.x.intclient.path));
-
-	if (args.size() > 0) {
-	    const char * args_cstr = args.c_str();
-	    strncpy (req.x.intclient.init, args_cstr, sizeof (req.x.intclient.init));
-	} else {
-	    req.x.intclient.init[0] = '\0';
-	}
-
-	pthread_mutex_lock (&engine->request_lock);
-	jack_engine_intclient_load_request( *engine, &req );
-	pthread_mutex_unlock (&engine->request_lock);
-    }
-}
-
-static void load_internal_clients_pp( engine_pp & engine, const vector<string> & internal_clients )
+static void load_internal_clients( engine_pp & engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
 	jack_request_t req;
@@ -279,74 +188,6 @@ static void load_internal_clients_pp( engine_pp & engine, const vector<string> &
 }
 
 static int main_loop( const jack_options & parsed_options,
-		      const drivers & loaded_drivers,
-		      jack_driver_desc_t * driver_desc,
-		      JSList * driver_params_jsl )
-{
-    unique_ptr<jack_engine_t> engine;
-    int sig;
-
-    sigset_t signals = jack_signals_create();
-
-    if( (engine = jack_engine_create(
-	     parsed_options,
-	     getpid(),
-	     loaded_drivers.get_loaded_descs() )) == 0 ) {
-	jack_error ("cannot create engine");
-	return -1;
-    }
-
-    jack_info ("loading driver ..");
-	
-    if( jack_engine_load_driver( *engine, driver_desc, driver_params_jsl )) {
-	jack_error ("cannot load driver module %s",
-		    driver_desc->name);
-	goto error;
-    }
-
-    for( const string & slave_driver_name : parsed_options.slave_drivers ) {
-	jack_driver_desc_t *sl_desc = loaded_drivers.find_desc_by_name( slave_driver_name );
-	if (sl_desc) {
-	    jack_engine_load_slave_driver( *engine, sl_desc, NULL );
-	}
-    }
-
-    if (jack_engine_drivers_start( *engine ) != 0) {
-	jack_error ("cannot start driver");
-	goto error;
-    }
-
-    load_internal_clients( engine.get(), parsed_options.internal_clients );
-
-    /* install a do-nothing handler because otherwise pthreads
-       behaviour is undefined when we enter sigwait.
-    */
-    jack_signals_install_do_nothing_action( signals );
-
-    if( parsed_options.verbose ) {
-	jack_info ("%d waiting for signals", getpid());
-    }
-
-    sig = jack_signals_wait( signals, engine.get() );
-
-    if (sig != SIGSEGV) {
-	/* unblock signals so we can see them during shutdown.
-	   this will help prod developers not to lose sight of
-	   bugs that cause segfaults etc. during shutdown.
-	*/
-	jack_signals_unblock( signals );
-    }
-
-    jack_engine_cleanup( *engine );
-
-    return 1;
-	
-  error:
-    jack_engine_cleanup( *engine );
-    return -1;
-}
-
-static int main_loop_pp( const jack_options & parsed_options,
 			 const drivers & loaded_drivers,
 			 jack_driver_desc_t * driver_desc,
 			 JSList * driver_params_jsl )
@@ -369,7 +210,7 @@ static int main_loop_pp( const jack_options & parsed_options,
 	parsed_options.client_timeout,
 	parsed_options.unlock_gui_memory,
 	parsed_options.verbose,
-	parsed_options.verbose,
+	parsed_options.no_zombies,
 	server_pid,
 	loaded_drivers.get_loaded_descs() );
 
@@ -398,7 +239,7 @@ static int main_loop_pp( const jack_options & parsed_options,
 	goto error;
     }
 
-    load_internal_clients_pp( *engine, parsed_options.internal_clients );
+    load_internal_clients( *engine, parsed_options.internal_clients );
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -409,7 +250,7 @@ static int main_loop_pp( const jack_options & parsed_options,
 	jack_info( "%d waiting for signals", server_pid );
     }
 
-    sig = jack_signals_wait_pp( signals, engine.get() );
+    sig = jack_signals_wait( signals, engine.get() );
 
     if (sig != SIGSEGV) {
 	/* unblock signals so we can see them during shutdown.
@@ -557,17 +398,10 @@ int main (int argc, char *argv[])
     cleanup_files( parsed_options.server_name );
 
     /* run the server engine until it terminates */
-#ifdef USE_CPP_MAINLOOP
-    main_loop_pp( parsed_options,
+    main_loop( parsed_options,
 		  drivers,
 		  desc,
 		  driver_params_jsl );
-#else
-    main_loop( parsed_options,
-	       drivers,
-	       desc,
-	       driver_params_jsl );
-#endif
 
     /* clean up shared memory and files from this server instance */
     if( parsed_options.verbose )

@@ -327,9 +327,10 @@ public:
 
     int drivers_start();
     int drivers_stop();
-    void driver_exit();
+
     int load_driver( jack_driver_desc_t * driver_desc,
 		     JSList * driver_params_jsl );
+    void driver_unload( jack_driver_t * driver );
     int use_driver( jack_driver_t * driver );
     int load_slave_driver( jack_driver_desc_t * driver_desc,
 			   JSList * driver_params_jsl );
@@ -400,6 +401,15 @@ public:
     static int run_cycle_pp( engine * engine_ptr, jack_nframes_t nframes, float delayed_usecs );
 
     int check_clients( int with_timeout_check );
+
+    static int driver_buffer_size( engine * engine_ptr, jack_nframes_t nframes );
+    static int set_sample_rate( engine * engine_ptr, jack_nframes_t nframes );
+
+    static void delay( engine * engine_ptr, float delayed_usecs );
+
+    static void driver_exit( engine * engine_ptr );
+
+    int run_one_cycle( jack_nframes_t nframes, float delayed_usecs );
 
 private:
     jack_driver_info_t * load_driver_so_( jack_driver_desc_t * driver_desc );
@@ -497,10 +507,6 @@ private:
     int do_has_session_cb_( jack_request_t *req );
 
     int send_session_reply_( jack_client_internal_t *client );
-
-    int run_one_cycle_( jack_nframes_t nframes, float delayed_usecs );
-
-    void delay_( float delayed_usecs );
 
     int drivers_read_( jack_nframes_t nframes );
     int drivers_write_( jack_nframes_t nframes );
