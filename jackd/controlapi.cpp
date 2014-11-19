@@ -85,7 +85,7 @@ using jack::drivers;
 using jack::cleanup_files;
 using jack::server_default_name;
 
-typedef jack::engine engine_pp;
+using jack::engine;
 
 /*
  * XXX: dont like statics here.
@@ -813,7 +813,7 @@ bool jackctl_server_start( jackctl_server_t *server_ptr,
     server_options.no_zombies = server_ptr->nozombies.b;
     server_options.timeout_threshold = server_ptr->timothres.ui;
 
-    server_ptr->engine = make_unique<engine_pp>(
+    server_ptr->engine = make_unique<engine>(
 	server_options.timeout_threshold,
 	server_options.frame_time_offset,
 	server_options.memory_locked,

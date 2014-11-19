@@ -28,7 +28,6 @@
 #include <jack/midiport.h>
 #include <jack/ringbuffer.h>
 
-//#include "list.h"
 #include "a2j.hpp"
 #include "port_hash.hpp"
 #include "port.hpp"
@@ -70,7 +69,6 @@ a2j_stream_init(alsa_midi_driver_t* driver, int which)
   }
   
   snd_midi_event_new (MAX_EVENT_SIZE, &str->codec);
-//  INIT_LIST_HEAD (&str->list);
   
   return true;
 }
@@ -78,23 +76,16 @@ a2j_stream_init(alsa_midi_driver_t* driver, int which)
 static void
 a2j_stream_detach( struct a2j_stream * stream_ptr )
 {
-//	struct a2j_port * port_ptr;
-//	struct list_head * node_ptr;
-        
-        if( !stream_ptr ) {
-          return;
-        }
+    if( !stream_ptr ) {
+	return;
+    }
 
-//	while (!list_empty (&stream_ptr->list)) {
-	for( a2j_port* port_ptr : stream_ptr->port_ptrs ) {
-//		node_ptr = stream_ptr->list.next;
-//		list_del (node_ptr);
-//		port_ptr = list_entry (node_ptr, struct a2j_port, siblings);
+    for( a2j_port* port_ptr : stream_ptr->port_ptrs ) {
 
-	    a2j_debug ("port deleted: %s", port_ptr->name);
-	    a2j_port_free( port_ptr );
-	}
-	stream_ptr->port_ptrs.clear();
+	a2j_debug ("port deleted: %s", port_ptr->name);
+	a2j_port_free( port_ptr );
+    }
+    stream_ptr->port_ptrs.clear();
 }
 
 static
@@ -398,7 +389,7 @@ a2j_process_outgoing (
   limit = vec[0].len / sizeof (struct a2j_delivery_event);
   nevents = jack_midi_get_event_count (port->jack_buf);
 
-  for (i = 0; (i < nevents) && (written < limit); ++i) {
+  for( i = 0; (i < nevents) && (written < (int)limit); ++i ) {
 
     jack_midi_event_get (&dev->jack_event, port->jack_buf, i);
     if (dev->jack_event.size <= MAX_JACKMIDI_EV_SIZE)
@@ -424,7 +415,7 @@ a2j_process_outgoing (
 
     limit += (vec[1].len / sizeof (struct a2j_delivery_event));
 
-    while ((i < nevents) && (written < limit))
+    while( (i < nevents) && (written < (int)limit) )
     {
       jack_midi_event_get(&dev->jack_event, port->jack_buf, i);
       if (dev->jack_event.size <= MAX_JACKMIDI_EV_SIZE)
@@ -447,18 +438,7 @@ a2j_process_outgoing (
   return nevents;
 }
 
-static int
-time_sorter (struct a2j_delivery_event * a, struct a2j_delivery_event * b)
-{
-  if (a->time < b->time) {
-    return -1;
-  } else if (a->time > b->time) {
-    return 1;
-  } 
-  return 0;
-}
-
-static bool time_sorter_pp( a2j_delivery_event * a, a2j_delivery_event * b )
+static bool time_sorter( a2j_delivery_event * a, a2j_delivery_event * b )
 {
     return( a->time < b->time );
 }
@@ -469,22 +449,17 @@ alsa_output_thread(void * arg)
     alsa_midi_driver_t * driver = (alsa_midi_driver_t*) arg;
     struct a2j_stream *str = &driver->stream[A2J_PORT_PLAYBACK];
     int i;
-//  struct list_head evlist;
-//  struct list_head * node_ptr;
     std::vector<a2j_delivery_event*> evlist;
     jack_ringbuffer_data_t vec[2];
     snd_seq_event_t alsa_event;
     struct a2j_delivery_event* ev;
     float sr;
     jack_nframes_t now;
-    int err;
     int limit;
 
     while( driver->running ) {
 	/* first, make a list of all events in the outbound_events FIFO */
     
-//	INIT_LIST_HEAD(&evlist);
-
 	jack_ringbuffer_get_read_vector( driver->outbound_events, vec );
 
 	a2j_debug( "output thread: got %d+%d events", 
@@ -494,7 +469,6 @@ alsa_output_thread(void * arg)
 	ev = (struct a2j_delivery_event*) vec[0].buf;
 	limit = vec[0].len / sizeof (struct a2j_delivery_event);
 	for( i = 0; i < limit; ++i ) {
-//	    list_add_tail(&ev->siblings, &evlist);
 	    evlist.insert( evlist.end(), ev->siblings_vector.begin(), ev->siblings_vector.end() );
 	    ev++;
 	}
@@ -502,7 +476,6 @@ alsa_output_thread(void * arg)
 	ev = (struct a2j_delivery_event*) vec[1].buf;
 	limit = vec[1].len / sizeof (struct a2j_delivery_event);
 	for( i = 0; i < limit; ++i ) {
-//	    list_add_tail(&ev->siblings, &evlist);
 	    evlist.insert( evlist.end(), ev->siblings_vector.begin(), ev->siblings_vector.end() );
 	    ev++;
 	}
@@ -517,17 +490,13 @@ alsa_output_thread(void * arg)
 
 	/* now sort this list by time */
 
-//	list_sort(&evlist, struct a2j_delivery_event, siblings, time_sorter);
-	std::sort( evlist.begin(), evlist.end(), time_sorter_pp );
+	std::sort( evlist.begin(), evlist.end(), time_sorter );
 
 	/* now deliver */
 
 	sr = jack_get_sample_rate (driver->jack_client);
 
 	for( a2j_delivery_event * ev : evlist ) {
-//	list_for_each(node_ptr, &evlist)
-//	{
-//	    ev = list_entry(node_ptr, struct a2j_delivery_event, siblings);
 
 	    snd_seq_ev_clear(&alsa_event);
 	    snd_midi_event_reset_encode(str->codec);
@@ -569,7 +538,7 @@ alsa_output_thread(void * arg)
 	    }
       
 	    /* its time to deliver */
-	    err = snd_seq_event_output(driver->seq, &alsa_event);
+	    (void)snd_seq_event_output(driver->seq, &alsa_event);
 	    snd_seq_drain_output (driver->seq);
 	    now = jack_frame_time (driver->jack_client);
 	    a2j_debug("alsa_out: written %d bytes to %s at %d, DELTA = %d", ev->jack_event.size, ev->port->name, now, 
@@ -842,7 +811,6 @@ driver_get_descriptor ()
 {
     jack_driver_desc_t * desc;
     jack_driver_param_desc_t * params;
-    //unsigned int i;
 
     desc = (jack_driver_desc_t*)calloc (1, sizeof (jack_driver_desc_t));
 

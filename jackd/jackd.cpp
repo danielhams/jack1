@@ -93,12 +93,12 @@ using jack::jack_signals_wait;
 
 using jack::drivers;
 
-typedef jack::engine engine_pp;
+using jack::engine;
 
 namespace jack
 {
 
-static void load_internal_clients( engine_pp & engine, const vector<string> & internal_clients )
+static void load_internal_clients( engine & engine, const vector<string> & internal_clients )
 {
     for( const string & internal_client : internal_clients ) {
 	jack_request_t req;
@@ -198,7 +198,7 @@ static int main_loop( const jack_options & parsed_options,
 
     int server_pid = getpid();
 
-    unique_ptr<engine_pp> engine = make_unique<engine_pp>(
+    unique_ptr<engine> eng = make_unique<engine>(
 	parsed_options.timeout_threshold,
 	parsed_options.frame_time_offset,
 	parsed_options.memory_locked,
@@ -214,14 +214,14 @@ static int main_loop( const jack_options & parsed_options,
 	server_pid,
 	loaded_drivers.get_loaded_descs() );
 
-    if( engine->init() < 0 ) {
+    if( eng->init() < 0 ) {
 	jack_error( "cannot create engine" );
 	return -1;
     }
 
     jack_info( "loading driver .." );
 
-    if( engine->load_driver( driver_desc, driver_params_jsl ) ) {
+    if( eng->load_driver( driver_desc, driver_params_jsl ) ) {
 	jack_error( "cannot load driver module %s",
 		    driver_desc->name );
 	goto error;
@@ -230,16 +230,16 @@ static int main_loop( const jack_options & parsed_options,
     for( const string & slave_driver_name : parsed_options.slave_drivers ) {
 	jack_driver_desc_t *sl_desc = loaded_drivers.find_desc_by_name( slave_driver_name );
 	if( sl_desc ) {
-	    engine->load_slave_driver( sl_desc, NULL );
+	    eng->load_slave_driver( sl_desc, NULL );
 	}
     }
 
-    if( engine->drivers_start() != 0 ) {
+    if( eng->drivers_start() != 0 ) {
 	jack_error( "cannot start driver" );
 	goto error;
     }
 
-    load_internal_clients( *engine, parsed_options.internal_clients );
+    load_internal_clients( *eng, parsed_options.internal_clients );
 
     /* install a do-nothing handler because otherwise pthreads
        behaviour is undefined when we enter sigwait.
@@ -250,9 +250,9 @@ static int main_loop( const jack_options & parsed_options,
 	jack_info( "%d waiting for signals", server_pid );
     }
 
-    sig = jack_signals_wait( signals, engine.get() );
+    sig = jack_signals_wait( signals, eng.get() );
 
-    if (sig != SIGSEGV) {
+    if( sig != SIGSEGV ) {
 	/* unblock signals so we can see them during shutdown.
 	   this will help prod developers not to lose sight of
 	   bugs that cause segfaults etc. during shutdown.
@@ -260,12 +260,12 @@ static int main_loop( const jack_options & parsed_options,
 	jack_signals_unblock( signals );
     }
 
-    engine->cleanup();
+    eng->cleanup();
 
     return 1;
 
   error:
-    engine->cleanup();
+    eng->cleanup();
     return -1;
 }
 

@@ -248,7 +248,7 @@ static inline int jack_rolling_interval( jack_time_t period_usecs )
 namespace jack
 {
 
-int internal_client_request_pp( void * ptr, jack_request_t * request )
+int internal_client_request( void * ptr, jack_request_t * request )
 {
     engine * engine_ptr = static_cast<engine*>( ptr );
     engine_ptr->do_request( request, nullptr );
@@ -2356,7 +2356,7 @@ jack_client_internal_t * engine::setup_client(
 	 * system to work.  The client is in the same address
 	 * space */
 
-	client->private_client->deliver_request = internal_client_request_pp;
+	client->private_client->deliver_request = internal_client_request;
 	client->private_client->deliver_arg = this;
     }
 
