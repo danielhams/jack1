@@ -42,7 +42,7 @@
  *
  *   precondition: caller holds the graph lock. */
 static inline void
-jack_sync_poll_new_pp( jack::engine * engine, jack_client_internal_t *client )
+jack_sync_poll_new( jack::engine * engine, jack_client_internal_t *client )
 {
     /* force sync_cb callback to run in its first cycle */
     engine->control->sync_time_left = engine->control->sync_timeout;
@@ -64,7 +64,7 @@ jack_sync_poll_new_pp( jack::engine * engine, jack_client_internal_t *client )
 /* stop polling a specific slow-sync client
  *
  *   precondition: caller holds the graph lock. */
-static inline void jack_sync_poll_deactivate_pp( jack::engine * engine, jack_client_internal_t *client)
+static inline void jack_sync_poll_deactivate( jack::engine * engine, jack_client_internal_t *client)
 {
     if( client->control->sync_poll ) {
 	client->control->sync_poll = 0;
@@ -80,7 +80,7 @@ static inline void jack_sync_poll_deactivate_pp( jack::engine * engine, jack_cli
 /* stop polling all the slow-sync clients
  *
  *   precondition: caller holds the graph lock. */
-static void jack_sync_poll_stop_pp( jack::engine * engine )
+static void jack_sync_poll_stop( jack::engine * engine )
 {
     long poll_count = 0;		/* count sync_poll clients */
 
@@ -106,7 +106,7 @@ static void jack_sync_poll_stop_pp( jack::engine * engine )
 /* start polling all the slow-sync clients
  *
  *   precondition: caller holds the graph lock. */
-static void jack_sync_poll_start_pp( jack::engine * engine )
+static void jack_sync_poll_start( jack::engine * engine )
 {
     long sync_count = 0;		/* count slow-sync clients */
 
@@ -127,7 +127,7 @@ static void jack_sync_poll_start_pp( jack::engine * engine )
 }
 
 /* check for sync timeout */
-static inline int jack_sync_timeout_pp( jack::engine * engine )
+static inline int jack_sync_timeout( jack::engine * engine )
 {
     jack_control_t *ectl = engine->control;
     jack_time_t buf_usecs = ((ectl->buffer_size * (jack_time_t) 1000000) /
@@ -149,7 +149,7 @@ static inline int jack_sync_timeout_pp( jack::engine * engine )
 /**************** subroutines used by engine.c ****************/
 
 /* on ResetTimeBaseClient request */
-int jack_timebase_reset_pp( jack::engine * engine, jack_uuid_t client_id )
+int jack_timebase_reset( jack::engine * engine, jack_uuid_t client_id )
 {
     int ret;
     struct _jack_client_internal *client;
@@ -177,7 +177,7 @@ int jack_timebase_reset_pp( jack::engine * engine, jack_uuid_t client_id )
 }
 
 /* on SetTimeBaseClient request */
-int jack_timebase_set_pp( jack::engine * engine, jack_uuid_t client_id, int conditional )
+int jack_timebase_set( jack::engine * engine, jack_uuid_t client_id, int conditional )
 {
     int ret = 0;
     struct _jack_client_internal *client;
@@ -230,13 +230,13 @@ int jack_timebase_set_pp( jack::engine * engine, jack_uuid_t client_id, int cond
 /* for client activation
  *
  *   precondition: caller holds the graph lock. */
-void jack_transport_activate_pp( jack::engine * engine, jack_client_internal_t *client )
+void jack_transport_activate( jack::engine * engine, jack_client_internal_t *client )
 {
     if( client->control->is_slowsync ) {
 	assert( !client->control->active_slowsync );
 	client->control->active_slowsync = 1;
 	engine->control->sync_clients++;
-	jack_sync_poll_new_pp( engine, client );
+	jack_sync_poll_new( engine, client );
     }
 
     if( client->control->is_timebase ) {
@@ -245,7 +245,7 @@ void jack_transport_activate_pp( jack::engine * engine, jack_client_internal_t *
 }
 
 /* for engine initialization */
-void jack_transport_init_pp( jack::engine * engine )
+void jack_transport_init( jack::engine * engine )
 {
     jack_control_t *ectl = engine->control;
 
@@ -272,7 +272,7 @@ void jack_transport_init_pp( jack::engine * engine )
 /* when any client exits the graph (either dead or not active)
  *
  * precondition: caller holds the graph lock */
-void jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_t *client )
+void jack_transport_client_exit( jack::engine * engine, jack_client_internal_t *client )
 {
     if( client == engine->timebase_client ) {
 	if( client->control->dead ) {
@@ -287,7 +287,7 @@ void jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_
 
     if( client->control->is_slowsync ) {
 	if( client->control->active_slowsync ) {
-	    jack_sync_poll_deactivate_pp( engine, client );
+	    jack_sync_poll_deactivate( engine, client );
 	}
 	if( client->control->dead ) {
 	    client->control->is_slowsync = 0;
@@ -296,7 +296,7 @@ void jack_transport_client_exit_pp( jack::engine * engine, jack_client_internal_
 }
 
 /* when a new client is being created */
-void jack_transport_client_new_pp( jack_client_internal_t *client )
+void jack_transport_client_new( jack_client_internal_t *client )
 {
 	client->control->is_timebase = 0;
 	client->control->timebase_new = 0;
@@ -319,7 +319,7 @@ void jack_transport_client_new_pp( jack_client_internal_t *client )
 }
 
 /* on ResetSyncClient request */
-int jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t client_id)
+int jack_transport_client_reset_sync( jack::engine * engine, jack_uuid_t client_id)
 {
     int ret;
     jack_client_internal_t *client;
@@ -330,7 +330,7 @@ int jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t clie
 
     if( client && (client->control->is_slowsync) ) {
 	if( client->control->active_slowsync ) {
-	    jack_sync_poll_deactivate_pp( engine, client );
+	    jack_sync_poll_deactivate( engine, client );
 	}
 	client->control->is_slowsync = 0;
 	ret = 0;
@@ -345,7 +345,7 @@ int jack_transport_client_reset_sync_pp( jack::engine * engine, jack_uuid_t clie
 }
 
 /* on SetSyncClient request */
-int jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client_id )
+int jack_transport_client_set_sync( jack::engine * engine, jack_uuid_t client_id )
 {
     int ret;
     jack_client_internal_t *client;
@@ -373,7 +373,7 @@ int jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client
 	/* force poll of the new slow-sync client, if active */
 	if( client->control->active_slowsync ) {
 	    DEBUG( "sync poll new" );
-	    jack_sync_poll_new_pp( engine, client );
+	    jack_sync_poll_new( engine, client );
 	}
 	ret = 0;
     }
@@ -391,7 +391,7 @@ int jack_transport_client_set_sync_pp( jack::engine * engine, jack_uuid_t client
  *
  * precondition: caller holds the graph lock.
  */
-void jack_transport_cycle_end_pp( jack::engine * engine )
+void jack_transport_cycle_end( jack::engine * engine )
 {
     jack_control_t *ectl = engine->control;
     transport_command_t cmd;	/* latest transport command */
@@ -407,7 +407,7 @@ void jack_transport_cycle_end_pp( jack::engine * engine )
     /* check sync results from previous cycle */
     if( ectl->transport_state == JackTransportStarting ) {
 	if( (ectl->sync_remain == 0) ||
-	    (jack_sync_timeout_pp(engine)) ) {
+	    (jack_sync_timeout(engine)) ) {
 	    ectl->transport_state = JackTransportRolling;
 	    VERBOSE( engine, "transport Rolling, %8.6f sec"
 		     " left for poll",
@@ -433,7 +433,7 @@ void jack_transport_cycle_end_pp( jack::engine * engine )
 	    if( cmd == TransportCommandStart ) {
 		if( ectl->sync_clients ) {
 		    ectl->transport_state = JackTransportStarting;
-		    jack_sync_poll_start_pp( engine );
+		    jack_sync_poll_start( engine );
 		}
 		else {
 		    ectl->transport_state = JackTransportRolling;
@@ -446,13 +446,13 @@ void jack_transport_cycle_end_pp( jack::engine * engine )
 		ectl->transport_state = JackTransportStopped;
 		VERBOSE( engine, "transport Stopped");
 		if( ectl->sync_remain ) {
-		    jack_sync_poll_stop_pp( engine );
+		    jack_sync_poll_stop( engine );
 		}
 	    }
 	    else if( ectl->new_pos ) {
 		if( ectl->sync_clients ) {
 		    ectl->transport_state = JackTransportStarting;
-		    jack_sync_poll_start_pp( engine );
+		    jack_sync_poll_start( engine );
 		}
 		else {
 		    ectl->transport_state = JackTransportRolling;
@@ -466,13 +466,13 @@ void jack_transport_cycle_end_pp( jack::engine * engine )
 		VERBOSE( engine, "transport Stopped");
 		if( ectl->sync_remain )
 		{
-		    jack_sync_poll_stop_pp( engine );
+		    jack_sync_poll_stop( engine );
 		}
 	    }
 	    else if( ectl->new_pos ) {
 		if (ectl->sync_clients) {
 		    ectl->transport_state = JackTransportStarting;
-		    jack_sync_poll_start_pp( engine );
+		    jack_sync_poll_start( engine );
 		}
 	    }
 	    break;
@@ -506,13 +506,13 @@ void jack_transport_cycle_end_pp( jack::engine * engine )
 }
 
 /* driver callback at start of cycle */
-void jack_transport_cycle_start_pp( jack::engine * engine, jack_time_t time )
+void jack_transport_cycle_start( jack::engine * engine, jack_time_t time )
 {
     engine->control->current_time.usecs = time;
 }
 
 /* on SetSyncTimeout request */
-int jack_transport_set_sync_timeout_pp( jack::engine * engine, jack_time_t usecs)
+int jack_transport_set_sync_timeout( jack::engine * engine, jack_time_t usecs)
 {
     engine->control->sync_timeout = usecs;
     VERBOSE( engine, "new sync timeout: %8.6f secs",

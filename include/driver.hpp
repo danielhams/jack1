@@ -231,7 +231,6 @@ typedef struct _jack_driver {
     JackDriverNullCycleFunction null_cycle; \
     JackDriverStopFunction stop; \
     JackDriverStartFunction start; \
-    JackDriverStartFunctionPP start_pp; \
     JackDriverBufSizeFunction bufsize;
 
     JACK_DRIVER_DECL			/* expand the macro */

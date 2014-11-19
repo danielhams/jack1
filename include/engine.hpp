@@ -297,7 +297,7 @@ public:
 
     int driver_set_buffer_size( jack_nframes_t nframes );
 
-    static int run_cycle_pp( engine * engine_ptr, jack_nframes_t nframes, float delayed_usecs );
+    static int run_cycle( engine * engine_ptr, jack_nframes_t nframes, float delayed_usecs );
 
     int check_clients( int with_timeout_check );
 

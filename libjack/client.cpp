@@ -101,6 +101,7 @@ typedef struct {
 
 int cpu_type = 0;
 
+
 static void init_cpu ()
 {
 	cpu_type = ((have_3dnow() << 8) | have_sse());
@@ -126,6 +127,8 @@ static void init_cpu ()
 
 #endif /* USE_DYNSIMD */
 
+extern "C" {
+
 void jack_error (const char *fmt, ...)
 {
 	va_list ap;
@@ -135,6 +138,8 @@ void jack_error (const char *fmt, ...)
 	vsnprintf (buffer, sizeof(buffer), fmt, ap);
 	jack_error_callback (buffer);
 	va_end (ap);
+}
+
 }
 
 void default_jack_error_callback (const char *desc)
@@ -156,6 +161,8 @@ void silent_jack_error_callback (const char *desc)
 void (*jack_error_callback)(const char *desc) = &default_jack_error_callback;
 void (*jack_info_callback)(const char *desc) = &default_jack_info_callback;
 
+extern "C" {
+
 void jack_info (const char *fmt, ...)
 {
 	va_list ap;
@@ -165,6 +172,8 @@ void jack_info (const char *fmt, ...)
 	vsnprintf (buffer, sizeof(buffer), fmt, ap);
 	jack_info_callback (buffer);
 	va_end (ap);
+}
+
 }
 
 static int oop_client_deliver_request (void *ptr, jack_request_t *req)
@@ -2505,6 +2514,8 @@ float jack_cpu_load (jack_client_t *client)
 	return client->engine->cpu_load;
 }
 
+extern "C" {
+
 float jack_get_xrun_delayed_usecs (jack_client_t *client)
 {
 	return client->engine->xrun_delayed_usecs;
@@ -2518,6 +2529,8 @@ float jack_get_max_delayed_usecs (jack_client_t *client)
 void jack_reset_max_delayed_usecs (jack_client_t *client)
 {
 	client->engine->max_delayed_usecs =  0.0f;
+}
+
 }
 
 pthread_t jack_client_thread_id (jack_client_t *client)

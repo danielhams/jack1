@@ -355,12 +355,12 @@ engine::engine(
     driver( nullptr ),
     driver_desc( nullptr ),
     driver_params( nullptr ),
-    set_buffer_size_c( (set_buffer_size_callback)jack::engine::driver_buffer_size ),
-    set_sample_rate_c( (set_sample_rate_callback)jack::engine::set_sample_rate ),
-    run_cycle_c( (run_cycle_callback)jack::engine::run_cycle_pp ),
-    delay_c( (delay_callback)jack::engine::delay ),
-    transport_cycle_start_c( (transport_cycle_start_callback)jack_transport_cycle_start_pp ),
-    driver_exit_c( (driver_exit_callback)jack::engine::driver_exit ),
+    set_buffer_size_c( engine::driver_buffer_size ),
+    set_sample_rate_c( engine::set_sample_rate ),
+    run_cycle_c( engine::run_cycle ),
+    delay_c( engine::delay ),
+    transport_cycle_start_c( jack_transport_cycle_start ),
+    driver_exit_c( engine::driver_exit ),
     get_microseconds_c( nullptr ), // Initialised after a call to jack_set_clock_source
     client_timeout_msecs( client_timeout ),
     port_max( port_max ),
@@ -584,7 +584,6 @@ int engine::init()
     jack_set_clock_source( clock_source );
     control->clock_source = clock_source;
     get_microseconds_c = jack_get_microseconds_pointer();
-    printf( "engine::init get_microseconds_c is %p\n", get_microseconds_c );
 
     VERBOSE( this, "clock source = %s", jack_clock_source_name( clock_source ) );
 
@@ -1503,7 +1502,7 @@ int engine::client_do_deactivate_( jack_client_internal_t *client,
 
     client->control->active = FALSE;
 
-    jack_transport_client_exit_pp( this, client );
+    jack_transport_client_exit( this, client );
 
     if( !jack_client_is_internal(client) &&
 	external_client_cnt > 0) {
@@ -2542,7 +2541,7 @@ jack_client_internal_t * engine::setup_client_control_(
 	client->thread_cb_arg = NULL;
     }
 #endif
-    jack_transport_client_new_pp( client );
+    jack_transport_client_new( client );
 
     return client;
 }
@@ -3325,21 +3324,21 @@ void engine::do_request( jack_request_t *req, int *reply_fd )
 	    req->status = client_deactivate( req->x.client_id );
 	    break;
 	case SetTimeBaseClient:
-	    req->status = jack_timebase_set_pp( this,
-						req->x.timebase.client_id,
-						req->x.timebase.conditional );
+	    req->status = jack_timebase_set( this,
+					     req->x.timebase.client_id,
+					     req->x.timebase.conditional );
 	    break;
 	case ResetTimeBaseClient:
-	    req->status = jack_timebase_reset_pp( this, req->x.client_id );
+	    req->status = jack_timebase_reset( this, req->x.client_id );
 	    break;
 	case SetSyncClient:
-	    req->status = jack_transport_client_set_sync_pp( this, req->x.client_id );
+	    req->status = jack_transport_client_set_sync( this, req->x.client_id );
 	    break;
 	case ResetSyncClient:
-	    req->status = jack_transport_client_reset_sync_pp( this, req->x.client_id );
+	    req->status = jack_transport_client_reset_sync( this, req->x.client_id );
 	    break;
 	case SetSyncTimeout:
-	    req->status = jack_transport_set_sync_timeout_pp( this, req->x.timeout);
+	    req->status = jack_transport_set_sync_timeout( this, req->x.timeout);
 	    break;
 	case GetPortConnections:
 	case GetPortNConnections:
@@ -3936,7 +3935,7 @@ int engine::client_activate( jack_uuid_t id )
     {
 	client->control->active = TRUE;
 
-	jack_transport_activate_pp( this, client );
+	jack_transport_activate( this, client );
 
 	/* we call this to make sure the FIFO is
 	 * built+ready by the time the client needs
@@ -4775,7 +4774,7 @@ void engine::place_port_buffers_( jack_port_type_id_t ptid,
     pthread_mutex_unlock( &pti->lock );
 }
 
-int engine::run_cycle_pp( jack::engine * engine_ptr, jack_nframes_t nframes, float delayed_usecs )
+int engine::run_cycle( jack::engine * engine_ptr, jack_nframes_t nframes, float delayed_usecs )
 {
     jack_time_t now = engine_ptr->driver->last_wait_ust;
     jack_time_t dus = 0;
@@ -5093,7 +5092,7 @@ void engine::post_process_()
 {
     /* precondition: caller holds the graph lock. */
 
-    jack_transport_cycle_end_pp( this );
+    jack_transport_cycle_end( this );
     calc_cpu_load_();
     check_clients( 0 );
 }
