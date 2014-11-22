@@ -120,20 +120,21 @@ static void load_internal_clients( engine & engine, const vector<string> & inter
 	string::size_type colon_pos = internal_client.find(':');
 	string::size_type slash_pos = internal_client.find('/');
 
-	if ((slash_pos == string::npos && colon_pos == string::npos) ||
-	    ((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos))) {
+	if( (slash_pos == string::npos && colon_pos == string::npos) ||
+	    ((slash_pos != string::npos) && (colon_pos != string::npos) && (colon_pos > slash_pos)) ) {
 	    /* client-type */
 	    client_name = internal_client;
 	    path = client_name;
 	}
-	else if (slash_pos != string::npos && colon_pos != string::npos) {
+	else if( slash_pos != string::npos && colon_pos != string::npos ) {
 	    /* client-name:client-type/args */
 	    client_name = internal_client.substr(0,colon_pos);
 
 	    string::size_type len = slash_pos - (colon_pos + 1);
-	    if (len > 0) {
-		path = internal_client.substr(colon_pos+1,len);
-	    } else {
+	    if( len > 0 ) {
+		path = internal_client.substr( colon_pos+1, len );
+	    }
+	    else {
 		path = client_name;
 	    }
 
@@ -143,15 +144,17 @@ static void load_internal_clients( engine & engine, const vector<string> & inter
 		rest = internal_client.substr(slash_pos+1,rest_len);
 		args = rest;
 	    }
-	} else if (slash_pos != string::npos && colon_pos == string::npos) {
+	}
+	else if( slash_pos != string::npos && colon_pos == string::npos ) {
 	    /* client-type/args */
 	    path = internal_client.substr(0, slash_pos);
 	    string::size_type rest_len = str_length - (slash_pos+1);
-	    if (rest_len > 0) {
+	    if( rest_len > 0 ) {
 		rest = internal_client.substr(slash_pos+1,rest_len);
 		args = rest;
 	    }
-	} else {
+	}
+	else {
 	    /* client-name:client-type */
 	    client_name = internal_client.substr(0,colon_pos);
 	    string::size_type rest_len = str_length - (colon_pos+1);
@@ -161,22 +164,23 @@ static void load_internal_clients( engine & engine, const vector<string> & inter
 	}
 
 	// Check client name / path format
-	if (client_name.size() == 0 || path.size() == 0 ) {
+	if( client_name.size() == 0 || path.size() == 0 ) {
 	    cerr << "incorrect format for internal client specification (" << internal_client << ")" << endl;
 	    exit (1);
 	}
 
-	memset (&req, 0, sizeof (req));
+	memset( &req, 0, sizeof(req) );
 	req.type = IntClientLoad;
 	const char * client_name_cstr = client_name.c_str();
-	strncpy (req.x.intclient.name, client_name_cstr, sizeof (req.x.intclient.name));
+	strncpy( req.x.intclient.name, client_name_cstr, sizeof(req.x.intclient.name) );
 	const char * path_cstr = path.c_str();
-	strncpy (req.x.intclient.path, path_cstr, sizeof (req.x.intclient.path));
+	strncpy( req.x.intclient.path, path_cstr, sizeof(req.x.intclient.path) );
 
-	if (args.size() > 0) {
+	if( args.size() > 0 ) {
 	    const char * args_cstr = args.c_str();
-	    strncpy (req.x.intclient.init, args_cstr, sizeof (req.x.intclient.init));
-	} else {
+	    strncpy( req.x.intclient.init, args_cstr, sizeof(req.x.intclient.init) );
+	}
+	else {
 	    req.x.intclient.init[0] = '\0';
 	}
 
