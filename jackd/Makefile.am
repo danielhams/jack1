@@ -31,7 +31,7 @@ jackd_SOURCES = jackd.cpp \
 
 jackd_LDFLAGS = $(BOOST_LDFLAGS) $(BOOST_PROGRAM_OPTIONS_LDFLAGS)
 
-jackd_LDADD = $(top_builddir)/libjack/libjack.la libjackserver.la $(CAP_LIBS) @OS_LDFLAGS@ $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
+jackd_LDADD = libjackserver.la $(CAP_LIBS) @OS_LDFLAGS@ $(top_builddir)/libjack/libjack.la $(BOOST_LIBS) $(BOOST_PROGRAM_OPTIONS_LIBS)
 
 noinst_HEADERS = jack_md5.hpp \
 	jack_options_parser.hpp \
