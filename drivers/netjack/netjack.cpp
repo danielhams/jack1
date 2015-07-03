@@ -405,7 +405,7 @@ void netjack_attach( netjack_driver_state_t *netj )
 	if( netj->bitdepth == CELT_MODE ) {
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7 || HAVE_CELT_API_0_8
-	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( netj->celt_mode, 1, NULL ) );
+	  netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create_custom( netj->celt_mode, 1, NULL ) );
 #else
 	    netj->capture_srcs = jack_slist_append(netj->capture_srcs, celt_decoder_create( netj->celt_mode ) );
 #endif
@@ -452,7 +452,7 @@ void netjack_attach( netjack_driver_state_t *netj )
 #if HAVE_CELT
 #if HAVE_CELT_API_0_7 || HAVE_CELT_API_0_8
 	    CELTMode *celt_mode = celt_mode_create( netj->sample_rate, netj->period_size, NULL );
-	    netj->playback_srcs = jack_slist_append(netj->playback_srcs, celt_encoder_create( celt_mode, 1, NULL ) );
+	    netj->playback_srcs = jack_slist_append(netj->playback_srcs, celt_encoder_create_custom( celt_mode, 1, NULL ) );
 #else
 	    CELTMode *celt_mode = celt_mode_create( netj->sample_rate, 1, netj->period_size, NULL );
 	    netj->playback_srcs = jack_slist_append(netj->playback_srcs, celt_encoder_create( celt_mode ) );
@@ -500,7 +500,7 @@ void netjack_detach( netjack_driver_state_t *netj )
 #if HAVE_CELT
         if( netj->bitdepth == CELT_MODE )
         {
-            CELTDecoder * decoder = node->data;
+	  CELTDecoder * decoder = (CELTDecoder*)node->data;
             celt_decoder_destroy(decoder);
         }
         else
@@ -527,7 +527,7 @@ void netjack_detach( netjack_driver_state_t *netj )
 #if HAVE_CELT
         if( netj->bitdepth == CELT_MODE )
         {
-            CELTEncoder * encoder = node->data;
+	  CELTEncoder * encoder = (CELTEncoder*)node->data;
             celt_encoder_destroy(encoder);
         }
         else
